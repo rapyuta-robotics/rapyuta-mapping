@@ -1,0 +1,20 @@
+<package>
+  <description brief="rm_openni2">
+
+     rm_openni2
+
+  </description>
+  <author>Vladyslav Usenko</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rm_openni2</url>
+  
+  <depend package="mk"/>
+
+  <export>
+    <cpp cflags="-I${prefix}/include"  lflags="-L${prefix}/lib"/>
+  </export>
+
+</package>
+
+
