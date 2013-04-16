@@ -1,0 +1,17 @@
+<package>
+  <description brief="rm_openni2_camera">
+
+     rm_openni2_camera
+
+  </description>
+  <author>Vladyslav Usenko</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rm_openni2_camera</url>
+  <depend package="roscpp"/>
+  <depend package="image_transport"/>
+  <depend package="rm_openni2"/>
+
+</package>
+
+
