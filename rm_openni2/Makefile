@@ -3,7 +3,7 @@ all: openni2
 GIT_DIR = openni2-git
 GIT_URL = https://github.com/OpenNI/OpenNI2.git 
 GIT_PATCH = disable_softfp_arm.patch
-GIT_REVISION = 2.1-Beta
+GIT_REVISION = develop
 
 include $(shell rospack find mk)/git_checkout.mk
 
