@@ -11,6 +11,8 @@
   <depend package="roscpp"/>
   <depend package="image_transport"/>
   <depend package="rm_openni2"/>
+  <depend package="camera_info_manager"/>
+  
 
 </package>
 

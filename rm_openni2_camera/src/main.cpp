@@ -1,79 +1,128 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/distortion_models.h>
 #include <image_transport/image_transport.h>
+#include <camera_info_manager/camera_info_manager.h>
 #include <OpenNI.h>
 #include <cstring>
 
 using namespace openni;
 
-class DepthCallback: public VideoStream::NewFrameListener {
+class FrameCallback: public VideoStream::NewFrameListener {
 public:
 
-	DepthCallback(image_transport::ImageTransport & it) {
-		pub = it.advertise("/camera/depth/image_raw", 1);
+	FrameCallback(ros::NodeHandle & nh, image_transport::ImageTransport & it,
+			const std::string & camera_name) :
+			cim(nh, camera_name, "file://${ROS_HOME}/camera_info/${NAME}.yaml"), info(
+					new sensor_msgs::CameraInfo), msg(new sensor_msgs::Image) {
+		pub = it.advertiseCamera("/" + camera_name + "/image_raw", 1);
+		counter = 0;
+		this->camera_name = camera_name;
+
+		if (cim.isCalibrated()) {
+			*info = cim.getCameraInfo();
+		} else {
+			if (camera_name == "depth") {
+				info = getDefaultCameraInfo(640, 480, 570.0);
+			} else {
+				info = getDefaultCameraInfo(640, 480, 525.0);
+			}
+		}
+
 	}
 
-	virtual ~DepthCallback() {
+	virtual ~FrameCallback() {
 	}
 
 	void onNewFrame(VideoStream& stream) {
 		stream.readFrame(&m_frame);
 
-		//std::cerr << m_frame.getVideoMode().getPixelFormat() << std::endl;
-
-		sensor_msgs::ImagePtr msg(new sensor_msgs::Image);
+		msg->header.frame_id = "camera_" + camera_name + "_optical_frame";
+		msg->header.stamp = ros::Time::now();
+		msg->header.seq = counter++;
 		msg->width = m_frame.getWidth();
 		msg->height = m_frame.getHeight();
 		msg->step = m_frame.getStrideInBytes();
-		msg->encoding = sensor_msgs::image_encodings::MONO16;
+
+		switch (m_frame.getVideoMode().getPixelFormat()) {
+
+		case PIXEL_FORMAT_DEPTH_1_MM:
+			msg->encoding = sensor_msgs::image_encodings::MONO16;
+			break;
+
+		case PIXEL_FORMAT_YUV422:
+			msg->encoding = sensor_msgs::image_encodings::YUV422;
+			break;
+
+		case PIXEL_FORMAT_RGB888:
+			msg->encoding = sensor_msgs::image_encodings::RGB8;
+			break;
+
+		default:
+			ROS_INFO("Unsupported encoding\n");
+			break;
+		}
+
 		msg->data.resize(m_frame.getDataSize());
 		memcpy(msg->data.data(), m_frame.getData(), m_frame.getDataSize());
 
-		pub.publish(msg);
+		info->header = msg->header;
+		pub.publish(msg, info);
+	}
+
+	sensor_msgs::CameraInfoPtr getDefaultCameraInfo(int width, int height,
+			double f) const {
+		sensor_msgs::CameraInfoPtr info = boost::make_shared<
+				sensor_msgs::CameraInfo>();
+
+		info->width = width;
+		info->height = height;
+
+		// No distortion
+		info->D.resize(5, 0.0);
+		info->distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+
+		// Simple camera matrix: square pixels (fx = fy), principal point at center
+		info->K.assign(0.0);
+		info->K[0] = info->K[4] = f;
+		info->K[2] = (width / 2) - 0.5;
+		// Aspect ratio for the camera center on Kinect (and other devices?) is 4/3
+		// This formula keeps the principal point the same in VGA and SXGA modes
+		info->K[5] = (width * (3. / 8.)) - 0.5;
+		info->K[8] = 1.0;
+
+		// No separate rectified image plane, so R = I
+		info->R.assign(0.0);
+		info->R[0] = info->R[4] = info->R[8] = 1.0;
+
+		// Then P=K(I|0) = (K|0)
+		info->P.assign(0.0);
+		info->P[0] = info->P[5] = f; // fx, fy
+		info->P[2] = info->K[2]; // cx
+		info->P[6] = info->K[5]; // cy
+		info->P[10] = 1.0;
+
+		return info;
 	}
 
 private:
 	VideoFrameRef m_frame;
-	image_transport::Publisher pub;
-};
+	image_transport::CameraPublisher pub;
+	camera_info_manager::CameraInfoManager cim;
 
-class RGBCallback: public VideoStream::NewFrameListener {
-public:
+	unsigned int counter;
+	std::string camera_name;
+	sensor_msgs::CameraInfoPtr info;
+	sensor_msgs::ImagePtr msg;
 
-	RGBCallback(image_transport::ImageTransport & it) {
-		pub = it.advertise("/camera/rgb/image_color", 1);
-	}
-
-	virtual ~RGBCallback() {
-	}
-
-	void onNewFrame(VideoStream& stream) {
-		stream.readFrame(&m_frame);
-
-		//std::cerr << m_frame.getVideoMode().getPixelFormat() << std::endl;
-
-		sensor_msgs::ImagePtr msg(new sensor_msgs::Image);
-		msg->width = m_frame.getWidth();
-		msg->height = m_frame.getHeight();
-		msg->step = m_frame.getStrideInBytes();
-		msg->encoding = sensor_msgs::image_encodings::RGB8;
-		msg->data.resize(m_frame.getDataSize());
-		memcpy(msg->data.data(), m_frame.getData(), m_frame.getDataSize());
-
-		pub.publish(msg);
-	}
-
-private:
-	VideoFrameRef m_frame;
-	image_transport::Publisher pub;
 };
 
 class OpenNI2Camera {
 public:
 
 	OpenNI2Camera(ros::NodeHandle & nh) :
-			it(nh), dc(it), rgbc(it) {
+			it(nh), dc(nh, it, "depth"), rgbc(nh, it, "rgb") {
 
 		Status rc = OpenNI::initialize();
 		if (rc != STATUS_OK) {
@@ -109,6 +158,18 @@ public:
 				printf("Couldn't create color stream\n%s\n",
 						OpenNI::getExtendedError());
 			}
+		}
+
+		rc = depth.setMirroringEnabled(false);
+		if (rc != STATUS_OK) {
+			printf("Couldn't disable mirroring for depth stream\n%s\n",
+					OpenNI::getExtendedError());
+		}
+
+		rc = color.setMirroringEnabled(false);
+		if (rc != STATUS_OK) {
+			printf("Couldn't disable mirroring for color stream\n%s\n",
+					OpenNI::getExtendedError());
 		}
 
 		VideoMode depth_video_mode, color_video_mode;
@@ -167,14 +228,14 @@ private:
 
 	image_transport::ImageTransport it;
 
-	DepthCallback dc;
-	RGBCallback rgbc;
+	FrameCallback dc;
+	FrameCallback rgbc;
 
 };
 
 int main(int argc, char** argv) {
 
-	ros::init(argc, argv, "openni2_camera");
+	ros::init(argc, argv, "camera");
 	ros::NodeHandle nh;
 
 	OpenNI2Camera pc(nh);
