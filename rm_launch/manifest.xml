@@ -1,0 +1,15 @@
+<package>
+  <description brief="rm_launch">
+
+     rm_launch
+
+  </description>
+  <author>Vladyslav Usenko</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rm_launch</url>
+  <depend package="rm_openni2_camera"/>
+
+</package>
+
+
