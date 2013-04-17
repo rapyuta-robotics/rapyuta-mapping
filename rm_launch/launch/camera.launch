@@ -6,7 +6,7 @@
 
   <node name="camera" pkg="rm_openni2_camera" type="camera" />
 
-  <include file="$(find openni_launch)/launch/kinect_frames.launch">
+  <include file="$(find rm_launch)/launch/kinect_frames.launch">
     <arg name="camera" value="$(arg camera)" />
   </include>
 
