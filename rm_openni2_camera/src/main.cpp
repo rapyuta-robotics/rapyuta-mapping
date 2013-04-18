@@ -16,7 +16,7 @@ public:
 			const std::string & camera_name) :
 			cim(nh, camera_name, "file://${ROS_HOME}/camera_info/${NAME}.yaml"), info(
 					new sensor_msgs::CameraInfo), msg(new sensor_msgs::Image) {
-		pub = it.advertiseCamera("/" + camera_name + "/image_raw", 1);
+		pub = it.advertiseCamera(camera_name + "/image_raw", 1);
 		counter = 0;
 		this->camera_name = camera_name;
 
