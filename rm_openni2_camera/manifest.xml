@@ -12,7 +12,11 @@
   <depend package="image_transport"/>
   <depend package="rm_openni2"/>
   <depend package="camera_info_manager"/>
+  <depend package="nodelet"/>
   
+  <export>
+  	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
+  </export>
 
 </package>
 

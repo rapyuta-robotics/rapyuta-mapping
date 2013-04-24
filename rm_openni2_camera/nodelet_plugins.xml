@@ -1,0 +1,7 @@
+<library path="lib/libOpenNI2CameraNodelet">
+  <class name="rm_openni2_camera/OpenNI2CameraNodelet" type="OpenNI2CameraNodelet" base_class_type="nodelet::Nodelet">
+  <description>
+  This is my nodelet.
+  </description>
+  </class>
+</library>

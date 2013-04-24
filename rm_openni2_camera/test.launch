@@ -1,0 +1,28 @@
+<launch>
+  <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
+  <node pkg="nodelet" type="nodelet" name="camera_nodelet" args="load rm_openni2_camera/OpenNI2CameraNodelet
+   standalone_nodelet" output="screen" />       
+   
+   
+  <node pkg="nodelet" type="nodelet" name="rgb_image" args="load image_view/image
+   standalone_nodelet" output="screen" >
+   		 <remap from="image" to="/rgb/image_raw"/>
+   		<param name="autosize" value="true"/>
+   </node>         
+   
+   
+   <node pkg="nodelet" type="nodelet" name="depth_converter" args="load depth_image_proc/convert_metric
+   standalone_nodelet" output="screen" >
+   		 <remap from="image_raw" to="/depth/image_raw"/>
+   		 <remap from="image" to="/depth/image"/>
+   		<param name="autosize" value="true"/>
+   </node>
+   
+   
+   
+  <node pkg="nodelet" type="nodelet" name="depth_image" args="load image_view/image
+   standalone_nodelet" output="screen" >
+   		 <remap from="image" to="/depth/image"/>
+   		<param name="autosize" value="true"/>
+   </node>        
+</launch>
