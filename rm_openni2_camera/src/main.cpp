@@ -12,12 +12,12 @@ using namespace openni;
 class FrameCallback: public VideoStream::NewFrameListener {
 public:
 
-	FrameCallback(ros::NodeHandle & nh, image_transport::ImageTransport & it,
-			const std::string & camera_name) :
-			cim(nh, camera_name, "file://${ROS_HOME}/camera_info/${NAME}.yaml"), info(
+	FrameCallback(ros::NodeHandle & nh, const std::string & camera_name) :
+			cam_nh(nh, camera_name), cam_it(cam_nh), cim(cam_nh, camera_name,
+					"file://${ROS_HOME}/camera_info/${NAME}.yaml"), info(
 					new sensor_msgs::CameraInfo), msg(new sensor_msgs::Image) {
-		pub = it.advertiseCamera(camera_name + "/image_raw", 1);
-		counter = 0;
+
+		pub = cam_it.advertiseCamera("image_raw", 1);
 		this->camera_name = camera_name;
 
 		if (cim.isCalibrated()) {
@@ -38,9 +38,9 @@ public:
 	void onNewFrame(VideoStream& stream) {
 		stream.readFrame(&m_frame);
 
-		msg->header.frame_id = "camera_" + camera_name + "_optical_frame";
+		msg->header.frame_id = "/camera_" + camera_name + "_optical_frame";
 		msg->header.stamp = ros::Time::now();
-		msg->header.seq = counter++;
+		msg->header.seq = m_frame.getFrameIndex();
 		msg->width = m_frame.getWidth();
 		msg->height = m_frame.getHeight();
 		msg->step = m_frame.getStrideInBytes();
@@ -48,7 +48,7 @@ public:
 		switch (m_frame.getVideoMode().getPixelFormat()) {
 
 		case PIXEL_FORMAT_DEPTH_1_MM:
-			msg->encoding = sensor_msgs::image_encodings::MONO16;
+			msg->encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 			break;
 
 		case PIXEL_FORMAT_YUV422:
@@ -107,11 +107,12 @@ public:
 	}
 
 private:
-	VideoFrameRef m_frame;
-	image_transport::CameraPublisher pub;
+	ros::NodeHandle cam_nh;
+	image_transport::ImageTransport cam_it;
 	camera_info_manager::CameraInfoManager cim;
+	image_transport::CameraPublisher pub;
+	VideoFrameRef m_frame;
 
-	unsigned int counter;
 	std::string camera_name;
 	sensor_msgs::CameraInfoPtr info;
 	sensor_msgs::ImagePtr msg;
@@ -121,8 +122,7 @@ private:
 class OpenNI2Camera {
 public:
 
-	OpenNI2Camera(ros::NodeHandle & nh) :
-			it(nh), dc(nh, it, "depth"), rgbc(nh, it, "rgb") {
+	OpenNI2Camera(ros::NodeHandle & nh) {
 
 		Status rc = OpenNI::initialize();
 		if (rc != STATUS_OK) {
@@ -179,7 +179,7 @@ public:
 		depth_video_mode.setResolution(640, 480);
 
 		color_video_mode.setFps(30);
-		color_video_mode.setPixelFormat(PIXEL_FORMAT_RGB888);
+		color_video_mode.setPixelFormat(PIXEL_FORMAT_YUV422);
 		color_video_mode.setResolution(640, 480);
 
 		rc = depth.setVideoMode(depth_video_mode);
@@ -206,9 +206,12 @@ public:
 					OpenNI::getExtendedError());
 		}
 
+		dc.reset(new FrameCallback(nh, "depth"));
+		rgbc.reset(new FrameCallback(nh, "rgb"));
+
 		// Register to new frame
-		depth.addNewFrameListener(&dc);
-		color.addNewFrameListener(&rgbc);
+		depth.addNewFrameListener(dc.get());
+		color.addNewFrameListener(rgbc.get());
 
 	}
 
@@ -226,10 +229,7 @@ private:
 	VideoStream depth, color;
 	Device device;
 
-	image_transport::ImageTransport it;
-
-	FrameCallback dc;
-	FrameCallback rgbc;
+	boost::shared_ptr<FrameCallback> dc, rgbc;
 
 };
 

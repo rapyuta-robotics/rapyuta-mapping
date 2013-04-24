@@ -3,7 +3,7 @@
          
  <!-- Parameters -->
   <arg name="manager_name" default="rgbd_manager"/>
-  <arg name="calib_path" default="$(find ccny_rgbd)/data/calibration_openni_default"/> 
+  <arg name="calib_path" default="$(find ccny_rgbd_data)/calibration_openni_default"/> 
   <arg name="unwarp" default="false"/> 
   <arg name="scale" default="1.0"/> 
   <arg name="publish_cloud" default="true"/>
@@ -15,7 +15,7 @@
 
 
   <node pkg="nodelet" type="nodelet" name="rgbd_image_proc"
-        args="load ccny_rgbd/RGBDImageProcNodelet $(arg manager_name) _image_transport:=theora"
+        args="load ccny_rgbd/RGBDImageProcNodelet $(arg manager_name)"
         output="screen">
     
     <!-- Resample by a factor of 2-->
@@ -27,8 +27,11 @@
 
     <remap from="/camera/rgb/image_color"   to="/rgb/image_raw"/>
     <remap from="/camera/depth/image_raw"   to="/depth/image_raw"/>
+    <remap from="/camera/rgb/image_color/compressed"   to="/rgb/image_raw/compressed"/>
+    <remap from="/camera/depth/image_raw/compressedDepth"   to="/depth/image_raw/compressedDepth"/>
     <remap from="/camera/rgb/camera_info"   to="/rgb/camera_info"/>
     <remap from="/camera/depth/camera_info" to="/depth/camera_info"/>
+
 
 
   </node> 
