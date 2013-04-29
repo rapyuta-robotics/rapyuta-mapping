@@ -63,7 +63,7 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh) {
 	depth_video_mode.setResolution(640, 480);
 
 	color_video_mode.setFps(30);
-	color_video_mode.setPixelFormat(PIXEL_FORMAT_YUV422);
+	color_video_mode.setPixelFormat(PIXEL_FORMAT_RGB888);
 	color_video_mode.setResolution(640, 480);
 
 	rc = depth.setVideoMode(depth_video_mode);
@@ -88,6 +88,13 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh) {
 	if (rc != STATUS_OK) {
 		printf("Couldn't start the color stream\n%s\n",
 				OpenNI::getExtendedError());
+	}
+
+	rc = device.setImageRegistrationMode(IMAGE_REGISTRATION_DEPTH_TO_COLOR);
+	if (rc != STATUS_OK) {
+		printf("Couldn't enable depth and color images registration\n%s\n",
+				OpenNI::getExtendedError());
+		exit(2);
 	}
 
 	dc.reset(new FrameCallback(nh, "depth"));

@@ -2,27 +2,58 @@
   <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager" output="screen"/>
   <node pkg="nodelet" type="nodelet" name="camera_nodelet" args="load rm_openni2_camera/OpenNI2CameraNodelet
    standalone_nodelet" output="screen" />       
-   
-   
+      
+  
+  <node pkg="nodelet" type="nodelet" name="rgbd_image_proc"
+        args="load ccny_rgbd/RGBDImageProcNodelet standalone_nodelet"
+        output="screen">
+    
+    <!-- Resample by a factor of 2-->
+    <param name="scale" value="1.0"/>
+    <param name="unwarp" value="false"/>
+    <param name="publish_cloud" value="true"/>
+    <param name="calib_path" value="$(find ccny_rgbd)/data/calibration_openni_default"/>
+    <param name="verbose" value="false"/>
+
+    <remap from="/camera/rgb/image_color"   to="/rgb/image_raw"/>
+    <remap from="/camera/depth/image_raw"   to="/depth/image_raw"/>
+    <remap from="/camera/rgb/image_color/compressed"   to="/rgb/image_raw/compressed"/>
+    <remap from="/camera/depth/image_raw/compressedDepth"   to="/depth/image_raw/compressedDepth"/>
+    <remap from="/camera/rgb/camera_info"   to="/rgb/camera_info"/>
+    <remap from="/camera/depth/camera_info" to="/depth/camera_info"/>
+
+  </node> 
+  
+  <!-- static transforms -->
+  <arg name="pi/2" value="1.5707963267948966" />
+  <arg name="optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
+        
+  <node pkg="tf" type="static_transform_publisher" name="camera_rgb_frame_tf"
+        args="0 -0.045 0 0 0 0  /camera_link /camera_rgb_frame 40" />        
+
+  <node pkg="tf" type="static_transform_publisher" name="camera_rgb_optical_frame_tf"
+        args="$(arg optical_rotate) /camera_rgb_frame /camera_rgb_optical_frame 40" />
+  
+  
+ <!-- 
+  
+  <node pkg="nodelet" type="nodelet" name="depth_converter" args="load depth_image_proc/convert_metric
+   standalone_nodelet" output="screen" >
+   		 <remap from="image_raw" to="/rgbd/depth"/>
+   		 <remap from="image" to="/rgbd/depth_metric"/>
+   		<param name="autosize" value="true"/>
+   </node>
+  
   <node pkg="nodelet" type="nodelet" name="rgb_image" args="load image_view/image
    standalone_nodelet" output="screen" >
-   		 <remap from="image" to="/rgb/image_raw"/>
-   		<param name="autosize" value="true"/>
-   </node>         
-   
-   
-   <node pkg="nodelet" type="nodelet" name="depth_converter" args="load depth_image_proc/convert_metric
-   standalone_nodelet" output="screen" >
-   		 <remap from="image_raw" to="/depth/image_raw"/>
-   		 <remap from="image" to="/depth/image"/>
+   		 <remap from="image" to="/rgbd/rgb"/>
    		<param name="autosize" value="true"/>
    </node>
    
-   
-   
   <node pkg="nodelet" type="nodelet" name="depth_image" args="load image_view/image
    standalone_nodelet" output="screen" >
-   		 <remap from="image" to="/depth/image"/>
+   		 <remap from="image" to="/rgbd/depth_metric"/>
    		<param name="autosize" value="true"/>
-   </node>        
+   </node>
+   -->    
 </launch>

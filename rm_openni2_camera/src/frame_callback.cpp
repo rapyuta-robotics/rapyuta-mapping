@@ -29,7 +29,7 @@ void FrameCallback::onNewFrame(VideoStream& stream) {
 
 	msg.reset(new sensor_msgs::Image);
 
-	msg->header.frame_id = "/camera_" + camera_name + "_optical_frame";
+	msg->header.frame_id = "/camera_rgb_optical_frame";
 	msg->header.stamp = ros::Time::now();
 	msg->header.seq = m_frame.getFrameIndex();
 	msg->width = m_frame.getWidth();
