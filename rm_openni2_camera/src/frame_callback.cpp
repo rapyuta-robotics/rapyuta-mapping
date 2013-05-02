@@ -6,6 +6,7 @@ FrameCallback::FrameCallback(ros::NodeHandle & nh,
 				"file://${ROS_HOME}/camera_info/${NAME}.yaml"), info(
 				new sensor_msgs::CameraInfo) {
 
+	ROS_INFO("Creating callback for camera %s", camera_name.c_str());
 	pub = cam_it.advertiseCamera("image_raw", 1);
 	this->camera_name = camera_name;
 
@@ -22,12 +23,15 @@ FrameCallback::FrameCallback(ros::NodeHandle & nh,
 }
 
 FrameCallback::~FrameCallback() {
+	ROS_INFO("Desroying callback for camera %s", this->camera_name.c_str());
 }
 
 void FrameCallback::onNewFrame(VideoStream& stream) {
+	ROS_INFO("Recieved Message");
 	stream.readFrame(&m_frame);
 
 	if (m_frame.getFrameIndex() % 2 == 0) return;
+	ROS_INFO("Sending Message");
 
 	msg.reset(new sensor_msgs::Image);
 
