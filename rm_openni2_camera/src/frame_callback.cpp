@@ -27,6 +27,8 @@ FrameCallback::~FrameCallback() {
 void FrameCallback::onNewFrame(VideoStream& stream) {
 	stream.readFrame(&m_frame);
 
+	if (m_frame.getFrameIndex() % 2 == 0) return;
+
 	msg.reset(new sensor_msgs::Image);
 
 	msg->header.frame_id = "/camera_rgb_optical_frame";
