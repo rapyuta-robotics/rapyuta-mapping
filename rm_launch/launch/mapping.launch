@@ -16,8 +16,8 @@
   <node pkg="ccny_rgbd" type="keyframe_mapper_node" name="keyframe_mapper_node" 
     output="screen">
  
-    <remap from="/rgbd/depth" to="/depth/image_raw"/>
-    <remap from="/rgbd/rgb"   to="/rgb/image_raw"/>
+    <remap from="/rgbd/depth" to="/depth/image_decompressed"/>
+    <remap from="/rgbd/rgb"   to="/rgb/image_decompressed"/>
     <remap from="/rgbd/info"  to="/rgb/camera_info"/>
     
     
