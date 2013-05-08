@@ -13,11 +13,11 @@ FrameCallback::FrameCallback(ros::NodeHandle & nh,
 	if (cim.isCalibrated()) {
 		*info = cim.getCameraInfo();
 	} else {
-		if (camera_name == "depth") {
-			info = getDefaultCameraInfo(640, 480, 570.0);
-		} else {
-			info = getDefaultCameraInfo(640, 480, 525.0);
-		}
+		//if (camera_name == "depth") {
+		//	info = getDefaultCameraInfo(640, 480, 570.0);
+		//} else {
+			info = getDefaultCameraInfo(640/2, 480/2, 525.0/2);
+		//}
 	}
 
 }
@@ -27,11 +27,8 @@ FrameCallback::~FrameCallback() {
 }
 
 void FrameCallback::onNewFrame(VideoStream& stream) {
-	ROS_INFO("Recieved Message");
 	stream.readFrame(&m_frame);
 
-	if (m_frame.getFrameIndex() % 2 == 0) return;
-	ROS_INFO("Sending Message");
 
 	msg.reset(new sensor_msgs::Image);
 

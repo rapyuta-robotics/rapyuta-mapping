@@ -58,13 +58,13 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh) {
 
 	VideoMode depth_video_mode, color_video_mode;
 
-	depth_video_mode.setFps(25);
+	depth_video_mode.setFps(30);
 	depth_video_mode.setPixelFormat(PIXEL_FORMAT_DEPTH_1_MM);
-	depth_video_mode.setResolution(640, 480);
+	depth_video_mode.setResolution(320, 240);
 
-	color_video_mode.setFps(25);
+	color_video_mode.setFps(30);
 	color_video_mode.setPixelFormat(PIXEL_FORMAT_RGB888);
-	color_video_mode.setResolution(640, 480);
+	color_video_mode.setResolution(320, 240);
 
 	rc = depth.setVideoMode(depth_video_mode);
 	if (rc != STATUS_OK) {
