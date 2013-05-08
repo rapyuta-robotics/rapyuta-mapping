@@ -1,0 +1,15 @@
+<!-- RGB-D Visual odometry -->
+
+<launch>
+
+  <node pkg="image_transport" type="republish" name="rgb_decompression" 
+    args="compressed in:=/rgbd/rgb raw out:=/rgbd/rgb" />
+    
+
+  <node pkg="image_transport" type="republish" name="depth_decompression" 
+    args="compressedDepth in:=/rgbd/depth raw out:=/rgbd/depth" />
+
+
+
+</launch>
+
