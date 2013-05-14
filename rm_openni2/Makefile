@@ -3,7 +3,7 @@ all: openni2
 GIT_DIR = openni2-git
 GIT_URL = https://github.com/OpenNI/OpenNI2.git 
 GIT_PATCH = disable_softfp_arm.patch
-GIT_REVISION = develop
+GIT_REVISION = 1e5dc11fb88408dd41fea3f5887679a96b0fe97c
 
 include $(shell rospack find mk)/git_checkout.mk
 
@@ -13,6 +13,8 @@ openni2: $(SVN_DIR) patched
 	cp $(GIT_DIR)/Bin/*-Release/libOpenNI2.so lib/
 	cp -r $(GIT_DIR)/Bin/*-Release/OpenNI2 lib/
 	cp -r $(GIT_DIR)/Include/* include/
+	cp -r $(GIT_DIR)/Include/* include/
+	cp $(GIT_DIR)/Config/OpenNI2/Drivers/PS1080.ini lib/OpenNI2/Drivers/PS1080.ini
 	touch openni2
 
 clean:
