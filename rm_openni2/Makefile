@@ -14,7 +14,7 @@ openni2: $(SVN_DIR) patched
 	cp -r $(GIT_DIR)/Bin/*-Release/OpenNI2 lib/
 	cp -r $(GIT_DIR)/Include/* include/
 	cp -r $(GIT_DIR)/Config/OpenNI.ini lib/
-	cp $(GIT_DIR)/Config/OpenNI2/Drivers/PS1080.ini lib/OpenNI2/Drivers/PS1080.ini
+	cp PS1080.ini lib/OpenNI2/Drivers/PS1080.ini
 	touch openni2
 
 clean:
