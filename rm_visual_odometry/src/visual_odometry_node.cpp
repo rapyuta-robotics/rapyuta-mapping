@@ -25,6 +25,9 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <ros/ros.h>
+#include <tbb/concurrent_queue.h>
+#include <boost/thread.hpp>
+#include <std_msgs/String.h>
 
 #define SAMPLE_READ_WAIT_TIMEOUT 2000 //2000ms
 using namespace openni;
@@ -32,7 +35,10 @@ using namespace openni;
 class VisualOdometry {
 
 public:
-	VisualOdometry() {
+	VisualOdometry(ros::NodeHandle & nh) {
+
+		pub = nh.advertise<std_msgs::String>("/test", 2);
+		msg.reset(new std_msgs::String);
 
 		Status rc = OpenNI::initialize();
 		if (rc != STATUS_OK) {
@@ -43,6 +49,13 @@ public:
 		rc = device.open(ANY_DEVICE);
 		if (rc != STATUS_OK) {
 			ROS_ERROR("Couldn't open device\n%s\n", OpenNI::getExtendedError());
+			exit(1);
+		}
+
+		rc = device.setDepthColorSyncEnabled(true);
+		if (rc != STATUS_OK) {
+			ROS_ERROR("Couldn't set depth color syncronization\n%s\n",
+					OpenNI::getExtendedError());
 			exit(1);
 		}
 
@@ -101,30 +114,43 @@ public:
 		switch (readyStream) {
 		case 0:
 			// Depth
-			depth.readFrame(&color_frame);
+			depth.readFrame(&depth_frame);
+			//cv::Mat(depth_frame.getHeight(), depth_frame.getWidth(),
+			//		CV_16UC1, (void *) depth_frame.getData());
+
+			ROS_INFO("Depth index: %d Time: %ld", depth_frame.getFrameIndex(),
+					depth_frame.getTimestamp());
 			break;
 		case 1:
 			// Color
-			color.readFrame(&depth_frame);
+			color.readFrame(&color_frame);
+			yuv_img = cv::Mat(color_frame.getHeight(), color_frame.getWidth(),
+					CV_8UC2, (void *) color_frame.getData());
+
+			cv::cvtColor(yuv_img, gray_img, CV_YUV2GRAY_UYVY);
+			cv::GaussianBlur(gray_img, gray_img, cv::Size(3,3), 0);
+			processColorFrame(gray_img);
+			ROS_INFO("Color index: %d Time: %ld", color_frame.getFrameIndex(),
+					color_frame.getTimestamp());
 			break;
 		default:
 			ROS_ERROR("Unxpected stream\n");
 		}
 
-		if(color_frame.isValid() && depth_frame.isValid()){
-			ROS_INFO("Color index: %d Depth index: %d", color_frame.getFrameIndex(), depth_frame.getFrameIndex());
-		}
+	}
 
-		/*if(color_frame.isValid() && depth_frame.isValid() && color_frame.getFrameIndex() == depth_frame.getFrameIndex()) {
-			cv::Mat color_img(color_frame.getHeight(), color_frame.getWidth(), CV_8UC2,(void *) color_frame.getData());
-			cv::Mat depth_img(depth_frame.getHeight(), depth_frame.getWidth(), CV_16UC1,(void *) depth_frame.getData());
-			cv::Mat gray_img;
+	void processColorFrame(const cv::Mat & gray_img) {
+		std::vector<cv::KeyPoint> keypoints;
+		cv::Mat descriptors;
+		brisk(gray_img, cv::noArray(), keypoints, descriptors);
 
-			cv::cvtColor(color_img, depth_img, CV_YUV2GRAY_UYVY);
-			cv::imshow("Color Image", gray_img);
-			cv::imshow("Depth Image", depth_img);
-			cv::waitKey(2);
-		}*/
+		pub.publish(msg);
+
+		//cv::drawKeypoints(gray_img, keypoints, keypoints_img, cv::Scalar(0, 255, 0),
+		//		cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+		//cv::imshow("Keypoints", keypoints_img);
+		//cv::waitKey(2);
+		ROS_INFO("Number of keypoints: %d", keypoints.size());
 
 	}
 
@@ -134,15 +160,27 @@ private:
 	VideoStream * streams[2];
 	VideoFrameRef color_frame, depth_frame;
 
+	cv::Mat yuv_img;
+	cv::Mat gray_img;
+	cv::Mat keypoints_img;
+
+	cv::BRISK brisk;
+
+	ros::Publisher pub;
+	std_msgs::StringPtr msg;
+
 };
 
 int main(int argc, char** argv) {
 	ros::init(argc, argv, "camera");
 
-	VisualOdometry vo;
+	ros::NodeHandle nh;
+
+	VisualOdometry vo(nh);
 
 	while (ros::ok()) {
 		vo.readFrame();
+		cv::waitKey(2);
 		ros::spinOnce();
 	}
 

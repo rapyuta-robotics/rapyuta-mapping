@@ -30,4 +30,4 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #target_link_libraries(example ${PROJECT_NAME})
 
 rosbuild_add_executable(visual_odometry_node src/visual_odometry_node.cpp)
-target_link_libraries(visual_odometry_node OpenNI2)
+target_link_libraries(visual_odometry_node OpenNI2 tbb)
