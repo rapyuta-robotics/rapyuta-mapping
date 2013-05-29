@@ -32,11 +32,42 @@
 #define SAMPLE_READ_WAIT_TIMEOUT 2000 //2000ms
 using namespace openni;
 
+class DynamicBRISK: public cv::BRISK {
+
+public:
+	DynamicBRISK(int init_threshold, int num_points) :
+			BRISK(init_threshold, 0) {
+		this->num_points = num_points;
+	}
+
+	void operator()(cv::InputArray image, cv::InputArray mask,
+			std::vector<cv::KeyPoint>& keypoints, cv::OutputArray descriptors,
+			bool useProvidedKeypoints = false) {
+		BRISK::operator()(image, mask, keypoints, descriptors,
+				useProvidedKeypoints);
+		if (keypoints.size() > num_points) {
+			threshold++;
+		}
+
+		if (keypoints.size() < num_points) {
+			threshold--;
+		}
+	}
+
+	int getThreshold(){
+		return threshold;
+	}
+
+private:
+	int num_points;
+
+};
+
 class VisualOdometry {
 
 public:
 	VisualOdometry(ros::NodeHandle & nh) :
-			brisk(30, 0), matcher(cv::NORM_HAMMING, true) {
+			brisk(30, 100), matcher(cv::NORM_HAMMING, true) {
 
 		pub = nh.advertise<std_msgs::String>("/test", 2);
 		msg.reset(new std_msgs::String);
@@ -152,6 +183,9 @@ public:
 
 		brisk(gray_img, cv::noArray(), *keypoints, descriptors);
 
+		ROS_INFO("Number of keypoints: %d, Threshold %d", keypoints->size(),
+				brisk.getThreshold());
+
 		if (prev_keypoints) {
 
 			std::vector<cv::DMatch> matches;
@@ -166,7 +200,6 @@ public:
 			//cv::imshow("Keypoints", keypoints_img);
 			//cv::waitKey(2);
 		}
-		ROS_INFO("Number of keypoints: %d", keypoints->size());
 
 	}
 
@@ -184,7 +217,7 @@ private:
 
 	cv::Mat keypoints_img;
 
-	cv::BRISK brisk;
+	DynamicBRISK brisk;
 	cv::BFMatcher matcher;
 
 	ros::Publisher pub;
