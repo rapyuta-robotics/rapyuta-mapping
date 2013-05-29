@@ -35,7 +35,8 @@ using namespace openni;
 class VisualOdometry {
 
 public:
-	VisualOdometry(ros::NodeHandle & nh) {
+	VisualOdometry(ros::NodeHandle & nh) :
+			brisk(30, 0), matcher(cv::NORM_HAMMING, true) {
 
 		pub = nh.advertise<std_msgs::String>("/test", 2);
 		msg.reset(new std_msgs::String);
@@ -111,6 +112,7 @@ public:
 			return;
 		}
 
+		cv::Mat img;
 		switch (readyStream) {
 		case 0:
 			// Depth
@@ -124,12 +126,10 @@ public:
 		case 1:
 			// Color
 			color.readFrame(&color_frame);
-			yuv_img = cv::Mat(color_frame.getHeight(), color_frame.getWidth(),
+			img = cv::Mat(color_frame.getHeight(), color_frame.getWidth(),
 					CV_8UC2, (void *) color_frame.getData());
 
-			cv::cvtColor(yuv_img, gray_img, CV_YUV2GRAY_UYVY);
-			cv::GaussianBlur(gray_img, gray_img, cv::Size(3,3), 0);
-			processColorFrame(gray_img);
+			processColorFrame(img);
 			ROS_INFO("Color index: %d Time: %ld", color_frame.getFrameIndex(),
 					color_frame.getTimestamp());
 			break;
@@ -139,18 +139,34 @@ public:
 
 	}
 
-	void processColorFrame(const cv::Mat & gray_img) {
-		std::vector<cv::KeyPoint> keypoints;
-		cv::Mat descriptors;
-		brisk(gray_img, cv::noArray(), keypoints, descriptors);
+	void processColorFrame(const cv::Mat & img) {
 
-		pub.publish(msg);
+		prev_gray_img = gray_img;
+		prev_keypoints = keypoints;
+		prev_descriptors = descriptors;
 
-		//cv::drawKeypoints(gray_img, keypoints, keypoints_img, cv::Scalar(0, 255, 0),
-		//		cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-		//cv::imshow("Keypoints", keypoints_img);
-		//cv::waitKey(2);
-		ROS_INFO("Number of keypoints: %d", keypoints.size());
+		keypoints.reset(new std::vector<cv::KeyPoint>);
+
+		cv::cvtColor(img, gray_img, CV_YUV2GRAY_UYVY);
+		cv::GaussianBlur(gray_img, gray_img, cv::Size(3, 3), 0);
+
+		brisk(gray_img, cv::noArray(), *keypoints, descriptors);
+
+		if (prev_keypoints) {
+
+			std::vector<cv::DMatch> matches;
+			matcher.match(prev_descriptors, descriptors, matches);
+
+			pub.publish(msg);
+
+			//cv::drawKeypoints(gray_img, keypoints, keypoints_img, cv::Scalar(0, 255, 0),
+			//		cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+			//cv::drawMatches(prev_gray_img, *prev_keypoints, gray_img,
+			//		*keypoints, matches, keypoints_img);
+			//cv::imshow("Keypoints", keypoints_img);
+			//cv::waitKey(2);
+		}
+		ROS_INFO("Number of keypoints: %d", keypoints->size());
 
 	}
 
@@ -161,10 +177,15 @@ private:
 	VideoFrameRef color_frame, depth_frame;
 
 	cv::Mat yuv_img;
-	cv::Mat gray_img;
+
+	cv::Mat gray_img, prev_gray_img;
+	boost::shared_ptr<std::vector<cv::KeyPoint> > keypoints, prev_keypoints;
+	cv::Mat descriptors, prev_descriptors;
+
 	cv::Mat keypoints_img;
 
 	cv::BRISK brisk;
+	cv::BFMatcher matcher;
 
 	ros::Publisher pub;
 	std_msgs::StringPtr msg;
