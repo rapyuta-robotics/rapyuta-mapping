@@ -14,6 +14,8 @@
 #include <sensor_msgs/distortion_models.h>
 #include <image_transport/image_transport.h>
 #include <camera_info_manager/camera_info_manager.h>
+#include <tf/transform_listener.h>
+#include <tf/tf.h>
 #include <OpenNI.h>
 
 using namespace openni;
@@ -21,7 +23,7 @@ using namespace openni;
 class FrameCallback: public VideoStream::NewFrameListener {
 public:
 
-	FrameCallback(ros::NodeHandle & nh, const std::string & camera_name);
+	FrameCallback(ros::NodeHandle & nh, ros::NodeHandle & nh_private, const std::string & camera_name);
 	virtual ~FrameCallback();
 	void onNewFrame(VideoStream& stream);
 
@@ -39,6 +41,8 @@ private:
 	std::string camera_name;
 	sensor_msgs::CameraInfoPtr info;
 	sensor_msgs::ImagePtr msg;
+
+	std::string frame;
 
 };
 

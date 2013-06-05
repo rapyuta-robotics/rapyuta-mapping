@@ -1,6 +1,6 @@
 #include <frame_callback.h>
 
-FrameCallback::FrameCallback(ros::NodeHandle & nh,
+FrameCallback::FrameCallback(ros::NodeHandle & nh, ros::NodeHandle & nh_private,
 		const std::string & camera_name) :
 		cam_nh(nh, camera_name), cam_it(cam_nh), cim(cam_nh, camera_name,
 				"file://${ROS_HOME}/camera_info/${NAME}.yaml"), info(
@@ -10,13 +10,23 @@ FrameCallback::FrameCallback(ros::NodeHandle & nh,
 	pub = cam_it.advertiseCamera("image_raw", 1);
 	this->camera_name = camera_name;
 
+	frame = "camera_rgb_optical_frame";
+
+	std::string tf_prefix_ = tf::getPrefixParam(nh_private);
+
+	ROS_INFO("Tf preffix %s", tf_prefix_.c_str());
+
+	frame = tf::resolve(tf_prefix_, frame);
+
+	ROS_INFO("Frame name %s", frame.c_str());
+
 	if (cim.isCalibrated()) {
 		*info = cim.getCameraInfo();
 	} else {
 		//if (camera_name == "depth") {
 		//	info = getDefaultCameraInfo(640, 480, 570.0);
 		//} else {
-			info = getDefaultCameraInfo(640/2, 480/2, 525.0/2);
+			info = getDefaultCameraInfo(640/1, 480/1, 525.0/1);
 		//}
 	}
 
@@ -32,7 +42,7 @@ void FrameCallback::onNewFrame(VideoStream& stream) {
 
 	msg.reset(new sensor_msgs::Image);
 
-	msg->header.frame_id = "/camera_rgb_optical_frame";
+	msg->header.frame_id = frame;
 	msg->header.stamp = ros::Time::now();
 	msg->header.seq = m_frame.getFrameIndex();
 	msg->width = m_frame.getWidth();

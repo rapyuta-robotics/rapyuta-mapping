@@ -7,7 +7,7 @@
 
 #include <openni2_camera.h>
 
-OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh) {
+OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private) {
 
 	Status rc = OpenNI::initialize();
 	if (rc != STATUS_OK) {
@@ -60,11 +60,11 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh) {
 
 	depth_video_mode.setFps(30);
 	depth_video_mode.setPixelFormat(PIXEL_FORMAT_DEPTH_1_MM);
-	depth_video_mode.setResolution(320, 240);
+	depth_video_mode.setResolution(640, 480);
 
 	color_video_mode.setFps(30);
 	color_video_mode.setPixelFormat(PIXEL_FORMAT_RGB888);
-	color_video_mode.setResolution(320, 240);
+	color_video_mode.setResolution(640, 480);
 
 	rc = depth.setVideoMode(depth_video_mode);
 	if (rc != STATUS_OK) {
@@ -97,8 +97,8 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh) {
 		exit(2);
 	}
 
-	dc.reset(new FrameCallback(nh, "depth"));
-	rgbc.reset(new FrameCallback(nh, "rgb"));
+	dc.reset(new FrameCallback(nh, nh_private, "depth"));
+	rgbc.reset(new FrameCallback(nh, nh_private, "rgb"));
 
 	// Register to new frame
 	ROS_INFO("Registering callbacks");

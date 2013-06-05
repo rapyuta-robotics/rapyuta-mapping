@@ -22,7 +22,7 @@ using namespace openni;
 class OpenNI2Camera {
 public:
 
-	OpenNI2Camera(ros::NodeHandle & nh);
+	OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private);
 	virtual ~OpenNI2Camera();
 
 private:

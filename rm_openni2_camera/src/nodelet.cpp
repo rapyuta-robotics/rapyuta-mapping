@@ -7,13 +7,14 @@
 class OpenNI2CameraNodelet: public nodelet::Nodelet {
 public:
 	virtual void onInit() {
-		nh = getMTNodeHandle();
-		pc.reset(new OpenNI2Camera(nh));
+		nh = getNodeHandle();
+		nh_private = getPrivateNodeHandle();
+		pc.reset(new OpenNI2Camera(nh, nh_private));
 
 	}
 
 private:
-	ros::NodeHandle nh;
+	ros::NodeHandle nh, nh_private;
 	boost::shared_ptr<OpenNI2Camera> pc;
 
 };

@@ -13,6 +13,7 @@
   <depend package="rm_openni2"/>
   <depend package="camera_info_manager"/>
   <depend package="nodelet"/>
+  <depend package="tf"/>
   
   <export>
   	<nodelet plugin="${prefix}/nodelet_plugins.xml" />
