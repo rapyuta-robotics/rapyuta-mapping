@@ -13,7 +13,7 @@
 
   #### KEYFRAME MAPPING ###################################
 
-  <node pkg="ccny_rgbd" type="keyframe_mapper_node" name="keyframe_mapper_node" 
+  <node pkg="ccny_rgbd" type="keyframe_multi_mapper_node" name="keyframe_multi_mapper_node" 
     output="screen">
  
     <remap from="/rgbd/depth/compressedDepth" to="/keyframes/depth/compressedDepth"/>

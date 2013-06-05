@@ -1,0 +1,16 @@
+<launch>
+
+
+<arg name="tf_prefix" default="$(env HOSTNAME)" />
+
+
+  <group ns="$(arg tf_prefix)">
+
+  <node pkg="create_node" type="turtlebot_node.py" name="turtlebot_node" respawn="true" args="--respawnable">
+    <param name="has_gyro" value="false" />
+    <param name="update_rate" value="30.0" />
+    <param name="port" value="/dev/ttySAC1" />
+  </node>
+  </group>
+
+</launch>
