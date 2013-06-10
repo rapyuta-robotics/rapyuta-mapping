@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import cv2, numpy as np
 import itertools
 rgbg = cv2.imread("../rgbd_dataset_freiburg1_desk/rgb/1305031453.359684.png")
@@ -14,11 +16,8 @@ keypoints = surfDetector.detect(rgb, (depth != 0).view(np.uint8))
 (keypoints, descriptors) = surfDescriptorExtractor.compute(rgb, keypoints)
 
 
-samples = np.array(descriptors)
-responses = np.arange(len(keypoints),dtype = np.float32)
-
-knn = cv2.KNearest()
-knn.train(samples,responses)
+flann_params = dict(algorithm=1, trees=4)
+flann = cv2.flann_Index(descriptors, flann_params)
 
 cam = np.identity(4)
 K = np.array([[525.0, 0, 319.5], [0, 525.0, 239.5], [0, 0, 1]])
@@ -27,28 +26,20 @@ rgb2 = cv2.cvtColor(rgb2g, cv2.COLOR_BGR2GRAY)
 keypoints2 = surfDetector.detect(rgb2, (depth2 != 0).view(np.uint8))
 (keypoints2, descriptors2) = surfDescriptorExtractor.compute(rgb2, keypoints2)
 
-for h,des in enumerate(descriptors2):
-    des = np.array(des,np.float32).reshape((1,128))
-    retval, results, neigh_resp, dists = knn.find_nearest(des,1)
-    res,dist =  int(results[0][0]),dists[0][0]
-    print res, dist
-    if dist<0.2: # draw matched keypoints in red color
-        color = (0,0,255)
-    else:  # draw unmatched in blue color
-        
-        color = (255,0,0)
+idx, dist = flann.knnSearch(descriptors2, 1, params={})
 
-    #Draw matched key points on original image
-    x,y = keypoints[res].pt
-    center = (int(x),int(y))
-    cv2.circle(rgbg,center,2,color,-1)
+im_k = cv2.drawKeypoints(rgbg, keypoints)
+im2_k = cv2.drawKeypoints(rgb2g, keypoints2)
 
-    #Draw matched key points on template image
-    x,y = keypoints2[h].pt
-    center = (int(x),int(y))
-    cv2.circle(rgb2g,center,2,color,-1)
+im_keypoints = np.hstack([im_k, im2_k]).copy()
 
-cv2.imshow('img',rgbg)
-cv2.imshow('tm',rgb2g)
+for i in range(len(idx)):
+	p1 = keypoints[idx[i]].pt
+	p1 = (int(p1[0]), int(p1[1]))
+	p2 = keypoints2[i].pt
+	p2 = (int(p2[0]+640), int(p2[1]))
+	cv2.line(im_keypoints, p1, p2, (0, 255, 0))
+
+cv2.imshow('img',im_keypoints)
 cv2.waitKey(0)
-cv2.destroyAllWindows()
+
