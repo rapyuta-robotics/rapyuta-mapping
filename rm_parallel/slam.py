@@ -4,110 +4,167 @@ import cv2, numpy as np
 import itertools
 import random as rnd
 
-def rigid_transform_3D(A, B):
-    assert len(A) == len(B)
+# Flann index types. Should be in cv2, but currently they are not there
+FLANN_INDEX_KDTREE = 1  
+FLANN_INDEX_LSH    = 6
 
-    N = A.shape[0]; # total points
-
-    centroid_A = mean(A, axis=0)
-    centroid_B = mean(B, axis=0)
-    
-    # centre the points
-    AA = A - tile(centroid_A, (N, 1))
-    BB = B - tile(centroid_B, (N, 1))
-
-    # dot is matrix multiplication for array
-    H = transpose(AA) * BB
-
-    U, S, Vt = linalg.svd(H)
-
-    R = Vt.T * U.T
-
-    # special reflection case
-    if linalg.det(R) < 0:
-       print "Reflection detected"
-       Vt[2,:] *= -1
-       R = Vt.T * U.T
-
-    t = -R*centroid_A.T + centroid_B.T
-
-    print t
-
-    return R, t
-
-
+# Initial camera transformation
 cam = np.identity(4)
+
+# Intrinsic parameters of the camera
 K = np.array([[525.0, 0, 319.5], [0, 525.0, 239.5], [0, 0, 1]])
 K_inv = np.linalg.inv(K)
 
-
-rgbg = cv2.imread("../rgbd_dataset_freiburg1_desk/rgb/1305031453.359684.png")
-depth = cv2.imread("../rgbd_dataset_freiburg1_desk/depth/1305031453.374112.png", cv2.CV_LOAD_IMAGE_UNCHANGED)
-rgb2g = cv2.imread("../rgbd_dataset_freiburg1_desk/rgb/1305031453.391690.png")
-depth2 = cv2.imread("../rgbd_dataset_freiburg1_desk/depth/1305031453.404816.png", cv2.CV_LOAD_IMAGE_UNCHANGED)
-
-rgb = cv2.cvtColor(rgbg, cv2.COLOR_BGR2GRAY)
-
+# Keypoint detector and extractor
 surfDetector = cv2.FeatureDetector_create("SURF")
-surfDetector.setInt('hessianThreshold', 2000)
+surfDetector.setInt('hessianThreshold', 1000)
 surfDetector.setBool('extended', True)
 surfDetector.setBool('upright', True)
 
 surfDescriptorExtractor = cv2.DescriptorExtractor_create("SURF")
 
-keypoints = surfDetector.detect(rgb, (depth != 0).view(np.uint8))
-(keypoints, descriptors) = surfDescriptorExtractor.compute(rgb, keypoints)
 
-keypoints3d = np.empty((3,len(keypoints)), dtype=np.float32)
-for i in range(len(keypoints)):
-    p = keypoints[i].pt
-    d = depth[int(p[1]), int(p[0])]/5000.0
-    keypoints3d[0,i] = p[0]*d
-    keypoints3d[1,i] = p[1]*d
-    keypoints3d[2,i] = d
+# Computes 2d features, their 3d positions and descriptors
+def compute_features(rgb, depth):
+	gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
 
-keypoints3d = np.dot(K_inv, keypoints3d)
+	keypoints = surfDetector.detect(gray, (depth != 0).view(np.uint8))
+	keypoints, descriptors = surfDescriptorExtractor.compute(gray, keypoints)
+
+	keypoints3d = np.empty((4,len(keypoints)), dtype=np.float64)
+	for i in range(len(keypoints)):
+		p = keypoints[i].pt
+		d = depth[int(p[1]), int(p[0])]/5000.0
+		keypoints3d[0,i] = p[0]*d
+		keypoints3d[1,i] = p[1]*d
+		keypoints3d[2,i] = d
+		keypoints3d[3,i] = 1
+
+	keypoints3d[0:3,:] = np.dot(K_inv, keypoints3d[0:3,:])
+
+	return keypoints, keypoints3d, descriptors
+
+# Estimates transform between src and dst points.
+# The algorithm is based on:
+# "Least-squares estimation of transformation parameters between two point patterns",
+# Shinji Umeyama, PAMI 1991, DOI: 10.1109/34.88573
+def umeyama(src, dst):
+	assert src.shape == dst.shape
+
+	m = src.shape[0]
+	n = src.shape[1]
+	one_over_n = 1.0/n
+
+	# compute mean
+	src_mean = np.sum(src, axis=1) * one_over_n
+	dst_mean = np.sum(dst, axis=1) * one_over_n
+
+	# demean
+	src_demean = src - src_mean[:,np.newaxis]
+	dst_demean = dst - dst_mean[:,np.newaxis]
 
 
+	# Eq. (36)-(37)
+	src_var = np.sum(src_demean**2) * one_over_n
+
+	# Eq. (38)
+	sigma = one_over_n * np.dot(dst_demean, src_demean.T);
+
+	U, d, Vt = np.linalg.svd(sigma)
+
+	# Initialize the resulting transformation with an identity matrix...
+	Rt = np.eye(m+1)
+
+	# Eq. (39)
+	S = np.ones(m);
+	if np.linalg.det(sigma) < 0:
+		S[m-1] = -1;
+	
+	# Eq. (40) and (43)
+	rank = 0
+	for i in range(m):
+		if d[i] > 1e-12*d[0]:
+			rank +=1
+
+	if rank == m-1:
+		if np.linalg.det(U) * np.linalg.det(Vt.T) > 0:
+			Rt[0:m,0:m] = np.dot(U, Vt)
+		else:
+			s = S[m-1]
+			S[m-1] = -1
+			Rt[0:m,0:m] =  np.dot(np.dot(U, np.diag(S)), Vt)
+			S[m-1] = s
+	else:
+		Rt[0:m,0:m] =  np.dot(np.dot(U, np.diag(S)), Vt)
+	
+	# Eq. (42)
+	c = 1.0/src_var * np.dot(d, S);
+
+	# Eq. (41)
+	Rt[0:m,m] = dst_mean
+	Rt[0:m,m] -= c*np.dot(Rt[0:m,0:m], src_mean)
+
+	return Rt
 
 
-flann_params = dict(algorithm=1, trees=4)
-flann = cv2.flann_Index(descriptors, flann_params)
+def estimate_transform_ransac(src, dst, num_iter, distance2_threshold):
+	assert src.shape == dst.shape
+	
+	max_num_inliers = 0
+	inliers = None
+
+	for i in range(num_iter):
+		# Select 3 random points
+		idx = np.random.permutation(src.shape[1])[0:3]
+		# Compute transformation using these 3 points
+		Rt = umeyama(src[0:3,idx], dst[0:3,idx])
+		# Transform src using computed transformation
+		src_transformed = np.dot(Rt, src)
+		# Compute number of inliers
+		dist2 = np.sum((dst -  src_transformed)**2, axis=0)
+		num_inliers = np.count_nonzero(dist2 < distance2_threshold)
+		if max_num_inliers < num_inliers:
+			max_num_inliers = num_inliers
+			inliers =  np.nonzero(dist2 < distance2_threshold)[0]
+	
+	# Reestimate transformations using all inliers
+	Rt = umeyama(src[0:3,inliers], dst[0:3,inliers])
+	return Rt, inliers
+		
+	
 
 
-rgb2 = cv2.cvtColor(rgb2g, cv2.COLOR_BGR2GRAY)
-keypoints2 = surfDetector.detect(rgb2, (depth2 != 0).view(np.uint8))
-(keypoints2, descriptors2) = surfDescriptorExtractor.compute(rgb2, keypoints2)
+rgb1 = cv2.imread("../rgbd_dataset_freiburg1_desk/rgb/1305031453.359684.png")
+depth1 = cv2.imread("../rgbd_dataset_freiburg1_desk/depth/1305031453.374112.png", cv2.CV_LOAD_IMAGE_UNCHANGED)
+rgb2 = cv2.imread("../rgbd_dataset_freiburg1_desk/rgb/1305031453.391690.png")
+depth2 = cv2.imread("../rgbd_dataset_freiburg1_desk/depth/1305031453.404816.png", cv2.CV_LOAD_IMAGE_UNCHANGED)
 
-B = np.empty((3,len(keypoints2)), dtype=np.float32)
-for i in range(len(keypoints2)):
-    p = keypoints2[i].pt
-    d = depth[int(p[1]), int(p[0])]/5000.0
-    B[0,i] = p[0]*d
-    B[1,i] = p[1]*d
-    B[2,i] = d
 
-B = np.dot(K_inv, B)
+keypoints1, keypoints3d1, descriptors1 =  compute_features(rgb1, depth1)
+keypoints2, keypoints3d2, descriptors2 =  compute_features(rgb2, depth2)
 
+# Match keypoints
+flann_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+flann = cv2.flann_Index(descriptors1, flann_params)
 idx, dist = flann.knnSearch(descriptors2, 1, params={})
 
-iter_count = 20
-#for i in xrange(iter_count):
-random_idx = rnd.sample(xrange(len(keypoints)), 3)
+# 3d coordinates of matched points.
+matched_keypoints3d1 = keypoints3d1[:,idx[:,0]]
 
-#A3 = [A[:,i] for i in random_idx]
-#B3 = [B[:,i] for i in random_idx]
 
-#ret_R, ret_t = rigid_transform_3D(A, B)
+# Estimate transform using ransac
+Rt, inliers = estimate_transform_ransac(matched_keypoints3d1, keypoints3d2, 100, 0.03**2)
 
-im_k = cv2.drawKeypoints(rgbg, keypoints)
-im2_k = cv2.drawKeypoints(rgb2g, keypoints2)
+print 'Transformation:\n', Rt
+print 'Number of inliers: ', inliers.shape[0]
+
+im_k = cv2.drawKeypoints(rgb1, keypoints1)
+im2_k = cv2.drawKeypoints(rgb2, keypoints2)
 
 im_keypoints = np.hstack([im_k, im2_k]).copy()
 
-
-for i in range(len(idx)):
-    p1 = keypoints[idx[i]].pt
+for i in inliers:
+    p1 = keypoints1[idx[i]].pt
     p1 = (int(p1[0]), int(p1[1]))
     p2 = keypoints2[i].pt
     p2 = (int(p2[0]+640), int(p2[1]))
