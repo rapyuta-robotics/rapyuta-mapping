@@ -17,6 +17,10 @@ depth2 = cv2.imread("../rgbd_dataset_freiburg1_desk/depth/1305031453.404816.png"
 rgb = cv2.cvtColor(rgbg, cv2.COLOR_BGR2GRAY)
 
 surfDetector = cv2.FeatureDetector_create("SURF")
+surfDetector.setInt('hessianThreshold', 2000)
+surfDetector.setBool('extended', True)
+surfDetector.setBool('upright', True)
+
 surfDescriptorExtractor = cv2.DescriptorExtractor_create("SURF")
 
 keypoints = surfDetector.detect(rgb, (depth != 0).view(np.uint8))
@@ -47,6 +51,7 @@ im_k = cv2.drawKeypoints(rgbg, keypoints)
 im2_k = cv2.drawKeypoints(rgb2g, keypoints2)
 
 im_keypoints = np.hstack([im_k, im2_k]).copy()
+
 
 for i in range(len(idx)):
 	p1 = keypoints[idx[i]].pt
