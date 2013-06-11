@@ -211,7 +211,7 @@ for line in f:
 
 truth = sorted(truth)
 
-truth_start_idx = find_best_start(rgb_files[sequence[0][0]][0], truth)
+truth_start_idx = find_best_start(rgb_files[sequence[0][0]][0]/100, truth)
 
 camera_positions.append(quat2R(truth[truth_start_idx[1]]))
 
@@ -239,7 +239,7 @@ for seq in range(FRAME_COUNT):
 
     # Estimate transform using ransac
     Rt, inliers = estimate_transform_ransac(matched_keypoints3d1, keypoints3d2, 200, 0.01**2)
-    camera_positions.append(np.dot(Rt,camera_positions[-1]))
+    camera_positions.append(np.dot(Rt,camera_positions[0]))
         
     outliers = np.setdiff1d(np.arange(len(keypoints2)), inliers)
     
