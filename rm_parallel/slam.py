@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # Flann index types. Should be in cv2, but currently they are not there
 FLANN_INDEX_KDTREE = 1  
 FLANN_INDEX_LSH    = 6
-
+FRAME_COUNT = 25
 # Necessary Paths
 DEPTH_FOLDER = "../rgbd_dataset_freiburg1_desk/depth"
 RGB_FOLDER = "../rgbd_dataset_freiburg1_desk/rgb"
@@ -51,7 +51,7 @@ def find_sequence(depth_files, rgb_files):
     rgb_idx = 0
     depth_idx = 0
     while True:
-        if rgb_idx == len(rgb_files)-1 or depth_idx == len(depth_files)-1:
+        if rgb_idx >= len(rgb_files)-1 or depth_idx >= len(depth_files)-1:
             break
 
         diff_rgbs_depth, idx_rgbs_depth = find_best_start(rgb_files[rgb_idx][0], depth_files[depth_idx:])
@@ -188,7 +188,7 @@ keypoints1, keypoints3d1, descriptors1 =  compute_features(rgb1, depth1)
 
 observation = []
 
-for seq in range(50):
+for seq in range(FRAME_COUNT):
     print seq
     rgb2 = cv2.imread(join(RGB_FOLDER, rgb_files[sequence[seq+1][0]][1]))
     depth2 = cv2.imread(join(DEPTH_FOLDER, depth_files[sequence[seq+1][1]][1]), cv2.CV_LOAD_IMAGE_UNCHANGED)
@@ -244,35 +244,57 @@ cv2.waitKey(0)
 
 
 f = open("../rgbd_dataset_freiburg1_desk/groundtruth.txt")
-tx1 = []
-ty1 = []
-tz1 = []
+truth = []
 
 for line in f:
     k = line.split()
-    tx1.append(float(k[1]))
-    ty1.append(float(k[2]))
-    tz1.append(float(k[3]))
+    truth.append((int(k[0].replace(".","")), float(k[1]), float(k[2]), 
+                float(k[3])))
 
-plt.plot(range(50), tx1[:50],'b.')
-plt.plot(range(50), ty1[:50],'b-')
-plt.plot(range(50), tz1[:50],'b+')
+truth = sorted(truth)
+estimate = []
+for pos in range(len(camera_positions)):
+    estimate.append((rgb_files[sequence[pos][0]][0]/100, 
+                    float(camera_positions[pos][0,3]), 
+                    float(camera_positions[pos][1,3]), 
+                    float(camera_positions[pos][2,3])))
+
+estimate = sorted(estimate)
+seq2 = find_sequence(truth, estimate)
+
+tx1 = []
+ty1 = []
+tz1 = []
 
 tx2 = []
 ty2 = []
 tz2 = []
 
+for i in seq2:
+    tx1.append(estimate[i[0]][1])
+    ty1.append(estimate[i[0]][2])
+    tz1.append(estimate[i[0]][3])
+    tx2.append(truth[i[1]][1])
+    ty2.append(truth[i[1]][2])
+    tz2.append(truth[i[1]][3])
+
+
+plt.plot(range(FRAME_COUNT), tx1[:FRAME_COUNT],'b.')
+plt.plot(range(FRAME_COUNT), ty1[:FRAME_COUNT],'bo')
+plt.plot(range(FRAME_COUNT), tz1[:FRAME_COUNT],'b+')
+
+
+'''
 # Plot camera positions in 3d
-for r in range(len(camera_positions)):
-    tx2.append(camera_positions[r][0,3])
-    ty2.append(camera_positions[r][1,3])
-    tz2.append(camera_positions[r][2,3])
-    '''mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,0], r[1,0], r[2,0], color=(1,0,0), mode='2ddash', scale_factor=0.1)
+for r in camera_positions:
+    mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,0], r[1,0], r[2,0], color=(1,0,0), mode='2ddash', scale_factor=0.1)
     mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,1], r[1,1], r[2,1], color=(0,1,0), mode='2ddash', scale_factor=0.1)
     mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,2], r[1,2], r[2,2], color=(0,0,1), mode='2ddash', scale_factor=0.1)'''
-plt.plot(range(50), tx2[:50],'r.')
-plt.plot(range(50), ty2[:50],'r-')
-plt.plot(range(50), tz2[:50],'r+')
+
+plt.plot(range(FRAME_COUNT), tx2[:FRAME_COUNT],'r.')
+plt.plot(range(FRAME_COUNT), ty2[:FRAME_COUNT],'ro')
+plt.plot(range(FRAME_COUNT), tz2[:FRAME_COUNT],'r+')
 
 #mlab.show()
+plt.axis([0,25,-0.25,2])
 plt.show()
