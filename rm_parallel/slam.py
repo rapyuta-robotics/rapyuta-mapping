@@ -5,6 +5,7 @@ import numpy as np
 from mayavi import mlab
 from os import listdir
 from os.path import isfile, join, splitext
+import matplotlib.pyplot as plt
 
 # Flann index types. Should be in cv2, but currently they are not there
 FLANN_INDEX_KDTREE = 1  
@@ -187,7 +188,7 @@ keypoints1, keypoints3d1, descriptors1 =  compute_features(rgb1, depth1)
 
 observation = []
 
-for seq in range(len(sequence)-1):
+for seq in range(50):
     print seq
     rgb2 = cv2.imread(join(RGB_FOLDER, rgb_files[sequence[seq+1][0]][1]))
     depth2 = cv2.imread(join(DEPTH_FOLDER, depth_files[sequence[seq+1][1]][1]), cv2.CV_LOAD_IMAGE_UNCHANGED)
@@ -204,7 +205,7 @@ for seq in range(len(sequence)-1):
 
 
     # Estimate transform using ransac
-    Rt, inliers = estimate_transform_ransac(matched_keypoints3d1, keypoints3d2, 100, 0.03**2)
+    Rt, inliers = estimate_transform_ransac(matched_keypoints3d1, keypoints3d2, 200, 0.01**2)
     camera_positions.append(np.dot(Rt,camera_positions[-1]))
         
     outliers = np.setdiff1d(np.arange(len(keypoints2)), inliers)
@@ -236,16 +237,42 @@ for i in inliers:
 
 cv2.imshow('img',im_keypoints)
 cv2.waitKey(0)
-
+'''
 
 # Plot keypoints in 3d
-mlab.points3d(keypoints3d1[0],keypoints3d1[1], keypoints3d1[2], mode='point', color=(1,1,1))
+#mlab.points3d(keypoints3d1[0],keypoints3d1[1], keypoints3d1[2], mode='point', color=(1,1,1))
+
+
+f = open("../rgbd_dataset_freiburg1_desk/groundtruth.txt")
+tx1 = []
+ty1 = []
+tz1 = []
+
+for line in f:
+    k = line.split()
+    tx1.append(float(k[1]))
+    ty1.append(float(k[2]))
+    tz1.append(float(k[3]))
+
+plt.plot(range(50), tx1[:50],'b.')
+plt.plot(range(50), ty1[:50],'b-')
+plt.plot(range(50), tz1[:50],'b+')
+
+tx2 = []
+ty2 = []
+tz2 = []
 
 # Plot camera positions in 3d
-for r in camera_positions:
-    mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,0], r[1,0], r[2,0], color=(1,0,0), mode='2ddash', scale_factor=0.1)
+for r in range(len(camera_positions)):
+    tx2.append(camera_positions[r][0,3])
+    ty2.append(camera_positions[r][1,3])
+    tz2.append(camera_positions[r][2,3])
+    '''mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,0], r[1,0], r[2,0], color=(1,0,0), mode='2ddash', scale_factor=0.1)
     mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,1], r[1,1], r[2,1], color=(0,1,0), mode='2ddash', scale_factor=0.1)
-    mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,2], r[1,2], r[2,2], color=(0,0,1), mode='2ddash', scale_factor=0.1)
+    mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,2], r[1,2], r[2,2], color=(0,0,1), mode='2ddash', scale_factor=0.1)'''
+plt.plot(range(50), tx2[:50],'r.')
+plt.plot(range(50), ty2[:50],'r-')
+plt.plot(range(50), tz2[:50],'r+')
 
-mlab.show()
-'''
+#mlab.show()
+plt.show()
