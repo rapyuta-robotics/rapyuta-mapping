@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-import cv2, numpy as np
-import itertools
-import random as rnd
+import cv2
+import numpy as np
+from mayavi import mlab
 
 # Flann index types. Should be in cv2, but currently they are not there
 FLANN_INDEX_KDTREE = 1  
 FLANN_INDEX_LSH    = 6
 
 # Initial camera transformation
-cam = np.identity(4)
+camera_positions = [np.eye(4)]
 
 # Intrinsic parameters of the camera
 K = np.array([[525.0, 0, 319.5], [0, 525.0, 239.5], [0, 0, 1]])
@@ -17,7 +17,7 @@ K_inv = np.linalg.inv(K)
 
 # Keypoint detector and extractor
 surfDetector = cv2.FeatureDetector_create("SURF")
-surfDetector.setInt('hessianThreshold', 1000)
+surfDetector.setInt('hessianThreshold', 400)
 surfDetector.setBool('extended', True)
 surfDetector.setBool('upright', True)
 
@@ -154,6 +154,7 @@ matched_keypoints3d1 = keypoints3d1[:,idx[:,0]]
 
 # Estimate transform using ransac
 Rt, inliers = estimate_transform_ransac(matched_keypoints3d1, keypoints3d2, 100, 0.03**2)
+camera_positions.append(Rt)
 
 print 'Transformation:\n', Rt
 print 'Number of inliers: ', inliers.shape[0]
@@ -173,4 +174,16 @@ for i in inliers:
 
 cv2.imshow('img',im_keypoints)
 cv2.waitKey(0)
+
+
+# Plot keypoints in 3d
+mlab.points3d(keypoints3d1[0],keypoints3d1[1], keypoints3d1[2], mode='point', color=(1,1,1))
+
+# Plot camera positions in 3d
+for r in camera_positions:
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,0], r[1,0], r[2,0], color=(1,0,0), mode='2ddash', scale_factor=0.1)
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,1], r[1,1], r[2,1], color=(0,1,0), mode='2ddash', scale_factor=0.1)
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,2], r[1,2], r[2,2], color=(0,0,1), mode='2ddash', scale_factor=0.1)
+
+mlab.show()
 
