@@ -11,12 +11,13 @@ import matplotlib.pyplot as plt
 FLANN_INDEX_KDTREE = 1  
 FLANN_INDEX_LSH    = 6
 FRAME_COUNT = 25
+
 # Necessary Paths
 DEPTH_FOLDER = "../rgbd_dataset_freiburg1_desk/depth"
 RGB_FOLDER = "../rgbd_dataset_freiburg1_desk/rgb"
 
 # Initial camera transformation
-camera_positions = [np.eye(4)]
+camera_positions = []
 
 # Intrinsic parameters of the camera
 K = np.array([[525.0, 0, 319.5], [0, 525.0, 239.5], [0, 0, 1]])
@@ -31,6 +32,23 @@ surfDetector.setBool('upright', True)
 surfDescriptorExtractor = cv2.DescriptorExtractor_create("SURF")
 
 
+# quaternion to Rotation matrix
+def quat2R(tq):
+    Rt = np.eye(4)
+    Rt[0,0] = 1 - 2*tq[5]*tq[5] - 2*tq[6]*tq[6]
+    Rt[0,1] = 2*(tq[4]*tq[5] - tq[6]*tq[7])
+    Rt[0,2] = 2*(tq[4]*tq[6] + tq[5]*tq[7])
+    Rt[1,0] = 2*(tq[4]*tq[5] + tq[6]*tq[7])
+    Rt[1,1] = 1 - 2*tq[4]*tq[4] - 2*tq[6]*tq[6]
+    Rt[1,2] = 2*(tq[5]*tq[6] - tq[4]*tq[7])
+    Rt[2,0] = 2*(tq[4]*tq[6] - tq[5]*tq[7])
+    Rt[2,1] = 2*(tq[4]*tq[7] + tq[5]*tq[6])
+    Rt[2,2] = 1 - 2*tq[4]*tq[4] - 2*tq[5]*tq[5]
+    Rt[0,3] = tq[1]
+    Rt[1,3] = tq[2]
+    Rt[2,3] = tq[3]
+    return Rt
+    
 # Search nearest index(difference in timestamps) to a starting point in 
 # the scan list
 def find_best_start(starting_point, scan_list):
@@ -182,6 +200,21 @@ rgb_files = sorted([ (int(splitext(f)[0].replace(".","")), f) for f in listdir(R
 
 sequence = find_sequence(depth_files, rgb_files)
 
+f = open("../rgbd_dataset_freiburg1_desk/groundtruth.txt")
+truth = []
+
+for line in f:
+    k = line.split()
+    truth.append((int(k[0].replace(".","")), float(k[1]), float(k[2]), 
+                float(k[3]), float(k[4]), float(k[5]), float(k[6]), 
+                float(k[7])))
+
+truth = sorted(truth)
+
+truth_start_idx = find_best_start(rgb_files[sequence[0][0]][0], truth)
+
+camera_positions.append(quat2R(truth[truth_start_idx[1]]))
+
 rgb1 = cv2.imread(join(RGB_FOLDER, rgb_files[sequence[0][0]][1]))
 depth1 = cv2.imread(join(DEPTH_FOLDER, depth_files[sequence[0][1]][1]), cv2.CV_LOAD_IMAGE_UNCHANGED)
 keypoints1, keypoints3d1, descriptors1 =  compute_features(rgb1, depth1)
@@ -243,15 +276,6 @@ cv2.waitKey(0)
 #mlab.points3d(keypoints3d1[0],keypoints3d1[1], keypoints3d1[2], mode='point', color=(1,1,1))
 
 
-f = open("../rgbd_dataset_freiburg1_desk/groundtruth.txt")
-truth = []
-
-for line in f:
-    k = line.split()
-    truth.append((int(k[0].replace(".","")), float(k[1]), float(k[2]), 
-                float(k[3])))
-
-truth = sorted(truth)
 estimate = []
 for pos in range(len(camera_positions)):
     estimate.append((rgb_files[sequence[pos][0]][0]/100, 
@@ -296,5 +320,5 @@ plt.plot(range(FRAME_COUNT), ty2[:FRAME_COUNT],'ro')
 plt.plot(range(FRAME_COUNT), tz2[:FRAME_COUNT],'r+')
 
 #mlab.show()
-plt.axis([0,25,-0.25,2])
+plt.axis([-1,25,-0.25,2])
 plt.show()
