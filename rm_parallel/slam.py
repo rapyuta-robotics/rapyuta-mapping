@@ -6,6 +6,8 @@ from mayavi import mlab
 from os import listdir
 from os.path import isfile, join, splitext
 import matplotlib.pyplot as plt
+import tf
+import sys
 
 # Flann index types. Should be in cv2, but currently they are not there
 FLANN_INDEX_KDTREE = 1  
@@ -13,8 +15,9 @@ FLANN_INDEX_LSH    = 6
 FRAME_COUNT = 25
 
 # Necessary Paths
-DEPTH_FOLDER = "../rgbd_dataset_freiburg1_desk/depth"
-RGB_FOLDER = "../rgbd_dataset_freiburg1_desk/rgb"
+DATASET_FOLDER = "../rgbd_dataset_freiburg1_desk"
+
+image_list_dtype =  [('timestamp', float), ('filename', 'S20')]
 
 # Initial camera transformation
 camera_positions = []
@@ -30,60 +33,6 @@ surfDetector.setBool('extended', True)
 surfDetector.setBool('upright', True)
 
 surfDescriptorExtractor = cv2.DescriptorExtractor_create("SURF")
-
-
-# quaternion to Rotation matrix
-def quat2R(tq):
-    Rt = np.eye(4)
-    Rt[0,0] = 1 - 2*tq[5]*tq[5] - 2*tq[6]*tq[6]
-    Rt[0,1] = 2*(tq[4]*tq[5] - tq[6]*tq[7])
-    Rt[0,2] = 2*(tq[4]*tq[6] + tq[5]*tq[7])
-    Rt[1,0] = 2*(tq[4]*tq[5] + tq[6]*tq[7])
-    Rt[1,1] = 1 - 2*tq[4]*tq[4] - 2*tq[6]*tq[6]
-    Rt[1,2] = 2*(tq[5]*tq[6] - tq[4]*tq[7])
-    Rt[2,0] = 2*(tq[4]*tq[6] - tq[5]*tq[7])
-    Rt[2,1] = 2*(tq[4]*tq[7] + tq[5]*tq[6])
-    Rt[2,2] = 1 - 2*tq[4]*tq[4] - 2*tq[5]*tq[5]
-    Rt[0,3] = tq[1]
-    Rt[1,3] = tq[2]
-    Rt[2,3] = tq[3]
-    return Rt
-    
-# Search nearest index(difference in timestamps) to a starting point in 
-# the scan list
-def find_best_start(starting_point, scan_list):
-    difference = float('inf')
-    best = 0
-    for i in range(len(scan_list)):
-        if difference > abs(starting_point - scan_list[i][0]):
-            difference = abs(starting_point - scan_list[i][0])
-            best = i
-        if difference < abs(starting_point - scan_list[i][0]):
-            break
-    return difference, best
-
-
-# Find Matches between depth and rgb images based on timestamps
-def find_sequence(depth_files, rgb_files):
-    Matches = []
-    rgb_idx = 0
-    depth_idx = 0
-    while True:
-        if rgb_idx >= len(rgb_files)-1 or depth_idx >= len(depth_files)-1:
-            break
-
-        diff_rgbs_depth, idx_rgbs_depth = find_best_start(rgb_files[rgb_idx][0], depth_files[depth_idx:])
-        diff_depths_rgb, idx_depths_rgb = find_best_start(depth_files[depth_idx][0], rgb_files[rgb_idx:])
-
-        if diff_rgbs_depth > diff_depths_rgb:
-            rgb_idx += idx_depths_rgb
-            Matches.append((rgb_idx, depth_idx))
-        else:
-            depth_idx += idx_rgbs_depth
-            Matches.append((rgb_idx, depth_idx))
-        rgb_idx += 1
-        depth_idx += 1
-    return Matches
 
 
 # Computes 2d features, their 3d positions and descriptors
@@ -192,133 +141,134 @@ def estimate_transform_ransac(src, dst, num_iter, distance2_threshold):
     
     # Reestimate transformations using all inliers
     Rt = umeyama(src[0:3,inliers], dst[0:3,inliers])
+    print 'Finished ransac with', max_num_inliers, 'inliers'
     return Rt, inliers
-        
+
+
+def read_image_list(filename):
+	f = open(filename)
+	fl = []
+	for line in f:
+		if line[0] == '#':
+			continue
+		timestamp, filename = line.split()
+		fl.append((float(timestamp), filename))
+	return np.array(fl, dtype=[('timestamp', float), ('filename', 'S30')])
+	
+def read_ground_truth(filename):
+	f = open(filename)
+	fl = []
+	for line in f:
+		if line[0] == '#':
+			continue
+		fl.append([float(x) for x in line.split()])
+	return np.array(fl, dtype=np.float64).T
+	
+def find_closest_idx(array, timestamp):
+	idx = np.searchsorted(array, timestamp)
+	if abs(array[idx] - timestamp) < abs(array[idx-1] - timestamp):
+		return idx
+	else:
+		return idx-1
+
+# read list of files and ground truth
+rgb_image_list = read_image_list(join(DATASET_FOLDER, 'rgb.txt'))
+depth_image_list = read_image_list(join(DATASET_FOLDER, 'depth.txt'))
+ground_truth = read_ground_truth(join(DATASET_FOLDER, 'groundtruth.txt'))
+
+
+rgb_list_item = rgb_image_list[0]
+rgb = cv2.imread(join(DATASET_FOLDER, rgb_list_item['filename']))
+
+depth_idx = find_closest_idx(depth_image_list['timestamp'], rgb_list_item['timestamp'])
+depth_list_item = depth_image_list[depth_idx]
+depth = cv2.imread(join(DATASET_FOLDER, depth_list_item['filename']), cv2.CV_LOAD_IMAGE_UNCHANGED)
+
+ground_truth_idx = find_closest_idx(ground_truth[0], rgb_list_item['timestamp'])
+ground_truth_item = ground_truth[:,ground_truth_idx]
+
+camera_positions = []
+camera_positions.append(ground_truth[:,ground_truth_idx])
+Mwc = tf.transformations.quaternion_matrix(ground_truth_item[4:8])
+Mwc[0:3,3] = ground_truth_item[1:4]
+
+accumulated_keypoints, accumulated_keypoints3d, accumulated_descriptors = compute_features(rgb, depth)
+accumulated_keypoints3d = np.dot(Mwc, accumulated_keypoints3d)
+
+observations = []
+
+for rgb_list_item in rgb_image_list[1:100:3]:
+	rgb = cv2.imread(join(DATASET_FOLDER, rgb_list_item['filename']))
+
+	depth_idx = find_closest_idx(depth_image_list['timestamp'], rgb_list_item['timestamp'])
+	depth_list_item = depth_image_list[depth_idx]
+	depth = cv2.imread(join(DATASET_FOLDER, depth_list_item['filename']), cv2.CV_LOAD_IMAGE_UNCHANGED)
+	
+	keypoints, keypoints3d, descriptors = compute_features(rgb, depth)
+	
+	# Match keypoints
+	flann_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+	flann = cv2.flann_Index(accumulated_descriptors, flann_params)
+	idx, dist = flann.knnSearch(descriptors, 1, params={})
+
+	# 3d coordinates of matched points.
+	matched_accumulated_keypoints3d = accumulated_keypoints3d[:,idx[:,0]]
+
+	# Estimate transform using ransac
+	Mwc, inliers = estimate_transform_ransac(keypoints3d, matched_accumulated_keypoints3d, 200, 0.01**2)
     
-depth_files = sorted([ (int(splitext(f)[0].replace(".","")), f) for f in listdir(DEPTH_FOLDER) if isfile(join(DEPTH_FOLDER,f)) ])
-rgb_files = sorted([ (int(splitext(f)[0].replace(".","")), f) for f in listdir(RGB_FOLDER) if isfile(join(RGB_FOLDER,f)) ])
+	outliers = np.setdiff1d(np.arange(len(keypoints)), inliers)
 
-sequence = find_sequence(depth_files, rgb_files)
+	num_accumulated_keypoints = accumulated_keypoints3d.shape[1]
 
-f = open("../rgbd_dataset_freiburg1_desk/groundtruth.txt")
-truth = []
+	accumulated_descriptors = np.vstack([accumulated_descriptors, descriptors[outliers]])
+	accumulated_keypoints3d = np.hstack([accumulated_keypoints3d, np.dot(Mwc, keypoints3d[:,outliers])])
 
-for line in f:
-    k = line.split()
-    truth.append((int(k[0].replace(".","")), float(k[1]), float(k[2]), 
-                float(k[3]), float(k[4]), float(k[5]), float(k[6]), 
-                float(k[7])))
+	cam_idx = len(camera_positions)
+	for i in range(outliers.shape[0]):
+		observations.append((cam_idx, num_accumulated_keypoints+i, keypoints[outliers[i]].pt))
 
-truth = sorted(truth)
-
-truth_start_idx = find_best_start(rgb_files[sequence[0][0]][0]/100, truth)
-
-camera_positions.append(quat2R(truth[truth_start_idx[1]]))
-
-rgb1 = cv2.imread(join(RGB_FOLDER, rgb_files[sequence[0][0]][1]))
-depth1 = cv2.imread(join(DEPTH_FOLDER, depth_files[sequence[0][1]][1]), cv2.CV_LOAD_IMAGE_UNCHANGED)
-keypoints1, keypoints3d1, descriptors1 =  compute_features(rgb1, depth1)
-
-observation = []
-
-for seq in range(FRAME_COUNT):
-    print seq
-    rgb2 = cv2.imread(join(RGB_FOLDER, rgb_files[sequence[seq+1][0]][1]))
-    depth2 = cv2.imread(join(DEPTH_FOLDER, depth_files[sequence[seq+1][1]][1]), cv2.CV_LOAD_IMAGE_UNCHANGED)
-
-    keypoints2, keypoints3d2, descriptors2 =  compute_features(rgb2, depth2)
-
-    # Match keypoints
-    flann_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-    flann = cv2.flann_Index(descriptors1, flann_params)
-    idx, dist = flann.knnSearch(descriptors2, 1, params={})
-
-    # 3d coordinates of matched points.
-    matched_keypoints3d1 = keypoints3d1[:,idx[:,0]]
+	for i in inliers:
+		observations.append((cam_idx, idx[i], keypoints[i].pt))
 
 
-    # Estimate transform using ransac
-    Rt, inliers = estimate_transform_ransac(matched_keypoints3d1, keypoints3d2, 200, 0.01**2)
-    camera_positions.append(np.dot(Rt,camera_positions[0]))
-        
-    outliers = np.setdiff1d(np.arange(len(keypoints2)), inliers)
-    
-    for outlier in outliers:
-        keypoints1 = np.hstack([keypoints1, keypoints2[outlier]])
-        descriptors1 = np.vstack([descriptors1, descriptors2[outlier]])
-        keypoints3d1 = np.hstack([keypoints3d1, keypoints3d2[:,[outlier]]])
+	estimated_poistion = np.zeros(8)
+	estimated_poistion[0] = rgb_list_item['timestamp']
+	estimated_poistion[1:4] = Mwc[0:3,3]
+	Mwc[0:3,3] = 0
+	estimated_poistion[4:8] = tf.transformations.quaternion_from_matrix(Mwc)
 
-    for inlier in inliers:
-        observation.append((seq, inlier, keypoints2[inlier].pt))
-    
-'''
-print 'Transformation:\n', Rt
-print 'Number of inliers: ', inliers.shape[0]
-
-im_k = cv2.drawKeypoints(rgb1, keypoints1)
-im2_k = cv2.drawKeypoints(rgb2, keypoints2)
-
-im_keypoints = np.hstack([im_k, im2_k]).copy()
-
-for i in inliers:
-    p1 = keypoints1[idx[i]].pt
-    p1 = (int(p1[0]), int(p1[1]))
-    p2 = keypoints2[i].pt
-    p2 = (int(p2[0]+640), int(p2[1]))
-    cv2.line(im_keypoints, p1, p2, (0, 255, 0))
+	camera_positions.append(estimated_poistion)
 
 
-cv2.imshow('img',im_keypoints)
-cv2.waitKey(0)
-'''
+camera_positions = np.array(camera_positions).T
 
-# Plot keypoints in 3d
-#mlab.points3d(keypoints3d1[0],keypoints3d1[1], keypoints3d1[2], mode='point', color=(1,1,1))
+plt.plot(ground_truth[0], ground_truth[1],'r')
+plt.plot(ground_truth[0], ground_truth[2],'g')
+plt.plot(ground_truth[0], ground_truth[3],'b')
 
+plt.plot(camera_positions[0], camera_positions[1],'r--')
+plt.plot(camera_positions[0], camera_positions[2],'g--')
+plt.plot(camera_positions[0], camera_positions[3],'b--')
 
-estimate = []
-for pos in range(len(camera_positions)):
-    estimate.append((rgb_files[sequence[pos][0]][0]/100, 
-                    float(camera_positions[pos][0,3]), 
-                    float(camera_positions[pos][1,3]), 
-                    float(camera_positions[pos][2,3])))
-
-estimate = sorted(estimate)
-seq2 = find_sequence(truth, estimate)
-
-tx1 = []
-ty1 = []
-tz1 = []
-
-tx2 = []
-ty2 = []
-tz2 = []
-
-for i in seq2:
-    tx1.append(estimate[i[0]][1])
-    ty1.append(estimate[i[0]][2])
-    tz1.append(estimate[i[0]][3])
-    tx2.append(truth[i[1]][1])
-    ty2.append(truth[i[1]][2])
-    tz2.append(truth[i[1]][3])
-
-
-plt.plot(range(FRAME_COUNT), tx1[:FRAME_COUNT],'b.')
-plt.plot(range(FRAME_COUNT), ty1[:FRAME_COUNT],'bo')
-plt.plot(range(FRAME_COUNT), tz1[:FRAME_COUNT],'b+')
-
-
-'''
-# Plot camera positions in 3d
-for r in camera_positions:
-    mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,0], r[1,0], r[2,0], color=(1,0,0), mode='2ddash', scale_factor=0.1)
-    mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,1], r[1,1], r[2,1], color=(0,1,0), mode='2ddash', scale_factor=0.1)
-    mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,2], r[1,2], r[2,2], color=(0,0,1), mode='2ddash', scale_factor=0.1)'''
-
-plt.plot(range(FRAME_COUNT), tx2[:FRAME_COUNT],'r.')
-plt.plot(range(FRAME_COUNT), ty2[:FRAME_COUNT],'ro')
-plt.plot(range(FRAME_COUNT), tz2[:FRAME_COUNT],'r+')
-
-#mlab.show()
-plt.axis([-1,25,-0.25,2])
 plt.show()
+
+
+mlab.points3d(accumulated_keypoints3d[0], accumulated_keypoints3d[1], accumulated_keypoints3d[2], mode='point', color=(1,1,1))
+mlab.plot3d(camera_positions[1], camera_positions[2], camera_positions[3], tube_radius=None, color=(0,1,0))
+mlab.plot3d(ground_truth[1], ground_truth[2], ground_truth[3], tube_radius=None, color=(1,0,0))
+
+'''
+for i in range(camera_positions.shape[1]):
+	
+	pos_item = camera_positions[:,i]
+
+	r = tf.transformations.quaternion_matrix(pos_item[4:8])
+	r[0:3,3] = pos_item[1:4]
+
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,0], r[1,0], r[2,0], color=(1,0,0), mode='2ddash', scale_factor=0.1)
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,1], r[1,1], r[2,1], color=(0,1,0), mode='2ddash', scale_factor=0.1)
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,2], r[1,2], r[2,2], color=(0,0,1), mode='2ddash', scale_factor=0.1)
+'''
+
+mlab.show()
