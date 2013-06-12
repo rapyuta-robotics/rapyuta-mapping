@@ -12,6 +12,9 @@ from mayavi import mlab
 cam_param = 9
 point_param = 3
 
+E_element_dtype = [('cam_id', int), ('point_id', int), ('observation_id', int)]
+observations_element_dtype = [('cam_id', int), ('point_id', int), ('coord', np.float64, 2)]
+
 f = open('problem-16-22106-pre.txt')
 num_cameras, num_points, num_observations = [int(x) for x in f.readline().split()]
 
@@ -27,7 +30,7 @@ def fill_hessian(cameras, points, observations):
 	B_arr = np.zeros((num_cameras, cam_param, cam_param), dtype=np.float64)
 	C_arr = np.zeros((num_points, point_param, point_param), dtype=np.float64)
 	E_arr = np.zeros((num_observations, cam_param, point_param), dtype=np.float64)
-	E_dict = []
+	E_dict = np.empty(num_observations, dtype=E_element_dtype) 
 
 	v = np.zeros(num_cameras*cam_param, dtype=np.float64).T
 	w = np.zeros(num_points*point_param, dtype=np.float64).T
@@ -54,30 +57,31 @@ def fill_hessian(cameras, points, observations):
 		C_arr[point_id] += JXtJX + mu*np.diag(JXtJX.diagonal())
 
 		E_arr[observation_id] = np.dot(Jc.T, JX)
-		E_dict.append((cam_id, point_id, observation_id))
+		E_dict[observation_id] = (cam_id, point_id, observation_id)
 	
 		v[cam_id*cam_param:(cam_id+1)*cam_param] += np.dot(Jc.T, e)
 		w[point_id*point_param:(point_id+1)*point_param] += np.dot(JX.T, e)
 	
 		error_sum += (e**2).sum()
 
-	E_dict = sorted(E_dict)
-	E_arr[:] = E_arr[[x[2] for x in E_dict]]
+
+	E_dict = np.sort(E_dict, order=['cam_id', 'point_id']) 
+	E_arr[:] = E_arr[E_dict['observation_id']]
 	
 	return B_arr, C_arr, E_arr, E_dict, v, w, error_sum
 
 
 
-observations = []
 cameras = np.empty((num_cameras, cam_param), dtype=np.float64)
 points = np.empty((num_points, point_param), dtype=np.float64)
+observations = np.empty(num_observations, dtype=observations_element_dtype)
 
 
 
 
 for i in range(num_observations):
 	cam_id, point_id, x, y = f.readline().split()
-	observations.append({'cam_id': int(cam_id), 'point_id': int(point_id), 'coord': np.array([float(x),float(y)])})
+	observations[i] = (int(cam_id), int(point_id), np.array([float(x),float(y)]))
 
 for i in range(num_cameras):
 	for j in range(cam_param):
@@ -126,8 +130,8 @@ while iteration < max_iterations:
 	indices = np.arange(num_cameras)
 	B = sp.bsr_matrix((Bp_arr, indices, indptr), blocksize=(cam_param, cam_param))
 
-	indices = [x[1] for x in E_dict]
-	u, indptr = np.unique([x[0] for x in E_dict], return_index=True)
+	indices = E_dict['point_id']
+	u, indptr = np.unique(E_dict['cam_id'], return_index=True)
 	indptr = np.hstack([indptr, len(indices)])
 	E = sp.bsr_matrix((E_arr, indices, indptr), blocksize=(cam_param, point_param))
 
@@ -158,20 +162,20 @@ while iteration < max_iterations:
 		
 		new_error_sum += (e**2).sum()
 
-	print 'New error', new_error_sum, 'Mean', new_error_sum/(num_observations*2)
-
 	F_gain = error_sum - new_error_sum
 	L_gain = -(np.dot(y.T,mu*y - v) + np.dot(z.T,mu*z - w))/2
 	sigma = F_gain/L_gain
 	
-	print 'F', F_gain, 'L', L_gain, 'sigma', sigma, 'mu', mu
+	print '********************************************************************'
+	print 'Iteration', iteration
+	print 'F gain', F_gain, 'L gain', L_gain, 'sigma', sigma, 'mu', mu
 
 	if sigma > 0:
 		cameras = camera_new
 		points = points_new
 
 		B_arr, C_arr, E_arr, E_dict, v, w, error_sum = fill_hessian(cameras, points, observations)
-		print 'Iteration', iteration, 'error', error_sum, 'mean error', error_sum/(num_observations*2)
+		print 'Error', error_sum, 'mean error', error_sum/(num_observations*2)
 		
 		mu = mu*max(1.0/3, 1-(2*sigma-1)**3)
 		vv = 2
