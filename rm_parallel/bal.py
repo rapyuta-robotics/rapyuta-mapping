@@ -53,8 +53,8 @@ def fill_hessian(cameras, points, observations):
 		JctJc = np.dot(Jc.T, Jc)
 		JXtJX = np.dot(JX.T, JX)
 				
-		B_arr[cam_id] += JctJc + mu*np.diag(JctJc.diagonal())
-		C_arr[point_id] += JXtJX + mu*np.diag(JXtJX.diagonal())
+		B_arr[cam_id] += JctJc
+		C_arr[point_id] += JXtJX
 
 		E_arr[observation_id] = np.dot(Jc.T, JX)
 		E_dict[observation_id] = (cam_id, point_id, observation_id)
@@ -116,11 +116,11 @@ while iteration < max_iterations:
 
 	#compute B+mu*I
 	for i in range(num_cameras):
-		Bp_arr[i] = B_arr[i] + mu * np.eye(cam_param)
+		Bp_arr[i] = B_arr[i] + mu*np.diag(B_arr[i].diagonal())
 
 	#invert C+mu*I
 	for i in range(num_points):
-		Cp_inv_arr[i] = np.linalg.inv(C_arr[i] + mu * np.eye(point_param))
+		Cp_inv_arr[i] = np.linalg.inv(C_arr[i] + mu*np.diag(C_arr[i].diagonal()))
 
 	indptr = np.arange(num_points+1)
 	indices = np.arange(num_points)
@@ -182,7 +182,6 @@ while iteration < max_iterations:
 	else:
 		mu = mu * vv
 		vv = 2 * vv
-		
 
 
 
