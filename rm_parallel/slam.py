@@ -7,7 +7,6 @@ from os import listdir
 from os.path import isfile, join, splitext
 import matplotlib.pyplot as plt
 import tf
-import sys
 
 # Flann index types. Should be in cv2, but currently they are not there
 FLANN_INDEX_KDTREE = 1  
@@ -34,12 +33,25 @@ surfDetector.setBool('upright', True)
 
 surfDescriptorExtractor = cv2.DescriptorExtractor_create("SURF")
 
+matcher = cv2.BFMatcher(cv2.NORM_L2)
+
 
 # Computes 2d features, their 3d positions and descriptors
 def compute_features(rgb, depth):
     gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
-
+    
+    threshold = 400
+    surfDetector.setInt('hessianThreshold', threshold)
     keypoints = surfDetector.detect(gray, (depth != 0).view(np.uint8))
+    
+    for i in range(3):
+		if len(keypoints) < 300:
+			threshold = threshold/2
+			keypoints = surfDetector.detect(gray, (depth != 0).view(np.uint8))
+		else:
+			break
+    
+    keypoints = keypoints[0:400]
     keypoints, descriptors = surfDescriptorExtractor.compute(gray, keypoints)
 
     keypoints3d = np.empty((4,len(keypoints)), dtype=np.float64)
@@ -119,7 +131,7 @@ def umeyama(src, dst):
     return Rt
 
 
-def estimate_transform_ransac(src, dst, num_iter, distance2_threshold):
+def estimate_transform_ransac(src, dst, num_iter, distance2_threshold, min_num_inliers):
     assert src.shape == dst.shape
     
     max_num_inliers = 0
@@ -138,6 +150,9 @@ def estimate_transform_ransac(src, dst, num_iter, distance2_threshold):
         if max_num_inliers < num_inliers:
             max_num_inliers = num_inliers
             inliers =  np.nonzero(dist2 < distance2_threshold)[0]
+    
+    if max_num_inliers < min_num_inliers:
+		return None, []
     
     # Reestimate transformations using all inliers
     Rt = umeyama(src[0:3,inliers], dst[0:3,inliers])
@@ -194,10 +209,13 @@ Mwc[0:3,3] = ground_truth_item[1:4]
 
 accumulated_keypoints, accumulated_keypoints3d, accumulated_descriptors = compute_features(rgb, depth)
 accumulated_keypoints3d = np.dot(Mwc, accumulated_keypoints3d)
+accumulated_weights = np.ones(accumulated_descriptors.shape[0])
+
+print accumulated_descriptors.shape, accumulated_weights.shape
 
 observations = []
 
-for rgb_list_item in rgb_image_list[1:100:3]:
+for rgb_list_item in rgb_image_list[1::3]:
 	rgb = cv2.imread(join(DATASET_FOLDER, rgb_list_item['filename']))
 
 	depth_idx = find_closest_idx(depth_image_list['timestamp'], rgb_list_item['timestamp'])
@@ -215,13 +233,25 @@ for rgb_list_item in rgb_image_list[1:100:3]:
 	matched_accumulated_keypoints3d = accumulated_keypoints3d[:,idx[:,0]]
 
 	# Estimate transform using ransac
-	Mwc, inliers = estimate_transform_ransac(keypoints3d, matched_accumulated_keypoints3d, 200, 0.01**2)
+	Mwc, inliers = estimate_transform_ransac(keypoints3d, matched_accumulated_keypoints3d, 200, 0.03**2, 30)
+	
+	if Mwc == None:
+		#cv2.imshow('Image', rgb)
+		#cv2.waitKey(0)
+		print 'No transformation found... Skipping frame'
+		continue
+	
+	inliers_accumulated_idx = idx[inliers][:,0]
+	w = accumulated_weights[inliers_accumulated_idx][:,np.newaxis]
+	accumulated_descriptors[inliers_accumulated_idx] = (w*accumulated_descriptors[inliers_accumulated_idx] + descriptors[inliers])/(w+1)
+	accumulated_weights[inliers_accumulated_idx] += 1
     
 	outliers = np.setdiff1d(np.arange(len(keypoints)), inliers)
 
 	num_accumulated_keypoints = accumulated_keypoints3d.shape[1]
 
 	accumulated_descriptors = np.vstack([accumulated_descriptors, descriptors[outliers]])
+	accumulated_weights = np.hstack([accumulated_weights, np.ones(outliers.shape[0])])
 	accumulated_keypoints3d = np.hstack([accumulated_keypoints3d, np.dot(Mwc, keypoints3d[:,outliers])])
 
 	cam_idx = len(camera_positions)
@@ -242,6 +272,12 @@ for rgb_list_item in rgb_image_list[1:100:3]:
 
 
 camera_positions = np.array(camera_positions).T
+observations = np.array(observations, dtype=[('cam_id', int), ('point_id', int), ('coord', np.float64, 2)])
+
+print 'Total number of keypoints', accumulated_keypoints3d.shape[1]
+print 'Total number of camera positions', camera_positions.shape[1]
+print 'Total number of observations', len(observations)
+print 'Total number of points with one observation', np.count_nonzero(np.bincount(observations['point_id']) == 1)
 
 plt.plot(ground_truth[0], ground_truth[1],'r')
 plt.plot(ground_truth[0], ground_truth[2],'g')
@@ -253,6 +289,8 @@ plt.plot(camera_positions[0], camera_positions[3],'b--')
 
 plt.show()
 
+plt.hist(np.bincount(observations['point_id']), 50, normed=1)
+plt.show()
 
 mlab.points3d(accumulated_keypoints3d[0], accumulated_keypoints3d[1], accumulated_keypoints3d[2], mode='point', color=(1,1,1))
 mlab.plot3d(camera_positions[1], camera_positions[2], camera_positions[3], tube_radius=None, color=(0,1,0))
@@ -272,3 +310,4 @@ for i in range(camera_positions.shape[1]):
 '''
 
 mlab.show()
+
