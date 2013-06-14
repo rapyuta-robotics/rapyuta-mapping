@@ -211,9 +211,11 @@ accumulated_keypoints, accumulated_keypoints3d, accumulated_descriptors = comput
 accumulated_keypoints3d = np.dot(Mwc, accumulated_keypoints3d)
 accumulated_weights = np.ones(accumulated_descriptors.shape[0])
 
-print accumulated_descriptors.shape, accumulated_weights.shape
-
 observations = []
+
+for i in range(len(accumulated_keypoints)):
+		observations.append((0, i, accumulated_keypoints[i].pt))
+
 
 for rgb_list_item in rgb_image_list[1::3]:
 	rgb = cv2.imread(join(DATASET_FOLDER, rgb_list_item['filename']))
@@ -273,6 +275,8 @@ for rgb_list_item in rgb_image_list[1::3]:
 
 camera_positions = np.array(camera_positions).T
 observations = np.array(observations, dtype=[('cam_id', int), ('point_id', int), ('coord', np.float64, 2)])
+
+np.savez('slam_data.npz', observations=observations, camera_positions=camera_positions, accumulated_keypoints3d=accumulated_keypoints3d, ground_truth=ground_truth)
 
 print 'Total number of keypoints', accumulated_keypoints3d.shape[1]
 print 'Total number of camera positions', camera_positions.shape[1]
