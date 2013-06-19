@@ -10,6 +10,7 @@
     <param name="has_gyro" value="false" />
     <param name="update_rate" value="30.0" />
     <param name="port" value="/dev/ttySAC1" />
+    <param name="publish_tf" value="true" />
   </node>
   </group>
 

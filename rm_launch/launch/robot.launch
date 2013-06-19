@@ -1,6 +1,6 @@
 <launch>
 <include file="$(find rm_launch)/launch/camera.launch" />
-<include file="$(find rm_launch)/launch/visual_odometry.launch" />
-<include file="$(find rm_launch)/launch/keyframe_sender.launch" />
 <include file="$(find rm_launch)/launch/base.launch" />
+<include file="$(find rm_launch)/launch/capture_server.launch" />
+<include file="$(find rm_launch)/launch/server_turtlebot_move.launch" />
 </launch>
