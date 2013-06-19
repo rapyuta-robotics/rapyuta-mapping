@@ -43,9 +43,9 @@ public:
 
 		queue_size_ = 5;
 
-		rgb_sub.subscribe(nh_, "/rgb/image_raw", queue_size_);
-		depth_sub.subscribe(nh_, "/depth/image_raw", queue_size_);
-		info_sub.subscribe(nh_, "/rgb/camera_info", queue_size_);
+		rgb_sub.subscribe(nh_, "rgb/image_raw", queue_size_);
+		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
+		info_sub.subscribe(nh_, "rgb/camera_info", queue_size_);
 
 		// Synchronize inputs.
 		sync.reset(
