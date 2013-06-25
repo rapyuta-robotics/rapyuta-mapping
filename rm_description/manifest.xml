@@ -1,0 +1,14 @@
+<package>
+  <description brief="rm_description">
+
+     rm_description
+
+  </description>
+  <author>odroid</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rm_description</url>
+
+</package>
+
+

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!--
+    - Base      : create
+    - Stacks    : circles
+    - 3d Sensor : kinect
+-->    
+<robot name="turtlebot"
+       xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+       xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <include filename="$(find turtlebot_description)/urdf/common_properties.urdf.xacro"/>
+  <include filename="$(find turtlebot_description)/urdf/turtlebot_properties.urdf.xacro"/>
+  <include filename="$(find create_description)/urdf/create.urdf.xacro"/>
+  <include filename="$(find turtlebot_description)/urdf/sensors/asus_xtion_pro.urdf.xacro"/>
+  <include filename="$(find turtlebot_description)/urdf/turtlebot_gazebo.urdf.xacro"/>
+
+  <create/>
+  <sensor_asus_xtion_pro  parent="base_link"/>
+</robot>
