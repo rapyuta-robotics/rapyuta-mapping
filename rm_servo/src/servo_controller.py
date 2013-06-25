@@ -2,26 +2,34 @@
 
 import rospy
 from std_msgs.msg import Float32
+from sensor_msgs.msg import JointState
 
 import sys
 import alsaaudio
 import numpy as np
 import math
 
+period = 640 * 3
 
 zero_pos = 144
 gain = 57.6/(np.pi/4)
+gain_inv = 1.0/gain
 
 ii16 = np.iinfo(np.int16)
-data = np.zeros(640, dtype=np.int16)
+data = np.zeros(period, dtype=np.int16)
 data[0:zero_pos] = ii16.max
+current_angle = np.zeros(1, dtype=np.float32)
 
-def callback(data):
-	if data < -np.pi/4 or data > np.pi/4:
-		rospy.loginfo(rospy.get_name() + ": Angle %f is bigger then servo limit" % data)
-	val = int(round(zero_pos + data*gain))
+joint_states_pub = rospy.Publisher('joint_states', JointState)
+
+def callback(angle_data):
+	angle = angle_data.data
+	if angle < -np.pi/4 or angle > np.pi/4:
+		rospy.loginfo(rospy.get_name() + ": Angle %f is bigger then servo limit" % angle)
+	val = int(round(zero_pos + angle*gain))
 	data[:] = 0
 	data[0:val] = ii16.max
+	current_angle[:] = angle
 
 
 if __name__ == '__main__':
@@ -41,11 +49,11 @@ if __name__ == '__main__':
 
 	# The period size controls the internal number of frames per period.
 	# The significance of this parameter is documented in the ALSA api.
-	out.setperiodsize(640)
+	out.setperiodsize(period)
 
-	# Read data from stdin
-	while True:
+	while not rospy.is_shutdown():
 		out.write(data.tostring())
-		rospy.spinOnce()
-
+		js = JointState(name = ["servo_joint"], position=[current_angle[0]], velocity=[0], effort=[0])
+		js.header.stamp = rospy.get_rostime()
+		joint_states_pub.publish(js)
 
