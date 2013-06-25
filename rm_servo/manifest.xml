@@ -1,0 +1,15 @@
+<package>
+  <description brief="rm_servo">
+
+     rm_servo
+
+  </description>
+  <author>vsu</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rm_servo</url>
+  <depend package="rospy"/>
+
+</package>
+
+
