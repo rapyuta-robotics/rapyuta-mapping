@@ -10,12 +10,68 @@
        xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
        xmlns:xacro="http://ros.org/wiki/xacro">
 
-  <include filename="$(find turtlebot_description)/urdf/common_properties.urdf.xacro"/>
-  <include filename="$(find turtlebot_description)/urdf/turtlebot_properties.urdf.xacro"/>
-  <include filename="$(find create_description)/urdf/create.urdf.xacro"/>
-  <include filename="$(find turtlebot_description)/urdf/sensors/asus_xtion_pro.urdf.xacro"/>
-  <include filename="$(find turtlebot_description)/urdf/turtlebot_gazebo.urdf.xacro"/>
+	<include filename="$(find turtlebot_description)/urdf/common_properties.urdf.xacro"/>
+	<include filename="$(find create_description)/urdf/create.urdf.xacro"/>
+	<include filename="$(find turtlebot_description)/urdf/sensors/asus_xtion_pro.urdf.xacro"/>
 
-  <create/>
-  <sensor_asus_xtion_pro  parent="base_link"/>
+	<property name="cam_px" value="0.018" />
+	<property name="cam_py" value="0.022" />
+	<property name="cam_pz" value="0.03" />
+	<property name="cam_or" value="0" />
+	<property name="cam_op" value="0" />
+	<property name="cam_oy" value="0" />
+
+	<create/>
+
+	<joint name="pole_joint" type="fixed">
+		<origin xyz="0 0 0.3" rpy="0 0 0"/>
+		<parent link="base_link"/>
+		<child link="pole" />
+	</joint>
+
+	<link name="pole">
+		<visual>
+		<geometry>
+			<box size="0.02 0.02 0.4" />
+		</geometry>
+		<material name="Grey">
+			<color rgba="0.6 0.6 0.6 1"/>
+		</material>
+		</visual>
+
+		<collision>
+			<origin xyz="0 0 0" rpy="0 0 0" />
+			<geometry>
+				<box size="0.02 0.02 0.4" />
+			</geometry>
+		</collision>
+	</link>
+
+	<joint name="servo_joint" type="revolute">
+		<axis xyz="0 -1 0"/>
+		<limit lower="${-M_PI/4}" upper="${M_PI/4}" effort="10" velocity="10"/>
+		<origin xyz="0 0 0.2" rpy="0 0 0"/>
+		<parent link="pole"/>
+		<child link="servo_holder" />
+	</joint>
+	
+	<link name="servo_holder">
+		<visual>
+		<geometry>
+			<box size="0.02 0.005 0.04" />
+		</geometry>
+		<material name="Grey">
+			<color rgba="0.6 0.6 0.6 1"/>
+		</material>
+		</visual>
+
+		<collision>
+			<origin xyz="0 0 0.01" rpy="0 0 0" />
+			<geometry>
+				<box size="0.02 0.005 0.04" />
+			</geometry>
+		</collision>
+	</link>
+	  
+	<sensor_asus_xtion_pro  parent="servo_holder"/>
 </robot>
