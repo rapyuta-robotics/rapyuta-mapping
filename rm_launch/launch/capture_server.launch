@@ -1,5 +1,0 @@
-<launch>
-  <node pkg="rm_capture_server" type="capture_server" name="capture_server" 
-    output="screen">
-  </node>
-</launch>
