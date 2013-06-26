@@ -1,6 +1,18 @@
 <launch>
-<include file="$(find rm_launch)/launch/camera.launch" />
-<include file="$(find rm_launch)/launch/base.launch" />
-<include file="$(find rm_launch)/launch/capture_server.launch" />
-<include file="$(find rm_launch)/launch/server_turtlebot_move.launch" />
+	<arg name="prefix" default="$(env HOSTNAME)" />
+	<group ns="$(arg prefix)">
+		<param name="robot/name" value="$(optenv ROBOT turtlebot)"/>
+		<param name="robot/type" value="turtlebot"/>
+		<param name="tf_prefix" value="$(arg prefix)" />
+		<include file="$(find rm_launch)/launch/_mobile_base.launch" />
+		<include file="$(find rm_launch)/launch/_robot.launch" />
+		<node pkg="rm_capture_server" type="capture_server" name="capture_server" output="screen"/>
+		<node pkg="turtlebot_actions" type="turtlebot_move_action_server" name="move_action_server">
+			<remap from="move_action_server/cmd_vel" to="mobile_base/commands/velocity"/>
+			<remap from="move_action_server/turtlebot_move" to="turtlebot_move"/>
+			<param name="base_frame" value="base_footprint"/>
+			<param name="odom_frame" value="odom_combined"/> 
+		</node>
+		<node name="camera" pkg="rm_openni2_camera" type="camera" />
+	</group>
 </launch>
