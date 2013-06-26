@@ -1,15 +1,5 @@
 <launch>
-
-
-<arg name="tf_prefix" default="$(env HOSTNAME)" />
-
-
-  <group ns="$(arg tf_prefix)">
-
   <node pkg="rm_capture_server" type="capture_server" name="capture_server" 
     output="screen">
   </node>
-  
-  </group>
-
 </launch>
