@@ -10,7 +10,7 @@ FrameCallback::FrameCallback(ros::NodeHandle & nh, ros::NodeHandle & nh_private,
 	pub = cam_it.advertiseCamera("image_raw", 1);
 	this->camera_name = camera_name;
 
-	frame = "camera_rgb_optical_frame";
+	frame = "camera_" + camera_name + "_optical_frame";
 
 	std::string tf_prefix_ = tf::getPrefixParam(nh_private);
 
@@ -23,11 +23,11 @@ FrameCallback::FrameCallback(ros::NodeHandle & nh, ros::NodeHandle & nh_private,
 	if (cim.isCalibrated()) {
 		*info = cim.getCameraInfo();
 	} else {
-		//if (camera_name == "depth") {
-		//	info = getDefaultCameraInfo(640, 480, 570.0);
-		//} else {
-			info = getDefaultCameraInfo(640/1, 480/1, 525.0/1);
-		//}
+		if (camera_name == "depth") {
+			info = getDefaultCameraInfo(640, 480, 570.0);
+		} else {
+			info = getDefaultCameraInfo(1280, 960, 1050.0);
+		}
 	}
 
 }
