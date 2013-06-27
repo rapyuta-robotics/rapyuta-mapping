@@ -21,7 +21,7 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 		exit(2);
 	}
 
-	rc = device.setDepthColorSyncEnabled(true);
+	rc = device.setDepthColorSyncEnabled(false);
 	if (rc != STATUS_OK) {
 		printf("Couldn't enable depth and color images synchronization\n%s\n",
 				OpenNI::getExtendedError());
@@ -56,6 +56,21 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 				OpenNI::getExtendedError());
 	}
 
+        rc = color.getCameraSettings()->setAutoWhiteBalanceEnabled(false);
+        if (rc != STATUS_OK) {
+                printf("Couldn't disable auto white balance\n%s\n",
+                                OpenNI::getExtendedError());
+                exit(2);
+        }
+
+        rc = color.getCameraSettings()->setAutoExposureEnabled(false);
+        if (rc != STATUS_OK) {
+                printf("Couldn't disable auto exposure\n%s\n",
+                                OpenNI::getExtendedError());
+                exit(2);
+        }
+
+
 	VideoMode depth_video_mode, color_video_mode;
 
 	depth_video_mode.setFps(30);
@@ -63,8 +78,8 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 	depth_video_mode.setResolution(640, 480);
 
 	color_video_mode.setFps(30);
-	color_video_mode.setPixelFormat(PIXEL_FORMAT_RGB888);
-	color_video_mode.setResolution(640, 480);
+	color_video_mode.setPixelFormat(PIXEL_FORMAT_GRAY8);
+	color_video_mode.setResolution(1280, 960);
 
 	rc = depth.setVideoMode(depth_video_mode);
 	if (rc != STATUS_OK) {
@@ -90,12 +105,20 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 				OpenNI::getExtendedError());
 	}
 
-	rc = device.setImageRegistrationMode(IMAGE_REGISTRATION_DEPTH_TO_COLOR);
+	rc = device.setImageRegistrationMode(IMAGE_REGISTRATION_OFF);
 	if (rc != STATUS_OK) {
 		printf("Couldn't enable depth and color images registration\n%s\n",
 				OpenNI::getExtendedError());
 		exit(2);
 	}
+
+        rc = color.getCameraSettings()->setExposure(1000);
+        if (rc != STATUS_OK) {
+                printf("Couldn't set exposure\n%s\n",
+                                OpenNI::getExtendedError());
+                exit(2);
+        }
+
 
 	dc.reset(new FrameCallback(nh, nh_private, "depth"));
 	rgbc.reset(new FrameCallback(nh, nh_private, "rgb"));

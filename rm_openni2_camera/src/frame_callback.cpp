@@ -63,6 +63,11 @@ void FrameCallback::onNewFrame(VideoStream& stream) {
 		msg->encoding = sensor_msgs::image_encodings::RGB8;
 		break;
 
+	case PIXEL_FORMAT_GRAY8:
+                msg->encoding = sensor_msgs::image_encodings::MONO8;
+                break;
+
+
 	default:
 		ROS_INFO("Unsupported encoding\n");
 		break;
