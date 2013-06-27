@@ -3,12 +3,12 @@ all: openni2
 GIT_DIR = openni2-git
 GIT_URL = https://github.com/OpenNI/OpenNI2.git 
 GIT_PATCH = disable_softfp_arm.patch
-GIT_REVISION = 20208af3b46572f6afb00a60e64a4697425eeb19
+GIT_REVISION = develop
 
 include $(shell rospack find mk)/git_checkout.mk
 
 openni2: $(SVN_DIR) patched
-	cd $(GIT_DIR) && make
+	cd $(GIT_DIR) && make -j4
 	mkdir -p lib include
 	cp $(GIT_DIR)/Bin/*-Release/libOpenNI2.so lib/
 	cp -r $(GIT_DIR)/Bin/*-Release/OpenNI2 lib/
