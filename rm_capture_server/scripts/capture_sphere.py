@@ -42,6 +42,7 @@ def main():
   depth_folder = join(dataset_folder, 'depth')
   rgb_filename = join(dataset_folder, 'rgb.txt')
   depth_filename = join(dataset_folder, 'depth.txt')
+  pos_filename = join(dataset_folder, 'position.txt')
   
   os.makedirs(dataset_folder)
   os.makedirs(rgb_folder)
@@ -49,6 +50,7 @@ def main():
   
   rgb_file = open(rgb_filename, 'w')
   depth_file = open(depth_filename, 'w')
+  pos_file = open(pos_filename, 'w')
   
 
   # Call the action
@@ -69,8 +71,8 @@ def main():
         for angle in np.linspace(-np.pi/3, np.pi/3, 12):
 			servo_pub.publish(angle)
 			time.sleep(2)
-			#servo_pub.publish(np.nan)
-			#time.sleep(2)
+			servo_pub.publish(np.nan)
+			time.sleep(2)
 			r = capture(0)
 			time.sleep(2)
 			rgb_buf = np.fromstring(r.rgb_png_data, dtype=np.uint8)
@@ -82,6 +84,7 @@ def main():
 			cv2.imwrite(join(depth_folder, str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + '.png'), depth_img*5)
 			rgb_file.write(str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + ' ' + join('rgb', str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + '.png') + '\n')
 			depth_file.write(str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + ' ' + join('depth', str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + '.png') + '\n')
+			pos_file.write(str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + ' ' + str(r.transform))
 
 			cv2.imshow('img', img)
 			cv2.imshow('depth', depth_img*5)
@@ -99,6 +102,7 @@ def main():
     
   rgb_file.close()
   depth_file.close()
+  pos_file.close()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 uint32 num_frames
 ---
 Header header
+geometry_msgs/Transform transform
 uint8[] rgb_png_data
 uint8[] depth_png_data
