@@ -16,13 +16,10 @@ from turtlebot_actions.msg import *
 from actionlib_msgs.msg import *
 from rm_capture_server.srv import *
 from std_msgs.msg import *
-
+from sensor_msgs.msg import JointState
 
 import actionlib
 
-'''
-  Very simple move action test - commands the robot to turn 45 degrees and travel 0.5 metres forward.
-'''
 
 def main():
   rospy.init_node("test_move_action_client")
@@ -55,11 +52,11 @@ def main():
   
 
   # Call the action
-  for j in range(3):
+  for j in range(1):
     for i in range(18):
       rospy.loginfo("Calling the action server...")
       action_goal = TurtlebotMoveGoal()
-      action_goal.turn_distance = math.pi/36
+      action_goal.turn_distance = math.pi/72
       action_goal.forward_distance = 0.0 # metres
       
       if action_client.send_goal_and_wait(action_goal, rospy.Duration(50.0), rospy.Duration(50.0)) == GoalStatus.SUCCEEDED:
@@ -72,7 +69,10 @@ def main():
         for angle in np.linspace(-np.pi/3, np.pi/3, 12):
 			servo_pub.publish(angle)
 			time.sleep(2)
+			#servo_pub.publish(np.nan)
+			#time.sleep(2)
 			r = capture(0)
+			time.sleep(2)
 			rgb_buf = np.fromstring(r.rgb_png_data, dtype=np.uint8)
 			depth_buf = np.fromstring(r.depth_png_data, dtype=np.uint8)
 			img = cv2.imdecode(rgb_buf, cv2.CV_LOAD_IMAGE_UNCHANGED)
@@ -92,10 +92,10 @@ def main():
     action_goal = TurtlebotMoveGoal()
     action_goal.turn_distance = 0
     action_goal.forward_distance = 0.5 # metres
-    if action_client.send_goal_and_wait(action_goal, rospy.Duration(50.0), rospy.Duration(50.0)) == GoalStatus.SUCCEEDED:
-		rospy.loginfo('Call to action server succeeded')
-    else:
-		rospy.logerr('Call to action server failed')
+    #if action_client.send_goal_and_wait(action_goal, rospy.Duration(50.0), rospy.Duration(50.0)) == GoalStatus.SUCCEEDED:
+	#	rospy.loginfo('Call to action server succeeded')
+    #else:
+	#e	rospy.logerr('Call to action server failed')
     
   rgb_file.close()
   depth_file.close()
