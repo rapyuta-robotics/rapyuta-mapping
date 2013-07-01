@@ -10,6 +10,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <sensor_msgs/image_encodings.h>
+#include <tf/transform_listener.h>
 
 class CaptureServer {
 protected:
@@ -27,6 +28,8 @@ protected:
 	sensor_msgs::Image::ConstPtr depth_msg;
 	sensor_msgs::CameraInfo::ConstPtr yuv2_info_msg;
 	sensor_msgs::CameraInfo::ConstPtr depth_info_msg;
+
+	tf::TransformListener listener;
 
 	int queue_size_;
 
@@ -83,6 +86,16 @@ public:
 			ROS_ERROR("cv::imencode (png) failed on input image");
 			return false;
 		}
+
+		tf::StampedTransform transform;
+		try {
+			listener.lookupTransform("odom_combined", yuv2_msg->header.frame_id,
+					ros::Time(0), transform);
+		} catch (tf::TransformException ex) {
+			ROS_ERROR("%s", ex.what());
+		}
+
+		tf::transformTFToMsg(transform, res.transform);
 
 		return true;
 	}
