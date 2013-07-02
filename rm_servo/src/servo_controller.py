@@ -9,7 +9,7 @@ import alsaaudio
 import numpy as np
 import math
 
-period = 640 * 3
+period = 640 * 2
 
 zero_correction = 0
 zero_pos = 144 + zero_correction
@@ -21,7 +21,7 @@ data = np.zeros(period, dtype=np.int16)
 data[0:zero_pos] = ii16.max
 
 current_angle = np.zeros(1, dtype=np.float32)
-angles = np.zeros(50, dtype=np.float32)
+angles = np.zeros(25, dtype=np.float32)
 
 joint_states_pub = rospy.Publisher('joint_states', JointState)
 
@@ -55,14 +55,18 @@ if __name__ == '__main__':
 	out.setperiodsize(period)
 
 	while not rospy.is_shutdown():
-		angles = np.roll(angles, -1)
-		angles[-1] = current_angle[0]
 		
 		mean_angle = np.mean(angles)
 		
-		val = int(round(zero_pos + mean_angle*gain))
-		data[:] = 0
-	        data[0:val] = ii16.max
+		if np.isnan(current_angle[0]):
+			data[:] = 0
+		else:
+			angles = np.roll(angles, -1)
+			angles[-1] = current_angle[0]
+				
+			val = int(round(zero_pos + mean_angle*gain))
+			data[:] = 0
+	        	data[0:val] = ii16.max
 
 		
 		out.write(data.tostring())
