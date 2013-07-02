@@ -21,7 +21,7 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 		exit(2);
 	}
 
-	rc = device.setDepthColorSyncEnabled(false);
+	rc = device.setDepthColorSyncEnabled(true);
 	if (rc != STATUS_OK) {
 		printf("Couldn't enable depth and color images synchronization\n%s\n",
 				OpenNI::getExtendedError());
@@ -78,8 +78,8 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 	depth_video_mode.setResolution(640, 480);
 
 	color_video_mode.setFps(30);
-	color_video_mode.setPixelFormat(PIXEL_FORMAT_GRAY8);
-	color_video_mode.setResolution(1280, 960);
+	color_video_mode.setPixelFormat(PIXEL_FORMAT_YUV422);
+	color_video_mode.setResolution(640, 480);
 
 	rc = depth.setVideoMode(depth_video_mode);
 	if (rc != STATUS_OK) {
@@ -105,7 +105,7 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 				OpenNI::getExtendedError());
 	}
 
-	rc = device.setImageRegistrationMode(IMAGE_REGISTRATION_OFF);
+	rc = device.setImageRegistrationMode(IMAGE_REGISTRATION_DEPTH_TO_COLOR);
 	if (rc != STATUS_OK) {
 		printf("Couldn't enable depth and color images registration\n%s\n",
 				OpenNI::getExtendedError());
