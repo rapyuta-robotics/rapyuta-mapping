@@ -24,8 +24,10 @@ t = MatrixSymbol('t', 3,1)
 f, c1, c2, k1 = symbols("f, c1, c2, k1")
 u, v = symbols("u, v")
 
+Rp = (dR*R).T
+tp = -Rp*t
 
-P = Matrix(dR*R*X + t)
+P = Matrix(Rp*X + tp)
 p = Matrix([P[0]/P[2], P[1]/P[2]])
 p_norm2 = p[0]**2 + p[1]**2
 p_prime = f * (1 + k1 * p_norm2) * p

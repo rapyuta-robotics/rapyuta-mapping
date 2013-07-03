@@ -14,7 +14,7 @@ FLANN_INDEX_LSH    = 6
 FRAME_COUNT = 25
 
 # Necessary Paths
-DATASET_FOLDER = "../rgbd_dataset_freiburg1_desk"
+DATASET_FOLDER = "../panorama5"
 
 image_list_dtype =  [('timestamp', float), ('filename', 'S20')]
 
@@ -38,38 +38,53 @@ matcher = cv2.BFMatcher(cv2.NORM_L2)
 
 # Computes 2d features, their 3d positions and descriptors
 def compute_features(rgb, depth):
-    gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
-    
-    threshold = 400
-    surfDetector.setInt('hessianThreshold', threshold)
-    keypoints = surfDetector.detect(gray, (depth != 0).view(np.uint8))
-    
-    for i in range(3):
+	gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
+
+	threshold = 400
+	surfDetector.setInt('hessianThreshold', threshold)
+	keypoints = surfDetector.detect(gray, (depth != 0).view(np.uint8))
+
+	for i in range(5):
 		if len(keypoints) < 300:
 			threshold = threshold/2
+			surfDetector.setInt('hessianThreshold', threshold)
 			keypoints = surfDetector.detect(gray, (depth != 0).view(np.uint8))
 		else:
 			break
-    
-    keypoints = keypoints[0:400]
-    keypoints, descriptors = surfDescriptorExtractor.compute(gray, keypoints)
 
-    keypoints3d = np.empty((4,len(keypoints)), dtype=np.float64)
-    for i in range(len(keypoints)):
-        p = keypoints[i].pt
-        d = depth[int(p[1]), int(p[0])]/5000.0
-        keypoints3d[0,i] = p[0]*d
-        keypoints3d[1,i] = p[1]*d
-        keypoints3d[2,i] = d
-        keypoints3d[3,i] = 1
+	keypoints = keypoints[0:400]
+	keypoints, descriptors = surfDescriptorExtractor.compute(gray, keypoints)
 
-    keypoints3d[0:3,:] = np.dot(K_inv, keypoints3d[0:3,:])
+	keypoints3d = np.empty((4,len(keypoints)), dtype=np.float64)
+	for i in range(len(keypoints)):
+		p = keypoints[i].pt
+		d = depth[int(p[1]), int(p[0])]/5000.0
+		if d == 0:
+			keypoints3d[0,i] = np.nan
+			keypoints3d[1,i] = np.nan
+			keypoints3d[2,i] = np.nan
+			keypoints3d[3,i] = np.nan
+		else:
+			keypoints3d[0,i] = p[0]*d
+			keypoints3d[1,i] = p[1]*d
+			keypoints3d[2,i] = d
+			keypoints3d[3,i] = 1
 
-    return keypoints, keypoints3d, descriptors
+	idx = np.isfinite(keypoints3d[0])
+	if idx.shape[0] == 0:
+		return [], [], []
+	keypoints = [keypoints[i] for i in range(idx.shape[0]) if idx[i] == True]
+	keypoints3d = keypoints3d[:,idx]
+	descriptors = descriptors[idx]
+
+	keypoints3d[0:3,:] = np.dot(K_inv, keypoints3d[0:3,:])
+
+	return keypoints, keypoints3d, descriptors
 
 
 # Estimates transform between src and dst points.
 # The algorithm is based on:
+# "Least-squares estimation of transformation parameters between two point patterns",
 # "Least-squares estimation of transformation parameters between two point patterns",
 # Shinji Umeyama, PAMI 1991, DOI: 10.1109/34.88573
 def umeyama(src, dst):
@@ -189,7 +204,12 @@ def find_closest_idx(array, timestamp):
 # read list of files and ground truth
 rgb_image_list = read_image_list(join(DATASET_FOLDER, 'rgb.txt'))
 depth_image_list = read_image_list(join(DATASET_FOLDER, 'depth.txt'))
-ground_truth = read_ground_truth(join(DATASET_FOLDER, 'groundtruth.txt'))
+
+has_ground_truth = False
+if isfile(join(DATASET_FOLDER, 'groundtruth.txt')):
+	ground_truth = read_ground_truth(join(DATASET_FOLDER, 'groundtruth.txt'))
+	has_ground_truth = True
+
 
 
 rgb_list_item = rgb_image_list[0]
@@ -199,13 +219,18 @@ depth_idx = find_closest_idx(depth_image_list['timestamp'], rgb_list_item['times
 depth_list_item = depth_image_list[depth_idx]
 depth = cv2.imread(join(DATASET_FOLDER, depth_list_item['filename']), cv2.CV_LOAD_IMAGE_UNCHANGED)
 
-ground_truth_idx = find_closest_idx(ground_truth[0], rgb_list_item['timestamp'])
-ground_truth_item = ground_truth[:,ground_truth_idx]
+if has_ground_truth:
+	ground_truth_idx = find_closest_idx(ground_truth[0], rgb_list_item['timestamp'])
+	ground_truth_item = ground_truth[:,ground_truth_idx]
 
-camera_positions = []
-camera_positions.append(ground_truth[:,ground_truth_idx])
-Mwc = tf.transformations.quaternion_matrix(ground_truth_item[4:8])
-Mwc[0:3,3] = ground_truth_item[1:4]
+	camera_positions = []
+	camera_positions.append(ground_truth[:,ground_truth_idx])
+	Mwc = tf.transformations.quaternion_matrix(ground_truth_item[4:8])
+	Mwc[0:3,3] = ground_truth_item[1:4]
+else:
+	Mwc = np.eye(4)
+	val = np.array([rgb_list_item['timestamp'], 0,0,0,0,0,0,1])
+	camera_positions.append(val)
 
 accumulated_keypoints, accumulated_keypoints3d, accumulated_descriptors = compute_features(rgb, depth)
 accumulated_keypoints3d = np.dot(Mwc, accumulated_keypoints3d)
@@ -213,11 +238,13 @@ accumulated_weights = np.ones(accumulated_descriptors.shape[0])
 
 observations = []
 
+
+
 for i in range(len(accumulated_keypoints)):
-		observations.append((0, i, accumulated_keypoints[i].pt))
+	observations.append((0, i, accumulated_keypoints[i].pt))
 
 
-for rgb_list_item in rgb_image_list[1::3]:
+for rgb_list_item in rgb_image_list[1:]:
 	rgb = cv2.imread(join(DATASET_FOLDER, rgb_list_item['filename']))
 
 	depth_idx = find_closest_idx(depth_image_list['timestamp'], rgb_list_item['timestamp'])
@@ -225,6 +252,10 @@ for rgb_list_item in rgb_image_list[1::3]:
 	depth = cv2.imread(join(DATASET_FOLDER, depth_list_item['filename']), cv2.CV_LOAD_IMAGE_UNCHANGED)
 	
 	keypoints, keypoints3d, descriptors = compute_features(rgb, depth)
+	
+	if len(keypoints) < 3:
+		print 'Not enough features... Skipping frame'
+		continue
 	
 	# Match keypoints
 	flann_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
@@ -235,11 +266,13 @@ for rgb_list_item in rgb_image_list[1::3]:
 	matched_accumulated_keypoints3d = accumulated_keypoints3d[:,idx[:,0]]
 
 	# Estimate transform using ransac
-	Mwc, inliers = estimate_transform_ransac(keypoints3d, matched_accumulated_keypoints3d, 200, 0.03**2, 30)
+	Mwc, inliers = estimate_transform_ransac(keypoints3d, matched_accumulated_keypoints3d, 3000, 0.03**2, 20)
+	
+	#cv2.imshow('Image', rgb)
+	#cv2.imshow('Depth', depth)
+	#cv2.waitKey(0)
 	
 	if Mwc == None:
-		#cv2.imshow('Image', rgb)
-		#cv2.waitKey(0)
 		print 'No transformation found... Skipping frame'
 		continue
 	
@@ -276,16 +309,20 @@ for rgb_list_item in rgb_image_list[1::3]:
 camera_positions = np.array(camera_positions).T
 observations = np.array(observations, dtype=[('cam_id', int), ('point_id', int), ('coord', np.float64, 2)])
 
-np.savez('slam_data.npz', observations=observations, camera_positions=camera_positions, accumulated_keypoints3d=accumulated_keypoints3d, ground_truth=ground_truth)
+if has_ground_truth:
+	np.savez('slam_data.npz', observations=observations, camera_positions=camera_positions, accumulated_keypoints3d=accumulated_keypoints3d, ground_truth=ground_truth)
+else:
+	np.savez('slam_data.npz', observations=observations, camera_positions=camera_positions, accumulated_keypoints3d=accumulated_keypoints3d, ground_truth=[])
 
 print 'Total number of keypoints', accumulated_keypoints3d.shape[1]
 print 'Total number of camera positions', camera_positions.shape[1]
 print 'Total number of observations', len(observations)
 print 'Total number of points with one observation', np.count_nonzero(np.bincount(observations['point_id']) == 1)
 
-plt.plot(ground_truth[0], ground_truth[1],'r')
-plt.plot(ground_truth[0], ground_truth[2],'g')
-plt.plot(ground_truth[0], ground_truth[3],'b')
+if has_ground_truth:
+	plt.plot(ground_truth[0], ground_truth[1],'r')
+	plt.plot(ground_truth[0], ground_truth[2],'g')
+	plt.plot(ground_truth[0], ground_truth[3],'b')
 
 plt.plot(camera_positions[0], camera_positions[1],'r--')
 plt.plot(camera_positions[0], camera_positions[2],'g--')
@@ -298,7 +335,8 @@ plt.show()
 
 mlab.points3d(accumulated_keypoints3d[0], accumulated_keypoints3d[1], accumulated_keypoints3d[2], mode='point', color=(1,1,1))
 mlab.plot3d(camera_positions[1], camera_positions[2], camera_positions[3], tube_radius=None, color=(0,1,0))
-mlab.plot3d(ground_truth[1], ground_truth[2], ground_truth[3], tube_radius=None, color=(1,0,0))
+if has_ground_truth:
+	mlab.plot3d(ground_truth[1], ground_truth[2], ground_truth[3], tube_radius=None, color=(1,0,0))
 
 '''
 for i in range(camera_positions.shape[1]):
