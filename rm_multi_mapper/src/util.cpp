@@ -19,7 +19,7 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	fd->setInt("hessianThreshold", threshold);
 	std::vector<cv::KeyPoint> keypoints;
 
-	cv::Mat mask;
+	cv::Mat mask(depth.size(), CV_8UC1);
 	depth.convertTo(mask, CV_8U);
 
 	fd->detect(gray, keypoints, mask);
@@ -60,14 +60,15 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	de->compute(gray, filtered_keypoints, descriptors);
 }
 
-void estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
+bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		const pcl::PointCloud<pcl::PointXYZ> & dst,
 		const std::vector<cv::DMatch> matches, int num_iter,
 		float distance2_threshold, int min_num_inliers, Eigen::Affine3f & trans,
 		std::vector<bool> & inliers) {
 
-	pcl::registration::TransformationEstimationSVD<pcl::PointXYZ, pcl::PointXYZ> svd;
 	int max_inliers = 0;
+
+
 
 	for (int iter = 0; iter < num_iter; iter++) {
 
@@ -77,15 +78,15 @@ void estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 			rand_idx[i] = rand() % matches.size();
 		}
 
-		std::cerr << "Random idx " << rand_idx[0] << " " << rand_idx[1] << " "
-				<< rand_idx[2] << " " << matches.size() << std::endl;
-
 		while (rand_idx[0] == rand_idx[1] || rand_idx[0] == rand_idx[2]
 				|| rand_idx[1] == rand_idx[2]) {
 			for (int i = 0; i < 3; i++) {
 				rand_idx[i] = rand() % matches.size();
 			}
 		}
+
+		//std::cerr << "Random idx " << rand_idx[0] << " " << rand_idx[1] << " "
+		//		<< rand_idx[2] << " " << matches.size() << std::endl;
 
 		Eigen::Matrix3f src_rand, dst_rand;
 
@@ -100,12 +101,12 @@ void estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		Eigen::Affine3f transformation;
 		transformation = Eigen::umeyama(src_rand, dst_rand, false);
 
-		std::cerr << "src_rand " << std::endl << src_rand << std::endl;
-		std::cerr << "dst_rand " << std::endl << dst_rand << std::endl;
-		std::cerr << "src_rand_trans " << std::endl << transformation * src_rand
-				<< std::endl;
-		std::cerr << "trans " << std::endl << transformation.matrix()
-				<< std::endl;
+		//std::cerr << "src_rand " << std::endl << src_rand << std::endl;
+		//std::cerr << "dst_rand " << std::endl << dst_rand << std::endl;
+		//std::cerr << "src_rand_trans " << std::endl << transformation * src_rand
+		//		<< std::endl;
+		//std::cerr << "trans " << std::endl << transformation.matrix()
+		//		<< std::endl;
 
 		int current_num_inliers = 0;
 		vector<bool> current_inliers;
@@ -129,6 +130,10 @@ void estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		}
 	}
 
+	if(max_inliers < min_num_inliers) {
+		return false;
+	}
+
 	Eigen::Matrix3Xf src_rand(3, max_inliers), dst_rand(3, max_inliers);
 
 	int col_idx = 0;
@@ -145,7 +150,9 @@ void estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 
 	trans = Eigen::umeyama(src_rand, dst_rand, false);
 
-	std::cerr << trans.matrix() << std::endl;
+	//std::cerr << trans.matrix() << std::endl;
 	std::cerr << max_inliers << std::endl;
+
+	return true;
 
 }

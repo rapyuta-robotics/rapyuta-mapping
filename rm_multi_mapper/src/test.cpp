@@ -21,14 +21,14 @@ int main() {
 
 	cv::Ptr<cv::DescriptorMatcher> dm = new cv::BFMatcher;
 
-	cv::Mat rgb1 = cv::imread("../panorama7/rgb/1372857266.630473635.png",
+	cv::Mat rgb1 = cv::imread("../panorama5/rgb/1372788772.32563458.png",
 			CV_LOAD_IMAGE_UNCHANGED);
-	cv::Mat depth1 = cv::imread("../panorama7/depth/1372857266.630473635.png",
+	cv::Mat depth1 = cv::imread("../panorama5/depth/1372788772.32563458.png",
 			CV_LOAD_IMAGE_UNCHANGED);
 
-	cv::Mat rgb2 = cv::imread("../panorama7/rgb/1372857267.904209465.png",
+	cv::Mat rgb2 = cv::imread("../panorama5/rgb/1372788773.373165709.png",
 			CV_LOAD_IMAGE_UNCHANGED);
-	cv::Mat depth2 = cv::imread("../panorama7/depth/1372857267.904209465.png",
+	cv::Mat depth2 = cv::imread("../panorama5/depth/1372788773.373165709.png",
 			CV_LOAD_IMAGE_UNCHANGED);
 
 	std::vector<cv::KeyPoint> keypoints1, keypoints2;
@@ -55,6 +55,8 @@ int main() {
 			filtered_matches.push_back(matches[i]);
 	}
 
+
+
 	cv::Mat res;
 	cv::drawMatches(rgb1, keypoints1, rgb2, keypoints2, filtered_matches, res,
 			cv::Scalar(0, 255, 0));
@@ -67,6 +69,8 @@ int main() {
 
 	cv::imshow("Matches", res);
 	cv::waitKey(0);
+
+	std::cerr << descriptors1.cols << " " << descriptors1.rows << std::endl;
 
 	return 0;
 }

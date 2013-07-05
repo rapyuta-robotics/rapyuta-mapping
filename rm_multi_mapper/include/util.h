@@ -30,7 +30,7 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		std::vector<cv::KeyPoint> & filtered_keypoints,
 		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors);
 
-void estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
+bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		const pcl::PointCloud<pcl::PointXYZ> & dst,
 		const std::vector<cv::DMatch> matches, int num_iter,
 		float distance2_threshold, int min_num_inliers, Eigen::Affine3f & trans,
