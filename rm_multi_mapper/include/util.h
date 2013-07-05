@@ -24,6 +24,36 @@ typedef struct {
 } observation;
 
 
+class keypoint_map {
+
+public:
+
+	keypoint_map(cv::Mat & rgb, cv::Mat & depth);
+
+	bool merge_keypoint_map(const keypoint_map & other);
+
+	void remove_bad_points();
+
+	void optimize();
+
+	cv::Ptr<cv::FeatureDetector> fd;
+	cv::Ptr<cv::DescriptorExtractor> de;
+	cv::Ptr<cv::DescriptorMatcher> dm;
+
+	pcl::PointCloud<pcl::PointXYZ> keypoints3d;
+	cv::Mat descriptors;
+	vector<float> weights;
+
+	std::vector<Eigen::Affine3f> camera_positions;
+	std::vector<observation> observations;
+
+	Eigen::Vector4f intrinsics;
+
+	std::vector<cv::Mat> rgb_imgs;
+	std::vector<cv::Mat> depth_imgs;
+
+};
+
 void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		const Eigen::Vector4f & intrinsics, cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,

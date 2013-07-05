@@ -7,6 +7,285 @@
 
 #include <util.h>
 
+#include "g2o/core/sparse_optimizer.h"
+#include "g2o/core/block_solver.h"
+#include "g2o/core/solver.h"
+#include "g2o/core/robust_kernel_impl.h"
+#include "g2o/core/optimization_algorithm_levenberg.h"
+#include "g2o/solvers/cholmod/linear_solver_cholmod.h"
+#include "g2o/solvers/dense/linear_solver_dense.h"
+#include "g2o/types/sba/types_six_dof_expmap.h"
+#include "g2o/solvers/structure_only/structure_only_solver.h"
+
+keypoint_map::keypoint_map(const cv::Mat & rgb, const cv::Mat & depth) {
+	de = new cv::SurfDescriptorExtractor;
+	dm = new cv::FlannBasedMatcher;
+	fd = new cv::SurfFeatureDetector;
+	fd->setInt("hessianThreshold", 400);
+	fd->setBool("extended", true);
+	fd->setBool("upright", true);
+
+	intrinsics << 525.0, 525.0, 319.5, 239.5;
+
+	std::vector<cv::KeyPoint> keypoints;
+
+	compute_features(rgb, depth, intrinsics, fd, de, keypoints, keypoints3d,
+			descriptors);
+
+	for (int keypoint_id = 0; keypoint_id < keypoints.size(); keypoint_id++) {
+		observation o;
+		o.cam_id = 0;
+		o.point_id = keypoint_id;
+		o.coord << keypoints[keypoint_id].pt.x, keypoints[keypoint_id].pt.y;
+
+		observations.push_back(o);
+		weights.push_back(1.0f);
+	}
+
+	camera_positions.push_back(Eigen::Affine3f::Identity());
+	rgb_imgs.push_back(rgb);
+	depth_imgs.push_back(depth);
+
+}
+
+bool keypoint_map::merge_keypoint_map(const keypoint_map & other) {
+
+	std::vector<cv::DMatch> matches;
+	dm->match(other.descriptors, descriptors, matches);
+
+	Eigen::Affine3f transform;
+	std::vector<bool> inliers;
+
+	bool res = estimate_transform_ransac(other.keypoints3d, keypoints3d,
+			matches, 3000, 0.03 * 0.03, 20, transform, inliers);
+
+	if (!res)
+		return false;
+
+	size_t current_camera_positions_size = camera_positions.size();
+
+	for (size_t i = 0; i < other.camera_positions.size(); i++) {
+		camera_positions.push_back(transform * other.camera_positions[i]);
+		rgb_imgs.push_back(other.rgb_imgs[i]);
+		depth_imgs.push_back(other.depth_imgs[i]);
+	}
+
+	for (size_t i = 0; i < matches.size(); i++) {
+
+		if (inliers[i]) {
+			descriptors.row(matches[i].trainIdx) = (descriptors.row(
+					matches[i].trainIdx) * weights[matches[i].trainIdx]
+					+ other.descriptors.row(matches[i].queryIdx)
+							* other.weights[matches[i].queryIdx])
+					/ (weights[matches[i].trainIdx]
+							+ other.weights[matches[i].queryIdx]);
+
+			weights[matches[i].trainIdx] += other.weights[matches[i].queryIdx];
+
+			for (size_t j = 0; j < other.observations.size(); j++) {
+				if (other.observations[j].point_id == matches[i].queryIdx) {
+
+					observation o = other.observations[j];
+					o.point_id = matches[i].trainIdx;
+					o.cam_id += current_camera_positions_size;
+					observations.push_back(o);
+				}
+			}
+
+		} else {
+			pcl::PointXYZ p;
+			p.getVector4fMap() = transform
+					* other.keypoints3d[matches[i].queryIdx].getVector4fMap();
+			keypoints3d.push_back(p);
+
+			cv::vconcat(descriptors, other.descriptors.row(matches[i].queryIdx),
+					descriptors);
+
+			weights.push_back(other.weights[matches[i].queryIdx]);
+
+			for (size_t j = 0; j < other.observations.size(); j++) {
+				if (other.observations[j].point_id == matches[i].queryIdx) {
+
+					observation o = other.observations[j];
+					o.point_id = keypoints3d.size() - 1;
+					o.cam_id += current_camera_positions_size;
+					observations.push_back(o);
+				}
+			}
+
+		}
+	}
+
+	return true;
+
+}
+
+void keypoint_map::remove_bad_points() {
+
+	pcl::PointCloud<pcl::PointXYZ> new_keypoints3d;
+	cv::Mat new_descriptors;
+	vector<float> new_weights;
+
+	std::vector<observation> new_observations;
+
+	for (size_t i = 0; i < keypoints3d.size(); i++) {
+
+		if (weights[i] > 1) {
+			new_keypoints3d.push_back(keypoints3d[i]);
+			if (new_descriptors.rows == 0) {
+				descriptors.row(i).copyTo(new_descriptors);
+			} else {
+				cv::vconcat(new_descriptors, descriptors.row(i),
+						new_descriptors);
+			}
+			new_weights.push_back(weights[i]);
+
+			for (size_t j = 0; j < observations.size(); j++) {
+				if (observations[j].point_id == i) {
+					observation o = observations[j];
+					o.point_id = new_keypoints3d.size() - 1;
+					new_observations.push_back(o);
+				}
+			}
+
+		}
+
+	}
+
+	keypoints3d = new_keypoints3d;
+	descriptors = new_descriptors;
+	weights = new_weights;
+	observations = new_observations;
+
+}
+
+void keypoint_map::optimize() {
+
+	g2o::SparseOptimizer optimizer;
+	optimizer.setVerbose(true);
+	g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
+
+	linearSolver = new g2o::LinearSolverCholmod<
+			g2o::BlockSolver_6_3::PoseMatrixType>();
+
+	g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
+	g2o::OptimizationAlgorithmLevenberg* solver =
+			new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+	optimizer.setAlgorithm(solver);
+
+	double focal_length = intrinsics[0];
+	Eigen::Vector2d principal_point(intrinsics[2], intrinsics[3]);
+
+	g2o::CameraParameters * cam_params = new g2o::CameraParameters(focal_length,
+			principal_point, 0.);
+	cam_params->setId(0);
+
+	if (!optimizer.addParameter(cam_params)) {
+		assert(false);
+	}
+
+	std::cerr << camera_positions.size() << " " << keypoints3d.size() << " "
+			<< observations.size() << std::endl;
+
+	int vertex_id = 0, point_id = 0;
+
+	for (size_t i = 0; i < camera_positions.size(); i++) {
+		Eigen::Vector3d trans(camera_positions[i].translation().cast<double>());
+		Eigen::Quaterniond q(camera_positions[i].rotation().cast<double>());
+
+		g2o::SE3Quat pose(q, trans);
+		g2o::VertexSE3Expmap * v_se3 = new g2o::VertexSE3Expmap();
+		v_se3->setId(vertex_id);
+		if (i < 1) {
+			v_se3->setFixed(true);
+		}
+		v_se3->setEstimate(pose);
+		optimizer.addVertex(v_se3);
+		vertex_id++;
+	}
+
+	for (size_t i = 0; i < keypoints3d.size(); i++) {
+		g2o::VertexSBAPointXYZ * v_p = new g2o::VertexSBAPointXYZ();
+		v_p->setId(vertex_id + point_id);
+		v_p->setMarginalized(true);
+		v_p->setEstimate(keypoints3d[i].getVector3fMap().cast<double>());
+		optimizer.addVertex(v_p);
+		point_id++;
+	}
+
+	for (size_t i = 0; i < observations.size(); i++) {
+		g2o::EdgeProjectXYZ2UV * e = new g2o::EdgeProjectXYZ2UV();
+		e->setVertex(0,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						vertex_id + observations[i].point_id)->second));
+		e->setVertex(1,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						observations[i].cam_id)->second));
+		e->setMeasurement(observations[i].coord.cast<double>());
+		e->information() = Eigen::Matrix2d::Identity();
+
+		//g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
+		//e->setRobustKernel(rk);
+
+		e->setParameterId(0, 0);
+		optimizer.addEdge(e);
+
+	}
+
+	optimizer.save("debug.txt");
+
+	optimizer.initializeOptimization();
+	optimizer.setVerbose(true);
+
+	cout << endl;
+	cout << "Performing full BA:" << endl;
+	optimizer.optimize(10);
+	cout << endl;
+
+	for (int i = 0; i < vertex_id; i++) {
+		g2o::HyperGraph::VertexIDMap::iterator v_it = optimizer.vertices().find(
+				i);
+		if (v_it == optimizer.vertices().end()) {
+			cerr << "Vertex " << i << " not in graph!" << endl;
+			exit(-1);
+		}
+
+		g2o::VertexSE3Expmap * v_c =
+				dynamic_cast<g2o::VertexSE3Expmap *>(v_it->second);
+		if (v_c == 0) {
+			cerr << "Vertex " << i << "is not a VertexSE3Expmap!" << endl;
+			exit(-1);
+		}
+
+		Eigen::Affine3f pos;
+		pos.fromPositionOrientationScale(
+				v_c->estimate().translation().cast<float>(),
+				v_c->estimate().rotation().cast<float>(),
+				Eigen::Vector3f(1, 1, 1));
+		camera_positions[i] = pos;
+	}
+
+	for (int i = 0; i < point_id; i++) {
+		g2o::HyperGraph::VertexIDMap::iterator v_it = optimizer.vertices().find(
+				vertex_id + i);
+		if (v_it == optimizer.vertices().end()) {
+			cerr << "Vertex " << vertex_id + i << " not in graph!" << endl;
+			exit(-1);
+		}
+
+		g2o::VertexSBAPointXYZ * v_p =
+				dynamic_cast<g2o::VertexSBAPointXYZ *>(v_it->second);
+		if (v_p == 0) {
+			cerr << "Vertex " << vertex_id + i << "is not a VertexSE3Expmap!"
+					<< endl;
+			exit(-1);
+		}
+
+		keypoints3d[i].getVector3fMap() = v_p->estimate().cast<float>();
+	}
+
+}
+
 void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		const Eigen::Vector4f & intrinsics, cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,
@@ -41,7 +320,7 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	filtered_keypoints.clear();
 	keypoints3d.clear();
 
-	for (int i = 0; i < keypoints.size(); i++) {
+	for (size_t i = 0; i < keypoints.size(); i++) {
 		if (depth.at<unsigned short>(keypoints[i].pt) != 0) {
 			filtered_keypoints.push_back(keypoints[i]);
 
@@ -67,8 +346,6 @@ bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		std::vector<bool> & inliers) {
 
 	int max_inliers = 0;
-
-
 
 	for (int iter = 0; iter < num_iter; iter++) {
 
@@ -111,7 +388,7 @@ bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		int current_num_inliers = 0;
 		vector<bool> current_inliers;
 		current_inliers.resize(matches.size());
-		for (int i = 0; i < matches.size(); i++) {
+		for (size_t i = 0; i < matches.size(); i++) {
 
 			Eigen::Vector4f distance_vector = transformation
 					* src[matches[i].queryIdx].getVector4fMap()
@@ -130,19 +407,17 @@ bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		}
 	}
 
-	if(max_inliers < min_num_inliers) {
+	if (max_inliers < min_num_inliers) {
 		return false;
 	}
 
 	Eigen::Matrix3Xf src_rand(3, max_inliers), dst_rand(3, max_inliers);
 
 	int col_idx = 0;
-	for (int i = 0; i < inliers.size(); i++) {
+	for (size_t i = 0; i < inliers.size(); i++) {
 		if (inliers[i]) {
-			src_rand.col(col_idx) =
-					src[matches[i].queryIdx].getVector3fMap();
-			dst_rand.col(col_idx) =
-					dst[matches[i].trainIdx].getVector3fMap();
+			src_rand.col(col_idx) = src[matches[i].queryIdx].getVector3fMap();
+			dst_rand.col(col_idx) = dst[matches[i].trainIdx].getVector3fMap();
 			col_idx++;
 		}
 

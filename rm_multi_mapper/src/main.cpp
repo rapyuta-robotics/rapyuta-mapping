@@ -13,26 +13,9 @@ int main(int argc, char **argv) {
 
 	ros::NodeHandle nh;
 
-	cv::Ptr<cv::FeatureDetector> fd = new cv::SurfFeatureDetector;
-	fd->setInt("hessianThreshold", 400);
-	fd->setBool("extended", true);
-	fd->setBool("upright", true);
-
-	cv::Ptr<cv::DescriptorExtractor> de = new cv::SurfDescriptorExtractor;
-
-	cv::Ptr<cv::DescriptorMatcher> dm = new cv::BFMatcher;
-
-	pcl::PointCloud<pcl::PointXYZ> accumulated_keypoints3d;
-	cv::Mat accumulated_descriptors;
-	vector<float> accumulated_weights;
+	boost::shared_ptr<keypoint_map> map;
 
 	pcl::visualization::PCLVisualizer vis;
-
-	Eigen::Vector4f intrinsics;
-	intrinsics << 525.0, 525.0, 319.5, 239.5;
-
-	std::vector<Eigen::Affine3f, Eigen::aligned_allocator<Eigen::Affine3f> > camera_positions;
-	std::vector<observation> observations;
 
 	// create the action client
 	// true causes the client to spin its own thread
@@ -52,7 +35,7 @@ int main(int argc, char **argv) {
 	ROS_INFO("Action server started, sending goal.");
 	// send a goal to the action
 
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < 18; i++) {
 		turtlebot_actions::TurtlebotMoveGoal goal;
 		goal.forward_distance = 0;
 		goal.turn_distance = M_PI / 36;
@@ -84,107 +67,21 @@ int main(int argc, char **argv) {
 				cv::Mat depth = cv::imdecode(srv.response.depth_png_data,
 						CV_LOAD_IMAGE_UNCHANGED);
 
-				if (accumulated_keypoints3d.size() == 0) {
-
-					std::vector<cv::KeyPoint> keypoints;
-
-					compute_features(rgb, depth, intrinsics, fd, de, keypoints,
-							accumulated_keypoints3d, accumulated_descriptors);
-
-					for (int keypoint_id = 0; keypoint_id < keypoints.size();
-							keypoint_id++) {
-						observation o;
-						o.cam_id = 0;
-						o.point_id = keypoint_id;
-						o.coord << keypoints[keypoint_id].pt.x, keypoints[keypoint_id].pt.y;
-
-						observations.push_back(o);
-						accumulated_weights.push_back(1.0f);
-					}
-
-					camera_positions.push_back(Eigen::Affine3f::Identity());
-
+				if (map.get()) {
+					keypoint_map map1(rgb, depth);
+					map->merge_keypoint_map(map1);
 				} else {
-
-					std::vector<cv::KeyPoint> keypoints;
-					pcl::PointCloud<pcl::PointXYZ> keypoints3d;
-					cv::Mat descriptors;
-
-					compute_features(rgb, depth, intrinsics, fd, de, keypoints,
-							keypoints3d, descriptors);
-
-					if (keypoints.size() < 3) {
-						ROS_INFO("Not enough features... Skipping frame");
-						continue;
-					}
-
-					std::vector<cv::DMatch> matches;
-					dm->match(descriptors, accumulated_descriptors, matches);
-
-					Eigen::Affine3f transform;
-					std::vector<bool> inliers;
-
-					bool res = estimate_transform_ransac(keypoints3d,
-							accumulated_keypoints3d, matches, 3000, 0.03 * 0.03,
-							20, transform, inliers);
-
-					if(!res)
-						continue;
-
-					camera_positions.push_back(transform);
-
-					for (int i = 0; i < matches.size(); i++) {
-
-						observation o;
-						o.cam_id = camera_positions.size() - 1;
-						o.coord << keypoints[matches[i].queryIdx].pt.x, keypoints[matches[i].queryIdx].pt.y;
-
-						if (inliers[i]) {
-							o.point_id = matches[i].trainIdx;
-
-							accumulated_descriptors.row(o.point_id) =
-									(accumulated_descriptors.row(o.point_id)
-											* accumulated_weights[o.point_id]
-											+ descriptors.row(
-													matches[i].queryIdx))
-											/ (accumulated_weights[o.point_id]
-													+ 1);
-
-							accumulated_weights[o.point_id] += 1.0f;
-
-						} else {
-
-							pcl::PointXYZ p;
-							p.getVector4fMap() = transform * keypoints3d[matches[i].queryIdx].getVector4fMap();
-
-							accumulated_keypoints3d.push_back(p);
-
-							o.point_id = accumulated_keypoints3d.size() - 1;
-
-							accumulated_weights[o.point_id] += 1.0f;
-
-							cv::vconcat(accumulated_descriptors,
-									descriptors.row(matches[i].queryIdx),
-									accumulated_descriptors);
-
-							accumulated_weights.push_back(1.0f);
-
-						}
-
-						observations.push_back(o);
-
-					}
-
+					map.reset(new keypoint_map(rgb, depth));
 				}
 
-				std::cerr << accumulated_keypoints3d.size() << " "
-						<< accumulated_descriptors.rows << " "
-						<< accumulated_weights.size() << std::endl;
+				std::cerr << map->keypoints3d.size() << " "
+						<< map->descriptors.rows << " " << map->weights.size()
+						<< std::endl;
 
-				vis.removeAllPointClouds();
-				vis.addPointCloud<pcl::PointXYZ>(
-						accumulated_keypoints3d.makeShared(), "keypoints");
-				vis.spinOnce(2);
+				//vis.removeAllPointClouds();
+				//vis.addPointCloud<pcl::PointXYZ>(
+				//		accumulated_keypoints3d.makeShared(), "keypoints");
+				//vis.spinOnce(2);
 
 				//cv::imshow("Image", rgb);
 				//cv::waitKey(2);
@@ -197,6 +94,23 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	vis.removeAllPointClouds();
+	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
+			"keypoints");
+	vis.spin();
+
+	map->remove_bad_points();
+
+	vis.removeAllPointClouds();
+	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
+			"keypoints");
+	vis.spin();
+
+	map->optimize();
+
+	vis.removeAllPointClouds();
+	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
+			"keypoints");
 	vis.spin();
 
 //exit
