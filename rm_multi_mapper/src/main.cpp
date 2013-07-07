@@ -113,6 +113,9 @@ int main(int argc, char **argv) {
 			"keypoints");
 	vis.spin();
 
+
+	map->extract_surface();
+
 //exit
 	return 0;
 }

@@ -17,7 +17,14 @@
 #include "g2o/types/sba/types_six_dof_expmap.h"
 #include "g2o/solvers/structure_only/structure_only_solver.h"
 
-keypoint_map::keypoint_map(const cv::Mat & rgb, const cv::Mat & depth) {
+#include <pcl/surface/marching_cubes_hoppe.h>
+#include <pcl/features/normal_3d_omp.h>
+#include <pcl/search/flann_search.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/io/vtk_io.h>
+#include <pcl/io/pcd_io.h>
+
+keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth) {
 	de = new cv::SurfDescriptorExtractor;
 	dm = new cv::FlannBasedMatcher;
 	fd = new cv::SurfFeatureDetector;
@@ -124,7 +131,7 @@ void keypoint_map::remove_bad_points() {
 
 	pcl::PointCloud<pcl::PointXYZ> new_keypoints3d;
 	cv::Mat new_descriptors;
-	vector<float> new_weights;
+	std::vector<float> new_weights;
 
 	std::vector<observation> new_observations;
 
@@ -237,23 +244,24 @@ void keypoint_map::optimize() {
 	optimizer.initializeOptimization();
 	optimizer.setVerbose(true);
 
-	cout << endl;
-	cout << "Performing full BA:" << endl;
+	std::cout << std::endl;
+	std::cout << "Performing full BA:" << std::endl;
 	optimizer.optimize(10);
-	cout << endl;
+	std::cout << std::endl;
 
 	for (int i = 0; i < vertex_id; i++) {
 		g2o::HyperGraph::VertexIDMap::iterator v_it = optimizer.vertices().find(
 				i);
 		if (v_it == optimizer.vertices().end()) {
-			cerr << "Vertex " << i << " not in graph!" << endl;
+			std::cerr << "Vertex " << i << " not in graph!" << std::endl;
 			exit(-1);
 		}
 
 		g2o::VertexSE3Expmap * v_c =
 				dynamic_cast<g2o::VertexSE3Expmap *>(v_it->second);
 		if (v_c == 0) {
-			cerr << "Vertex " << i << "is not a VertexSE3Expmap!" << endl;
+			std::cerr << "Vertex " << i << "is not a VertexSE3Expmap!"
+					<< std::endl;
 			exit(-1);
 		}
 
@@ -269,20 +277,93 @@ void keypoint_map::optimize() {
 		g2o::HyperGraph::VertexIDMap::iterator v_it = optimizer.vertices().find(
 				vertex_id + i);
 		if (v_it == optimizer.vertices().end()) {
-			cerr << "Vertex " << vertex_id + i << " not in graph!" << endl;
+			std::cerr << "Vertex " << vertex_id + i << " not in graph!"
+					<< std::endl;
 			exit(-1);
 		}
 
 		g2o::VertexSBAPointXYZ * v_p =
 				dynamic_cast<g2o::VertexSBAPointXYZ *>(v_it->second);
 		if (v_p == 0) {
-			cerr << "Vertex " << vertex_id + i << "is not a VertexSE3Expmap!"
-					<< endl;
+			std::cerr << "Vertex " << vertex_id + i
+					<< "is not a VertexSE3Expmap!" << std::endl;
 			exit(-1);
 		}
 
 		keypoints3d[i].getVector3fMap() = v_p->estimate().cast<float>();
 	}
+
+}
+
+pcl::PolygonMesh::Ptr keypoint_map::extract_surface() {
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud(
+			new pcl::PointCloud<pcl::PointXYZ>);
+
+	for (size_t i = 0; i < depth_imgs.size(); i++) {
+
+		std::cerr << camera_positions[i].matrix() << std::endl;
+
+		for (int v = 0; v < depth_imgs[i].rows; v++) {
+			for (int u = 0; u < depth_imgs[i].cols; u++) {
+				if (depth_imgs[i].at<unsigned short>(v, u) != 0) {
+					pcl::PointXYZ p;
+					p.z = depth_imgs[i].at<unsigned short>(v, u) / 1000.0f;
+					p.x = (u - intrinsics[2]) * p.z / intrinsics[0];
+					p.y = (v - intrinsics[3]) * p.z / intrinsics[1];
+
+					Eigen::Vector4f tmp = camera_positions[i]
+							* p.getVector4fMap();
+
+					p.getVector4fMap() = tmp;
+
+					//ROS_INFO("Point %f %f %f from  %f %f ", p.x, p.y, p.z, keypoints[i].pt.x, keypoints[i].pt.y);
+
+					point_cloud->push_back(p);
+				}
+			}
+		}
+	}
+
+	pcl::io::savePCDFileASCII("room.pcd", *point_cloud);
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_filtered(
+				new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::VoxelGrid<pcl::PointXYZ> sor;
+	sor.setInputCloud(point_cloud);
+	sor.setLeafSize(0.05f, 0.05f, 0.05f);
+	sor.filter(*point_cloud_filtered);
+
+	pcl::io::savePCDFileASCII("room_sub.pcd", *point_cloud_filtered);
+
+	pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::PointNormal> ne;
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree1(
+			new pcl::search::KdTree<pcl::PointXYZ>);
+	tree1->setInputCloud(point_cloud);
+	ne.setInputCloud(point_cloud);
+	ne.setSearchMethod(tree1);
+	ne.setKSearch(20);
+	pcl::PointCloud<pcl::PointNormal>::Ptr normals(
+			new pcl::PointCloud<pcl::PointNormal>);
+	ne.compute(*normals);
+
+	point_cloud->clear();
+
+	pcl::MarchingCubesHoppe<pcl::PointNormal> mc;
+
+	pcl::PolygonMesh::Ptr triangles(new pcl::PolygonMesh);
+	mc.setInputCloud(normals);
+
+	pcl::search::KdTree<pcl::PointNormal>::Ptr tree2(
+			new pcl::search::KdTree<pcl::PointNormal>);
+	tree2->setInputCloud(normals);
+	mc.setSearchMethod(tree2);
+	mc.reconstruct(*triangles);
+
+	cout << triangles->polygons.size() << " triangles created" << endl;
+	pcl::io::saveVTKFile("mesh.vtk", *triangles);
+
+	return triangles;
 
 }
 
@@ -386,7 +467,7 @@ bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		//		<< std::endl;
 
 		int current_num_inliers = 0;
-		vector<bool> current_inliers;
+		std::vector<bool> current_inliers;
 		current_inliers.resize(matches.size());
 		for (size_t i = 0; i < matches.size(); i++) {
 

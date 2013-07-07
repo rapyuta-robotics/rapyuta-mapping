@@ -15,7 +15,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/registration/transformation_estimation_svd.h>
+#include <pcl/PolygonMesh.h>
 
 typedef struct {
 	int cam_id;
@@ -36,13 +36,15 @@ public:
 
 	void optimize();
 
+	pcl::PolygonMesh::Ptr extract_surface();
+
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
 	cv::Ptr<cv::DescriptorMatcher> dm;
 
 	pcl::PointCloud<pcl::PointXYZ> keypoints3d;
 	cv::Mat descriptors;
-	vector<float> weights;
+	std::vector<float> weights;
 
 	std::vector<Eigen::Affine3f> camera_positions;
 	std::vector<observation> observations;
