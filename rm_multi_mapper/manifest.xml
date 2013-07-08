@@ -17,6 +17,7 @@
   <depend package="opencv2"/>
   <depend package="pcl"/>
   <depend package="turtlebot_actions"/>
+  <depend package="eigen_conversions"/>
   <rosdep name="suitesparse" />
 
 </package>

@@ -17,6 +17,10 @@
 #include <pcl/point_types.h>
 #include <pcl/PolygonMesh.h>
 
+#include <octomap/OcTree.h>
+#include <octomap/ColorOcTree.h>
+
+
 typedef struct {
 	int cam_id;
 	int point_id;
@@ -28,7 +32,7 @@ class keypoint_map {
 
 public:
 
-	keypoint_map(cv::Mat & rgb, cv::Mat & depth);
+	keypoint_map(cv::Mat & rgb, cv::Mat & depth, Eigen::Affine3f & transform);
 
 	bool merge_keypoint_map(const keypoint_map & other);
 
@@ -36,7 +40,11 @@ public:
 
 	void optimize();
 
-	pcl::PolygonMesh::Ptr extract_surface();
+	void get_octree(octomap::OcTree & tree);
+
+	void extract_surface();
+
+	float compute_error();
 
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
@@ -53,6 +61,7 @@ public:
 
 	std::vector<cv::Mat> rgb_imgs;
 	std::vector<cv::Mat> depth_imgs;
+
 
 };
 

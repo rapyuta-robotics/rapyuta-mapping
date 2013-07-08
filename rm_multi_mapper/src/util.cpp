@@ -24,7 +24,10 @@
 #include <pcl/io/vtk_io.h>
 #include <pcl/io/pcd_io.h>
 
-keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth) {
+#include <octomap/ColorOcTree.h>
+
+keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
+		Eigen::Affine3f & transform) {
 	de = new cv::SurfDescriptorExtractor;
 	dm = new cv::FlannBasedMatcher;
 	fd = new cv::SurfFeatureDetector;
@@ -47,9 +50,13 @@ keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth) {
 
 		observations.push_back(o);
 		weights.push_back(1.0f);
+
+		keypoints3d[keypoint_id].getVector4fMap() = transform
+				* keypoints3d[keypoint_id].getVector4fMap();
+
 	}
 
-	camera_positions.push_back(Eigen::Affine3f::Identity());
+	camera_positions.push_back(transform);
 	rgb_imgs.push_back(rgb);
 	depth_imgs.push_back(depth);
 
@@ -137,7 +144,7 @@ void keypoint_map::remove_bad_points() {
 
 	for (size_t i = 0; i < keypoints3d.size(); i++) {
 
-		if (weights[i] > 1) {
+		if (weights[i] > 3) {
 			new_keypoints3d.push_back(keypoints3d[i]);
 			if (new_descriptors.rows == 0) {
 				descriptors.row(i).copyTo(new_descriptors);
@@ -197,8 +204,9 @@ void keypoint_map::optimize() {
 	int vertex_id = 0, point_id = 0;
 
 	for (size_t i = 0; i < camera_positions.size(); i++) {
-		Eigen::Vector3d trans(camera_positions[i].translation().cast<double>());
-		Eigen::Quaterniond q(camera_positions[i].rotation().cast<double>());
+		Eigen::Affine3f cam_world = camera_positions[i].inverse();
+		Eigen::Vector3d trans(cam_world.translation().cast<double>());
+		Eigen::Quaterniond q(cam_world.rotation().cast<double>());
 
 		g2o::SE3Quat pose(q, trans);
 		g2o::VertexSE3Expmap * v_se3 = new g2o::VertexSE3Expmap();
@@ -231,8 +239,8 @@ void keypoint_map::optimize() {
 		e->setMeasurement(observations[i].coord.cast<double>());
 		e->information() = Eigen::Matrix2d::Identity();
 
-		//g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-		//e->setRobustKernel(rk);
+		g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
+		e->setRobustKernel(rk);
 
 		e->setParameterId(0, 0);
 		optimizer.addEdge(e);
@@ -270,7 +278,7 @@ void keypoint_map::optimize() {
 				v_c->estimate().translation().cast<float>(),
 				v_c->estimate().rotation().cast<float>(),
 				Eigen::Vector3f(1, 1, 1));
-		camera_positions[i] = pos;
+		camera_positions[i] = pos.inverse();
 	}
 
 	for (int i = 0; i < point_id; i++) {
@@ -295,14 +303,21 @@ void keypoint_map::optimize() {
 
 }
 
-pcl::PolygonMesh::Ptr keypoint_map::extract_surface() {
+void get_octree(octomap::OcTree & tree) {
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud(
-			new pcl::PointCloud<pcl::PointXYZ>);
+	tree.clear();
 
 	for (size_t i = 0; i < depth_imgs.size(); i++) {
 
-		std::cerr << camera_positions[i].matrix() << std::endl;
+		octomap::Pointcloud octomap_cloud;
+		octomap::point3d sensor_origin(0.0, 0.0, 0.0);
+
+		Eigen::Vector3f trans(camera_positions[i].translation());
+		Eigen::Quaternionf rot(camera_positions[i].rotation());
+
+		octomap::pose6d frame_origin(
+				octomath::Vector3(trans.x(), trans.y(), trans.z()),
+				octomath::Quaternion(rot.w(), rot.x(), rot.y(), rot.z()));
 
 		for (int v = 0; v < depth_imgs[i].rows; v++) {
 			for (int u = 0; u < depth_imgs[i].cols; u++) {
@@ -312,58 +327,123 @@ pcl::PolygonMesh::Ptr keypoint_map::extract_surface() {
 					p.x = (u - intrinsics[2]) * p.z / intrinsics[0];
 					p.y = (v - intrinsics[3]) * p.z / intrinsics[1];
 
-					Eigen::Vector4f tmp = camera_positions[i]
-							* p.getVector4fMap();
+					octomap_cloud.push_back(p.x, p.y, p.z);
 
-					p.getVector4fMap() = tmp;
-
-					//ROS_INFO("Point %f %f %f from  %f %f ", p.x, p.y, p.z, keypoints[i].pt.x, keypoints[i].pt.y);
-
-					point_cloud->push_back(p);
 				}
 			}
 		}
+
+		tree.insertScan(octomap_cloud, sensor_origin, frame_origin);
+		tree.updateInnerOccupancy();
 	}
+
+}
+
+void keypoint_map::extract_surface() {
+
+	octomap::ColorOcTree tree(0.05f);
+
+	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud(
+			new pcl::PointCloud<pcl::PointXYZRGBA>);
+
+	for (size_t i = 0; i < depth_imgs.size(); i++) {
+
+		cv::imwrite("rgb/" + boost::lexical_cast<std::string>(i) + ".png",
+				rgb_imgs[i]);
+		cv::imwrite("depth/" + boost::lexical_cast<std::string>(i) + ".png",
+				depth_imgs[i]);
+
+		octomap::Pointcloud octomap_cloud;
+		octomap::point3d sensor_origin(0.0, 0.0, 0.0);
+
+		Eigen::Vector3f trans(camera_positions[i].translation());
+		Eigen::Quaternionf rot(camera_positions[i].rotation());
+
+		octomap::pose6d frame_origin(
+				octomath::Vector3(trans.x(), trans.y(), trans.z()),
+				octomath::Quaternion(rot.w(), rot.x(), rot.y(), rot.z()));
+		//std::cerr << camera_positions[i].matrix() << std::endl;
+
+		for (int v = 0; v < depth_imgs[i].rows; v++) {
+			for (int u = 0; u < depth_imgs[i].cols; u++) {
+				if (depth_imgs[i].at<unsigned short>(v, u) != 0) {
+					pcl::PointXYZRGBA p;
+					p.z = depth_imgs[i].at<unsigned short>(v, u) / 1000.0f;
+					p.x = (u - intrinsics[2]) * p.z / intrinsics[0];
+					p.y = (v - intrinsics[3]) * p.z / intrinsics[1];
+					cv::Vec3b brg = rgb_imgs[i].at<cv::Vec3b>(v, u);
+					p.r = brg[2];
+					p.g = brg[1];
+					p.b = brg[0];
+					p.a = 255;
+
+					Eigen::Vector4f tmp = camera_positions[i]
+							* p.getVector4fMap();
+
+					if (tmp[2] < 2.0) {
+
+						octomap_cloud.push_back(p.x, p.y, p.z);
+						p.getVector4fMap() = tmp;
+
+						octomap::point3d endpoint(p.x, p.y, p.z);
+						octomap::ColorOcTreeNode* n = tree.search(endpoint);
+						if (n) {
+							n->setColor(p.r, p.g, p.b);
+						}
+
+						//ROS_INFO("Point %f %f %f from  %f %f ", p.x, p.y, p.z, keypoints[i].pt.x, keypoints[i].pt.y);
+
+						point_cloud->push_back(p);
+
+					}
+
+				}
+			}
+		}
+
+		tree.insertScan(octomap_cloud, sensor_origin, frame_origin);
+		tree.updateInnerOccupancy();
+	}
+
+	tree.write("room.ot");
 
 	pcl::io::savePCDFileASCII("room.pcd", *point_cloud);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_filtered(
-				new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::VoxelGrid<pcl::PointXYZ> sor;
+	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud_filtered(
+			new pcl::PointCloud<pcl::PointXYZRGBA>);
+	pcl::VoxelGrid<pcl::PointXYZRGBA> sor;
 	sor.setInputCloud(point_cloud);
 	sor.setLeafSize(0.05f, 0.05f, 0.05f);
 	sor.filter(*point_cloud_filtered);
 
 	pcl::io::savePCDFileASCII("room_sub.pcd", *point_cloud_filtered);
 
-	pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::PointNormal> ne;
-	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree1(
-			new pcl::search::KdTree<pcl::PointXYZ>);
-	tree1->setInputCloud(point_cloud);
-	ne.setInputCloud(point_cloud);
-	ne.setSearchMethod(tree1);
-	ne.setKSearch(20);
-	pcl::PointCloud<pcl::PointNormal>::Ptr normals(
-			new pcl::PointCloud<pcl::PointNormal>);
-	ne.compute(*normals);
+}
 
-	point_cloud->clear();
+float keypoint_map::compute_error() {
 
-	pcl::MarchingCubesHoppe<pcl::PointNormal> mc;
+	float error = 0;
 
-	pcl::PolygonMesh::Ptr triangles(new pcl::PolygonMesh);
-	mc.setInputCloud(normals);
+	for (size_t i = 0; i < observations.size(); i++) {
 
-	pcl::search::KdTree<pcl::PointNormal>::Ptr tree2(
-			new pcl::search::KdTree<pcl::PointNormal>);
-	tree2->setInputCloud(normals);
-	mc.setSearchMethod(tree2);
-	mc.reconstruct(*triangles);
+		observation o = observations[i];
 
-	cout << triangles->polygons.size() << " triangles created" << endl;
-	pcl::io::saveVTKFile("mesh.vtk", *triangles);
+		Eigen::Vector4f point_transformed = camera_positions[o.cam_id].inverse()
+				* keypoints3d[o.point_id].getVector4fMap();
+		point_transformed /= point_transformed[3];
 
-	return triangles;
+		Eigen::Vector2f pixel_pos;
+
+		pixel_pos[0] = point_transformed[0] * intrinsics[0]
+				/ point_transformed[2] + intrinsics[2];
+		pixel_pos[1] = point_transformed[1] * intrinsics[1]
+				/ point_transformed[2] + intrinsics[3];
+
+		error += (o.coord - pixel_pos).squaredNorm();
+
+	}
+
+	return sqrtf(error);
 
 }
 

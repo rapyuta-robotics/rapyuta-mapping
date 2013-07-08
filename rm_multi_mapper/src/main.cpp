@@ -5,6 +5,7 @@
 #include <rm_capture_server/Capture.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <std_msgs/Float32.h>
+#include <eigen_conversions/eigen_msg.h>
 
 #include <util.h>
 
@@ -14,8 +15,6 @@ int main(int argc, char **argv) {
 	ros::NodeHandle nh;
 
 	boost::shared_ptr<keypoint_map> map;
-
-	pcl::visualization::PCLVisualizer vis;
 
 	// create the action client
 	// true causes the client to spin its own thread
@@ -35,10 +34,76 @@ int main(int argc, char **argv) {
 	ROS_INFO("Action server started, sending goal.");
 	// send a goal to the action
 
-	for (int i = 0; i < 18; i++) {
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < 12; i++) {
+			turtlebot_actions::TurtlebotMoveGoal goal;
+			goal.forward_distance = 0;
+			goal.turn_distance = M_PI / 36;
+			ac.sendGoal(goal);
+
+			//wait for the action to return
+			bool finished_before_timeout = ac.waitForResult(
+					ros::Duration(30.0));
+
+			if (finished_before_timeout) {
+				actionlib::SimpleClientGoalState state = ac.getState();
+				ROS_INFO("Action finished: %s", state.toString().c_str());
+			} else
+				ROS_INFO("Action did not finish before the time out.");
+
+			for (float angle = -M_PI / 4; angle <= M_PI / 4;
+					angle += M_PI / 18) {
+
+				std_msgs::Float32 angle_msg;
+				angle_msg.data = angle;
+				servo_pub.publish(angle_msg);
+				sleep(1);
+
+				rm_capture_server::Capture srv;
+				srv.request.num_frames = 1;
+				if (client.call(srv)) {
+
+					cv::Mat rgb = cv::imdecode(srv.response.rgb_png_data,
+							CV_LOAD_IMAGE_UNCHANGED);
+
+					cv::Mat depth = cv::imdecode(srv.response.depth_png_data,
+							CV_LOAD_IMAGE_UNCHANGED);
+
+					Eigen::Affine3d transform_d;
+					tf::transformMsgToEigen(srv.response.transform, transform_d);
+					Eigen::Affine3f transform = transform_d.cast<float>();
+
+
+					if (map.get()) {
+						keypoint_map map1(rgb, depth, transform);
+						map->merge_keypoint_map(map1);
+					} else {
+						map.reset(new keypoint_map(rgb, depth, transform));
+					}
+
+					std::cerr << map->keypoints3d.size() << " "
+							<< map->descriptors.rows << " "
+							<< map->weights.size() << std::endl;
+
+					//vis.removeAllPointClouds();
+					//vis.addPointCloud<pcl::PointXYZ>(
+					//		accumulated_keypoints3d.makeShared(), "keypoints");
+					//vis.spinOnce(2);
+
+					//cv::imshow("Image", rgb);
+					//cv::waitKey(2);
+
+				} else {
+					ROS_ERROR("Failed to call service /cloudbot1/capture");
+					return 1;
+				}
+
+			}
+		}
+
 		turtlebot_actions::TurtlebotMoveGoal goal;
-		goal.forward_distance = 0;
-		goal.turn_distance = M_PI / 36;
+		goal.forward_distance = 0.5;
+		goal.turn_distance = 0;
 		ac.sendGoal(goal);
 
 		//wait for the action to return
@@ -50,71 +115,20 @@ int main(int argc, char **argv) {
 		} else
 			ROS_INFO("Action did not finish before the time out.");
 
-		for (float angle = -M_PI / 4; angle <= M_PI / 4; angle += M_PI / 18) {
+		map->remove_bad_points();
 
-			std_msgs::Float32 angle_msg;
-			angle_msg.data = angle;
-			servo_pub.publish(angle_msg);
-			sleep(1);
+		octomap::OcTree tree;
+		map->get_octree(tree);
 
-			rm_capture_server::Capture srv;
-			srv.request.num_frames = 1;
-			if (client.call(srv)) {
 
-				cv::Mat rgb = cv::imdecode(srv.response.rgb_png_data,
-						CV_LOAD_IMAGE_UNCHANGED);
-
-				cv::Mat depth = cv::imdecode(srv.response.depth_png_data,
-						CV_LOAD_IMAGE_UNCHANGED);
-
-				if (map.get()) {
-					keypoint_map map1(rgb, depth);
-					map->merge_keypoint_map(map1);
-				} else {
-					map.reset(new keypoint_map(rgb, depth));
-				}
-
-				std::cerr << map->keypoints3d.size() << " "
-						<< map->descriptors.rows << " " << map->weights.size()
-						<< std::endl;
-
-				//vis.removeAllPointClouds();
-				//vis.addPointCloud<pcl::PointXYZ>(
-				//		accumulated_keypoints3d.makeShared(), "keypoints");
-				//vis.spinOnce(2);
-
-				//cv::imshow("Image", rgb);
-				//cv::waitKey(2);
-
-			} else {
-				ROS_ERROR("Failed to call service /cloudbot1/capture");
-				return 1;
-			}
-
-		}
 	}
 
+
+	pcl::visualization::PCLVisualizer vis;
 	vis.removeAllPointClouds();
 	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
 			"keypoints");
 	vis.spin();
-
-	map->remove_bad_points();
-
-	vis.removeAllPointClouds();
-	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
-			"keypoints");
-	vis.spin();
-
-	map->optimize();
-
-	vis.removeAllPointClouds();
-	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
-			"keypoints");
-	vis.spin();
-
-
-	map->extract_surface();
 
 //exit
 	return 0;
