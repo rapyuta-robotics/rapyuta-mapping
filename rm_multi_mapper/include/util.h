@@ -20,19 +20,18 @@
 #include <octomap/OcTree.h>
 #include <octomap/ColorOcTree.h>
 
-
 typedef struct {
 	int cam_id;
 	int point_id;
 	Eigen::Vector2f coord;
 } observation;
 
-
 class keypoint_map {
 
 public:
 
 	keypoint_map(cv::Mat & rgb, cv::Mat & depth, Eigen::Affine3f & transform);
+	keypoint_map(const std::string & dir_name);
 
 	bool merge_keypoint_map(const keypoint_map & other);
 
@@ -45,6 +44,8 @@ public:
 	void extract_surface();
 
 	float compute_error();
+
+	void save(const std::string & dir_name);
 
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
@@ -61,7 +62,6 @@ public:
 
 	std::vector<cv::Mat> rgb_imgs;
 	std::vector<cv::Mat> depth_imgs;
-
 
 };
 

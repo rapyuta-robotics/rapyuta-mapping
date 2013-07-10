@@ -6,6 +6,8 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <std_msgs/Float32.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <octomap/OcTree.h>
 
 #include <util.h>
 
@@ -15,6 +17,8 @@ int main(int argc, char **argv) {
 	ros::NodeHandle nh;
 
 	boost::shared_ptr<keypoint_map> map;
+
+	//nav_msgs::OccupancyGrid::Ptr grid(new nav_msgs::OccupancyGrid);
 
 	// create the action client
 	// true causes the client to spin its own thread
@@ -70,15 +74,19 @@ int main(int argc, char **argv) {
 							CV_LOAD_IMAGE_UNCHANGED);
 
 					Eigen::Affine3d transform_d;
-					tf::transformMsgToEigen(srv.response.transform, transform_d);
+					tf::transformMsgToEigen(srv.response.transform,
+							transform_d);
 					Eigen::Affine3f transform = transform_d.cast<float>();
-
 
 					if (map.get()) {
 						keypoint_map map1(rgb, depth, transform);
-						map->merge_keypoint_map(map1);
+						map1.save("map2");
+						//map->merge_keypoint_map(map1);
+						exit(-1);
+
 					} else {
 						map.reset(new keypoint_map(rgb, depth, transform));
+						map->save("map1");
 					}
 
 					std::cerr << map->keypoints3d.size() << " "
@@ -115,14 +123,36 @@ int main(int argc, char **argv) {
 		} else
 			ROS_INFO("Action did not finish before the time out.");
 
+		map->save("map_" + boost::lexical_cast<std::string>(j) + "_all");
 		map->remove_bad_points();
+		map->save("map_" + boost::lexical_cast<std::string>(j));
 
-		octomap::OcTree tree;
-		map->get_octree(tree);
+		/*
+		 octomap::OcTree tree(0.05);
+		 map->get_octree(tree);
 
+		 octomap::point3d max = tree.getBBXMax();
+		 octomap::point3d min = tree.getBBXMin();
+
+		 ROS_INFO("Bounding volume x: %f %f, y: %f %f, z: %f %f\n", min.x(),
+		 max.x(), min.y(), max.y(), min.z(), max.z());
+
+
+		 grid->info.height = 100;
+		 grid->info.width = 100;
+		 grid->info.map_load_time = ros::Time::now();
+		 grid->info.resolution = 0.05f;
+
+		 grid->info.origin;
+
+		 grid->header.frame_id = "odom_combined";
+		 grid->header.seq = 0;
+		 grid->header.stamp = ros::Time::now();
+
+		 grid->data.resize(grid->info.height*grid->info.width, 0);
+		 */
 
 	}
-
 
 	pcl::visualization::PCLVisualizer vis;
 	vis.removeAllPointClouds();

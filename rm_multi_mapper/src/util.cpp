@@ -24,7 +24,29 @@
 #include <pcl/io/vtk_io.h>
 #include <pcl/io/pcd_io.h>
 
+#include <boost/filesystem.hpp>
+#include <opencv2/core/core.hpp>
+
 #include <octomap/ColorOcTree.h>
+
+//These write and read functions must be defined for the serialization in FileStorage to work
+static void write(cv::FileStorage & fs, const std::string&,
+		const observation& x) {
+	fs << "{" << "cam_id" << x.cam_id << "point_id" << x.point_id << "coord0"
+			<< x.coord[0] << "coord1" << x.coord[1] << "}";
+}
+static void read(const cv::FileNode& node, observation& x,
+		const observation& default_value = observation()) {
+	if (node.empty()) {
+		x = default_value;
+	} else {
+
+		x.cam_id = (int) node["cam_id"];
+		x.point_id = (int) node["point_id"];
+		x.coord[0] = (float) node["coord0"];
+		x.coord[1] = (float) node["coord1"];
+	}
+}
 
 keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 		Eigen::Affine3f & transform) {
@@ -62,19 +84,111 @@ keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 
 }
 
+keypoint_map::keypoint_map(const std::string & dir_name) {
+
+	de = new cv::SurfDescriptorExtractor;
+	dm = new cv::FlannBasedMatcher;
+	fd = new cv::SurfFeatureDetector;
+	fd->setInt("hessianThreshold", 400);
+	fd->setBool("extended", true);
+	fd->setBool("upright", true);
+
+	intrinsics << 525.0, 525.0, 319.5, 239.5;
+
+	pcl::io::loadPCDFile(dir_name + "/keypoints3d.pcd", keypoints3d);
+
+	cv::FileStorage fs(dir_name + "/descriptors.yml", cv::FileStorage::READ);
+
+	fs["descriptors"] >> descriptors;
+	fs["weights"] >> weights;
+
+	cv::FileNode obs = fs["observations"];
+	for (cv::FileNodeIterator it = obs.begin(); it != obs.end(); ++it) {
+		observation o;
+		*it >> o;
+		observations.push_back(o);
+	}
+
+	cv::FileNode cam_pos = fs["camera_positions"];
+	for (cv::FileNodeIterator it = cam_pos.begin(); it != cam_pos.end(); ++it) {
+		Eigen::Affine3f pos;
+
+		int i = 0;
+		for (cv::FileNodeIterator it2 = (*it).begin(); it2 != (*it).end();
+				++it2) {
+			int u = i / 4;
+			int v = i % 4;
+
+			*it2 >> pos.matrix().coeffRef(u, v);
+			i++;
+
+		}
+		camera_positions.push_back(pos);
+	}
+
+	fs.release();
+
+	for (size_t i = 0; i < camera_positions.size(); i++) {
+		cv::Mat rgb = cv::imread(
+				dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
+						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
+		cv::Mat depth = cv::imread(
+				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
+						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
+
+		rgb_imgs.push_back(rgb);
+		depth_imgs.push_back(depth);
+	}
+
+}
+
 bool keypoint_map::merge_keypoint_map(const keypoint_map & other) {
 
-	std::vector<cv::DMatch> matches;
-	dm->match(other.descriptors, descriptors, matches);
+	/*
+	 std::vector<std::vector<cv::DMatch> > all_matches2;
+	 std::vector<cv::DMatch> matches;
+
+
+	 dm->knnMatch(
+	 other.descriptors, descriptors, all_matches2, 2);
+
+	 for (size_t i = 0; i < all_matches2.size(); ++i) {
+	 double ratio = all_matches2[i][0].distance
+	 / all_matches2[i][1].distance;
+	 if (ratio < 0.6) {
+	 matches.push_back(all_matches2[i][0]);
+	 }
+	 }
+
+	 */
+
+	std::vector<cv::DMatch> unfiltered_matches, matches;
+	dm->match(other.descriptors, descriptors, unfiltered_matches);
 
 	Eigen::Affine3f transform;
 	std::vector<bool> inliers;
 
 	bool res = estimate_transform_ransac(other.keypoints3d, keypoints3d,
-			matches, 3000, 0.03 * 0.03, 20, transform, inliers);
+			unfiltered_matches, 3000, 0.03 * 0.03, 20, transform, inliers);
 
 	if (!res)
 		return false;
+
+	std::set<int> unique_point_set, bad_matches;
+	for (size_t i = 0; i < unfiltered_matches.size(); i++) {
+		if (unique_point_set.find(unfiltered_matches[i].trainIdx) == unique_point_set.end()) {
+			unique_point_set.insert(unfiltered_matches[i].trainIdx);
+		} else {
+			bad_matches.insert(unfiltered_matches[i].trainIdx);
+		}
+	}
+
+	for (size_t i = 0; i < unfiltered_matches.size(); i++) {
+		if (bad_matches.find(unfiltered_matches[i].trainIdx)
+				== bad_matches.end()) {
+			matches.push_back(unfiltered_matches[i]);
+		}
+	}
 
 	size_t current_camera_positions_size = camera_positions.size();
 
@@ -303,7 +417,7 @@ void keypoint_map::optimize() {
 
 }
 
-void get_octree(octomap::OcTree & tree) {
+void keypoint_map::get_octree(octomap::OcTree & tree) {
 
 	tree.clear();
 
@@ -400,7 +514,6 @@ void keypoint_map::extract_surface() {
 				}
 			}
 		}
-
 		tree.insertScan(octomap_cloud, sensor_origin, frame_origin);
 		tree.updateInnerOccupancy();
 	}
@@ -443,7 +556,59 @@ float keypoint_map::compute_error() {
 
 	}
 
-	return sqrtf(error);
+	return error;
+
+}
+
+void keypoint_map::save(const std::string & dir_name) {
+
+	if (boost::filesystem::exists(dir_name)) {
+		boost::filesystem::remove_all(dir_name);
+	}
+
+	boost::filesystem::create_directory(dir_name);
+	boost::filesystem::create_directory(dir_name + "/rgb");
+	boost::filesystem::create_directory(dir_name + "/depth");
+
+	pcl::io::savePCDFile(dir_name + "/keypoints3d.pcd", keypoints3d);
+	cv::FileStorage fs(dir_name + "/descriptors.yml", cv::FileStorage::WRITE);
+	fs << "descriptors" << descriptors << "weights" << weights;
+	fs << "observations" << "[";
+
+	for (size_t i = 0; i < observations.size(); i++) {
+		fs << observations[i];
+	}
+
+	fs << "]";
+
+	fs << "camera_positions" << "[";
+
+	for (size_t i = 0; i < camera_positions.size(); i++) {
+		fs << "[";
+
+		for (int j = 0; j < 16; j++) {
+			int u = j / 4;
+			int v = j % 4;
+
+			fs << camera_positions[i].matrix().coeff(u, v);
+
+		}
+
+		fs << "]";
+	}
+
+	fs << "]";
+
+	fs.release();
+
+	for (size_t i = 0; i < depth_imgs.size(); i++) {
+		cv::imwrite(
+				dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
+						+ ".png", rgb_imgs[i]);
+		cv::imwrite(
+				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
+						+ ".png", depth_imgs[i]);
+	}
 
 }
 

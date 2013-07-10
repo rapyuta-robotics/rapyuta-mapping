@@ -35,6 +35,8 @@ target_link_libraries(multi_mapper cholmod vtkCommon vtkFiltering)
 rosbuild_add_executable(ransac_test src/test.cpp src/util.cpp)
 target_link_libraries(ransac_test cholmod vtkCommon vtkFiltering)
 
+rosbuild_add_executable(test2 src/test2.cpp src/util.cpp)
+target_link_libraries(test2 cholmod vtkCommon vtkFiltering)
 
 rosbuild_add_executable(ba_demo src/ba_demo.cpp)
 target_link_libraries(ba_demo cholmod)
