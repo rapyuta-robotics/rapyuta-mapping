@@ -16,6 +16,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/PolygonMesh.h>
+#include <nav_msgs/OccupancyGrid.h>
 
 #include <octomap/OcTree.h>
 #include <octomap/ColorOcTree.h>
@@ -35,7 +36,7 @@ public:
 
 	bool merge_keypoint_map(const keypoint_map & other);
 
-	void remove_bad_points();
+	void remove_bad_points(int min_num_observations);
 
 	void optimize();
 
@@ -45,7 +46,11 @@ public:
 
 	float compute_error();
 
+	void align_z_axis();
+
 	void save(const std::string & dir_name);
+
+	void compute_2d_map(const octomap::OcTree & tree, nav_msgs::OccupancyGrid & grid);
 
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;

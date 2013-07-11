@@ -80,13 +80,12 @@ int main(int argc, char **argv) {
 
 					if (map.get()) {
 						keypoint_map map1(rgb, depth, transform);
-						map1.save("map2");
-						//map->merge_keypoint_map(map1);
-						exit(-1);
+						map->merge_keypoint_map(map1);
 
 					} else {
 						map.reset(new keypoint_map(rgb, depth, transform));
-						map->save("map1");
+						map->align_z_axis();
+						map->save("map_aligned");
 					}
 
 					std::cerr << map->keypoints3d.size() << " "
@@ -124,8 +123,9 @@ int main(int argc, char **argv) {
 			ROS_INFO("Action did not finish before the time out.");
 
 		map->save("map_" + boost::lexical_cast<std::string>(j) + "_all");
-		map->remove_bad_points();
+		map->remove_bad_points(1);
 		map->save("map_" + boost::lexical_cast<std::string>(j));
+		map->optimize();
 
 		/*
 		 octomap::OcTree tree(0.05);
@@ -158,6 +158,18 @@ int main(int argc, char **argv) {
 	vis.removeAllPointClouds();
 	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
 			"keypoints");
+	vis.spin();
+
+	std::cerr << "Error " << map->compute_error() << " Mean error "
+			<< map->compute_error() / map->observations.size() << std::endl;
+
+	map->optimize();
+
+	std::cerr << "Error " << map->compute_error() << " Mean error "
+			<< map->compute_error() / map->observations.size() << std::endl;
+
+	vis.removeAllPointClouds();
+	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(), "keypoints");
 	vis.spin();
 
 //exit

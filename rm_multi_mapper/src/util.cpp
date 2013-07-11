@@ -21,8 +21,12 @@
 #include <pcl/features/normal_3d_omp.h>
 #include <pcl/search/flann_search.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/common/transforms.h>
 #include <pcl/io/vtk_io.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
 
 #include <boost/filesystem.hpp>
 #include <opencv2/core/core.hpp>
@@ -162,31 +166,32 @@ bool keypoint_map::merge_keypoint_map(const keypoint_map & other) {
 
 	 */
 
-	std::vector<cv::DMatch> unfiltered_matches, matches;
-	dm->match(other.descriptors, descriptors, unfiltered_matches);
+	std::vector<cv::DMatch> matches;
+	dm->match(other.descriptors, descriptors, matches);
 
 	Eigen::Affine3f transform;
 	std::vector<bool> inliers;
 
 	bool res = estimate_transform_ransac(other.keypoints3d, keypoints3d,
-			unfiltered_matches, 3000, 0.03 * 0.03, 20, transform, inliers);
+			matches, 3000, 0.03 * 0.03, 20, transform, inliers);
 
 	if (!res)
 		return false;
 
-	std::set<int> unique_point_set, bad_matches;
-	for (size_t i = 0; i < unfiltered_matches.size(); i++) {
-		if (unique_point_set.find(unfiltered_matches[i].trainIdx) == unique_point_set.end()) {
-			unique_point_set.insert(unfiltered_matches[i].trainIdx);
-		} else {
-			bad_matches.insert(unfiltered_matches[i].trainIdx);
-		}
-	}
+	std::map<int, int> unique_matches;
+	for (size_t i = 0; i < matches.size(); i++) {
 
-	for (size_t i = 0; i < unfiltered_matches.size(); i++) {
-		if (bad_matches.find(unfiltered_matches[i].trainIdx)
-				== bad_matches.end()) {
-			matches.push_back(unfiltered_matches[i]);
+		if (unique_matches.find(matches[i].trainIdx) == unique_matches.end()) {
+			unique_matches[matches[i].trainIdx] = i;
+
+		} else {
+			if (matches[unique_matches[matches[i].trainIdx]].distance
+					> matches[i].distance) {
+				inliers[unique_matches[matches[i].trainIdx]] = false;
+				unique_matches[matches[i].trainIdx] = i;
+			} else {
+				inliers[i] = false;
+			}
 		}
 	}
 
@@ -248,7 +253,7 @@ bool keypoint_map::merge_keypoint_map(const keypoint_map & other) {
 
 }
 
-void keypoint_map::remove_bad_points() {
+void keypoint_map::remove_bad_points(int min_num_observations) {
 
 	pcl::PointCloud<pcl::PointXYZ> new_keypoints3d;
 	cv::Mat new_descriptors;
@@ -258,7 +263,7 @@ void keypoint_map::remove_bad_points() {
 
 	for (size_t i = 0; i < keypoints3d.size(); i++) {
 
-		if (weights[i] > 3) {
+		if (weights[i] > min_num_observations) {
 			new_keypoints3d.push_back(keypoints3d[i]);
 			if (new_descriptors.rows == 0) {
 				descriptors.row(i).copyTo(new_descriptors);
@@ -361,14 +366,14 @@ void keypoint_map::optimize() {
 
 	}
 
-	optimizer.save("debug.txt");
+	//optimizer.save("debug.txt");
 
 	optimizer.initializeOptimization();
 	optimizer.setVerbose(true);
 
 	std::cout << std::endl;
 	std::cout << "Performing full BA:" << std::endl;
-	optimizer.optimize(10);
+	optimizer.optimize(1);
 	std::cout << std::endl;
 
 	for (int i = 0; i < vertex_id; i++) {
@@ -448,8 +453,9 @@ void keypoint_map::get_octree(octomap::OcTree & tree) {
 		}
 
 		tree.insertScan(octomap_cloud, sensor_origin, frame_origin);
-		tree.updateInnerOccupancy();
 	}
+
+	tree.updateInnerOccupancy();
 
 }
 
@@ -552,11 +558,90 @@ float keypoint_map::compute_error() {
 		pixel_pos[1] = point_transformed[1] * intrinsics[1]
 				/ point_transformed[2] + intrinsics[3];
 
+		/*
+		 std::cerr << "Observation " << i << " Prediction " << pixel_pos[0]
+		 << " " << pixel_pos[1] << " measurement " << o.coord[0] << " "
+		 << o.coord[1] << std::endl;
+		 std::cerr << "Camera id" << o.cam_id << " point id " << o.point_id << std::endl;
+		 */
+
 		error += (o.coord - pixel_pos).squaredNorm();
 
 	}
 
 	return error;
+
+}
+
+void keypoint_map::align_z_axis() {
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud(
+			new pcl::PointCloud<pcl::PointXYZ>);
+
+	for (int v = 0; v < depth_imgs[0].rows; v++) {
+		for (int u = 0; u < depth_imgs[0].cols; u++) {
+			if (depth_imgs[0].at<unsigned short>(v, u) != 0) {
+				pcl::PointXYZ p;
+
+				p.z = depth_imgs[0].at<unsigned short>(v, u) / 1000.0f;
+				p.x = (u - intrinsics[2]) * p.z / intrinsics[0];
+				p.y = (v - intrinsics[3]) * p.z / intrinsics[1];
+
+				p.getVector4fMap() = camera_positions[0] * p.getVector4fMap();
+
+				point_cloud->push_back(p);
+
+			}
+		}
+	}
+
+	pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+	pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+	// Create the segmentation object
+	pcl::SACSegmentation<pcl::PointXYZ> seg;
+	// Optional
+	seg.setOptimizeCoefficients(true);
+	// Mandatory
+	seg.setModelType(pcl::SACMODEL_PLANE);
+	seg.setMethodType(pcl::SAC_RANSAC);
+	seg.setDistanceThreshold(0.005);
+
+	seg.setInputCloud(point_cloud);
+	seg.segment(*inliers, *coefficients);
+
+	std::cerr << "Model coefficients: " << coefficients->values[0] << " "
+			<< coefficients->values[1] << " " << coefficients->values[2] << " "
+			<< coefficients->values[3] << " Num inliers "
+			<< inliers->indices.size() << std::endl;
+
+	Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+	if (coefficients->values[2] > 0) {
+		transform.matrix().coeffRef(0, 2) = coefficients->values[0];
+		transform.matrix().coeffRef(1, 2) = coefficients->values[1];
+		transform.matrix().coeffRef(2, 2) = coefficients->values[2];
+	} else {
+		transform.matrix().coeffRef(0, 2) = -coefficients->values[0];
+		transform.matrix().coeffRef(1, 2) = -coefficients->values[1];
+		transform.matrix().coeffRef(2, 2) = -coefficients->values[2];
+	}
+
+
+	transform.matrix().col(0).head<3>() =
+			transform.matrix().col(1).head<3>().cross(
+					transform.matrix().col(2).head<3>());
+	transform.matrix().col(1).head<3>() =
+			transform.matrix().col(2).head<3>().cross(
+					transform.matrix().col(0).head<3>());
+
+	transform = transform.inverse();
+
+	transform.matrix().coeffRef(2, 3) = coefficients->values[3];
+
+	pcl::transformPointCloud(keypoints3d, keypoints3d, transform);
+
+	for (size_t i = 0; i < camera_positions.size(); i++) {
+		camera_positions[i] = transform * camera_positions[i];
+	}
 
 }
 
@@ -608,6 +693,40 @@ void keypoint_map::save(const std::string & dir_name) {
 		cv::imwrite(
 				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
 						+ ".png", depth_imgs[i]);
+	}
+
+}
+
+void keypoint_map::compute_2d_map(const octomap::OcTree & tree,
+		nav_msgs::OccupancyGrid & grid) {
+
+	double min_x, min_y, min_z, max_x, max_y, max_z;
+	tree.getMetricMin(min_x, min_y, min_z);
+	tree.getMetricMax(max_x, max_y, max_z);
+
+	double res = tree.getResolution();
+
+	int map_min_x = floor(min_x) / res;
+	int map_min_y = floor(min_y) / res;
+	int map_max_x = ceil(max_x) / res;
+	int map_max_y = ceil(max_y) / res;
+
+	std::cerr << min_x << " " << min_y << " " << min_z << " " << max_x << " " << max_y << " " << max_z << std::endl;
+
+	int map_width = map_max_x - map_min_x;
+	int map_height = map_max_y - map_min_y;
+
+	grid.info.width = map_width;
+	grid.info.height = map_height;
+	grid.info.resolution = res;
+
+	grid.data.resize(grid.info.width * grid.info.height, -1);
+
+	for (octomap::OcTree::leaf_iterator it = tree.begin_leafs(), end =
+			tree.end_leafs(); it != end; ++it) {
+
+		std::cout << "Node center: " << it.getCoordinate();
+		std::cout << " value: " << it->getValue() << "\n";
 	}
 
 }
@@ -751,7 +870,7 @@ bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 
 	trans = Eigen::umeyama(src_rand, dst_rand, false);
 
-	//std::cerr << trans.matrix() << std::endl;
+//std::cerr << trans.matrix() << std::endl;
 	std::cerr << max_inliers << std::endl;
 
 	return true;
