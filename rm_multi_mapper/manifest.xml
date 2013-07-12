@@ -18,6 +18,8 @@
   <depend package="pcl"/>
   <depend package="turtlebot_actions"/>
   <depend package="eigen_conversions"/>
+  <depend package="move_base_msgs"/>
+  
   <rosdep name="suitesparse" />
 
 </package>

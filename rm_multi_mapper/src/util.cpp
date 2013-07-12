@@ -31,6 +31,7 @@
 #include <boost/filesystem.hpp>
 #include <opencv2/core/core.hpp>
 
+
 #include <octomap/ColorOcTree.h>
 
 //These write and read functions must be defined for the serialization in FileStorage to work
@@ -625,7 +626,6 @@ void keypoint_map::align_z_axis() {
 		transform.matrix().coeffRef(2, 2) = -coefficients->values[2];
 	}
 
-
 	transform.matrix().col(0).head<3>() =
 			transform.matrix().col(1).head<3>().cross(
 					transform.matrix().col(2).head<3>());
@@ -697,6 +697,7 @@ void keypoint_map::save(const std::string & dir_name) {
 
 }
 
+
 void keypoint_map::compute_2d_map(const octomap::OcTree & tree,
 		nav_msgs::OccupancyGrid & grid) {
 
@@ -711,7 +712,8 @@ void keypoint_map::compute_2d_map(const octomap::OcTree & tree,
 	int map_max_x = ceil(max_x) / res;
 	int map_max_y = ceil(max_y) / res;
 
-	std::cerr << min_x << " " << min_y << " " << min_z << " " << max_x << " " << max_y << " " << max_z << std::endl;
+	std::cerr << min_x << " " << min_y << " " << min_z << " " << max_x << " "
+			<< max_y << " " << max_z << std::endl;
 
 	int map_width = map_max_x - map_min_x;
 	int map_height = map_max_y - map_min_y;
@@ -719,17 +721,95 @@ void keypoint_map::compute_2d_map(const octomap::OcTree & tree,
 	grid.info.width = map_width;
 	grid.info.height = map_height;
 	grid.info.resolution = res;
+	grid.header.frame_id = "/cloudbot1/odom_combined";
+	grid.header.stamp = ros::Time::now();
+	grid.info.map_load_time = ros::Time::now();
 
 	grid.data.resize(grid.info.width * grid.info.height, -1);
 
 	for (octomap::OcTree::leaf_iterator it = tree.begin_leafs(), end =
 			tree.end_leafs(); it != end; ++it) {
 
-		std::cout << "Node center: " << it.getCoordinate();
-		std::cout << " value: " << it->getValue() << "\n";
+		if ((it.getZ() - it.getSize() / 2) < 0.6
+				|| (it.getZ() + it.getSize() / 2) > 0.1) {
+
+			if (it.getDepth() == tree.getTreeDepth()) {
+
+				int x = it.getX() / res + map_min_x;
+				int y = it.getY() / res + map_min_y;
+
+				int idx = y * grid.info.width + x;
+
+				if (tree.isNodeOccupied(*it)) {
+					grid.data[idx] = 100;
+				} else if (grid.data[idx] == -1) {
+					grid.data[idx] = 0;
+				}
+
+			} else {
+				int intSize = 1 << (tree.getTreeDepth() - it.getDepth());
+				int x = it.getX() / res + map_min_x;
+				int y = it.getY() / res + map_min_y;
+				for (int dx = 0; dx < intSize; dx++) {
+					for (int dy = 0; dy < intSize; dy++) {
+
+					}
+				}
+			}
+
+		}
+
 	}
 
 }
+
+
+void keypoint_map::publish_keypoints(ros::Publisher & pub) {
+
+	for (size_t i = 0; i < depth_imgs.size(); i++) {
+
+		pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
+
+			for (int v = 0; v < depth_imgs[i].rows; v++) {
+				for (int u = 0; u < depth_imgs[i].cols; u++) {
+					if (depth_imgs[i].at<unsigned short>(v, u) != 0) {
+						pcl::PointXYZRGBA p;
+						p.z = depth_imgs[i].at<unsigned short>(v, u) / 1000.0f;
+						p.x = (u - intrinsics[2]) * p.z / intrinsics[0];
+						p.y = (v - intrinsics[3]) * p.z / intrinsics[1];
+						cv::Vec3b brg = rgb_imgs[i].at<cv::Vec3b>(v, u);
+						p.r = brg[2];
+						p.g = brg[1];
+						p.b = brg[0];
+						p.a = 255;
+
+						Eigen::Vector4f tmp = camera_positions[i]
+								* p.getVector4fMap();
+
+						if (tmp[2] < 0.6 && tmp[2] > 0.2) {
+							p.getVector4fMap() = tmp;
+							point_cloud->push_back(p);
+
+						}
+
+					}
+				}
+			}
+
+
+			point_cloud->sensor_orientation_ = camera_positions[i].rotation();
+			point_cloud->sensor_origin_ = camera_positions[i].translation().homogeneous();
+			point_cloud->header.frame_id = "/cloudbot1/odom_combined";
+			point_cloud->header.seq = i;
+			point_cloud->header.stamp = ros::Time::now();
+
+			pub.publish(point_cloud);
+			usleep(10000);
+		}
+
+
+}
+
 
 void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		const Eigen::Vector4f & intrinsics, cv::Ptr<cv::FeatureDetector> & fd,

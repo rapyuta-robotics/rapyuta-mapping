@@ -13,13 +13,16 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/PolygonMesh.h>
 #include <nav_msgs/OccupancyGrid.h>
 
 #include <octomap/OcTree.h>
 #include <octomap/ColorOcTree.h>
+#include <ros/ros.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl_ros/publisher.h>
+
 
 typedef struct {
 	int cam_id;
@@ -51,6 +54,8 @@ public:
 	void save(const std::string & dir_name);
 
 	void compute_2d_map(const octomap::OcTree & tree, nav_msgs::OccupancyGrid & grid);
+
+	void publish_keypoints(ros::Publisher & pub);
 
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;

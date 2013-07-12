@@ -9,21 +9,43 @@
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap/OcTree.h>
 
+#include <move_base_msgs/MoveBaseAction.h>
+#include <octomap_msgs/BoundingBoxQuery.h>
+
+#include <tf/transform_broadcaster.h>
+
 #include <util.h>
 
+void publish_transforms() {
+	tf::TransformBroadcaster br;
+
+	while (true) {
+		tf::Transform transform;
+		transform.setIdentity();
+
+		br.sendTransform(
+				tf::StampedTransform(transform, ros::Time::now(), "/map",
+						"/cloudbot1/odom_combined"));
+
+		usleep(33000);
+
+	}
+
+}
+
 int main(int argc, char **argv) {
-	ros::init(argc, argv, "test_fibonacci");
+	ros::init(argc, argv, "multi_mapper");
 
 	ros::NodeHandle nh;
 
 	boost::shared_ptr<keypoint_map> map;
 
-	//nav_msgs::OccupancyGrid::Ptr grid(new nav_msgs::OccupancyGrid);
+	boost::thread t(publish_transforms);
 
 	// create the action client
 	// true causes the client to spin its own thread
-	actionlib::SimpleActionClient<turtlebot_actions::TurtlebotMoveAction> ac(
-			"/cloudbot1/turtlebot_move", true);
+	actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> ac(
+			"/cloudbot1/move_base", true);
 
 	ros::ServiceClient client = nh.serviceClient<rm_capture_server::Capture>(
 			"/cloudbot1/capture");
@@ -40,9 +62,18 @@ int main(int argc, char **argv) {
 
 	for (int j = 0; j < 3; j++) {
 		for (int i = 0; i < 12; i++) {
-			turtlebot_actions::TurtlebotMoveGoal goal;
-			goal.forward_distance = 0;
-			goal.turn_distance = M_PI / 36;
+			move_base_msgs::MoveBaseGoal goal;
+			goal.target_pose.header.frame_id = "base_link";
+			goal.target_pose.header.stamp = ros::Time::now();
+
+			goal.target_pose.pose.position.x = 0;
+			goal.target_pose.pose.position.y = 0;
+			goal.target_pose.pose.position.z = 0;
+
+			tf::Quaternion q;
+			q.setRotation(tf::Vector3(0,0,1), M_PI/4);
+			tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
+
 			ac.sendGoal(goal);
 
 			//wait for the action to return
@@ -108,10 +139,10 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		turtlebot_actions::TurtlebotMoveGoal goal;
-		goal.forward_distance = 0.5;
-		goal.turn_distance = 0;
-		ac.sendGoal(goal);
+		//turtlebot_actions::TurtlebotMoveGoal goal;
+		//goal.forward_distance = 0.5;
+		//goal.turn_distance = 0;
+		//ac.sendGoal(goal);
 
 		//wait for the action to return
 		bool finished_before_timeout = ac.waitForResult(ros::Duration(30.0));
@@ -169,7 +200,8 @@ int main(int argc, char **argv) {
 			<< map->compute_error() / map->observations.size() << std::endl;
 
 	vis.removeAllPointClouds();
-	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(), "keypoints");
+	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
+			"keypoints");
 	vis.spin();
 
 //exit
