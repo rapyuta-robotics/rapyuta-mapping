@@ -7,12 +7,36 @@
 		<include file="$(find rm_launch)/launch/_mobile_base.launch" />
 		<include file="$(find rm_launch)/launch/_robot.launch" />
 		<node pkg="rm_capture_server" type="capture_server" name="capture_server" output="screen"/>
+		<!--
 		<node pkg="turtlebot_actions" type="turtlebot_move_action_server" name="move_action_server">
 			<remap from="move_action_server/cmd_vel" to="mobile_base/commands/velocity"/>
 			<remap from="move_action_server/turtlebot_move" to="turtlebot_move"/>
 			<param name="base_frame" value="base_footprint"/>
 			<param name="odom_frame" value="odom_combined"/> 
+			<param name="turn_rate" value="0.5"/>
 		</node>
+		-->
 		<node name="camera" pkg="rm_openni2_camera" type="camera" />
+
+		<node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+			<rosparam file="$(find rm_launch)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    			<rosparam file="$(find rm_launch)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    			<rosparam file="$(find rm_launch)/param/local_costmap_params.yaml" command="load" />
+    			<rosparam file="$(find rm_launch)/param/global_costmap_params.yaml" command="load" />
+    			<rosparam file="$(find rm_launch)/param/base_local_planner_params.yaml" command="load" />
+			<param name="global_costmap/robot_base_frame" value="base_footprint"/>
+			<param name="global_costmap/global_frame" value="/map"/>
+			<param name="local_costmap/robot_base_frame" value="base_footprint"/>
+			<param name="local_costmap/global_frame" value="odom_combined"/>
+    			<remap from="cmd_vel" to="mobile_base/commands/velocity"/>
+			<remap from="map" to="/map"/>
+			<remap from="/scan" to="/$(env HOSTNAME)/scan"/>
+  		</node>
+		<node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" respawn="false" name="depthimage_to_laserscan" output="screen">
+			<remap from="image" to="depth/image_raw"/>
+			<remap from="camera_info" to="rgb/camera_info"/>
+			<param name="output_frame_id" value="/$(env HOSTNAME)/camera_rgb_frame"/>
+		</node>
+	
 	</group>
 </launch>
