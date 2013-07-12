@@ -16,7 +16,7 @@ point_param = 3
 
 E_element_dtype = [('cam_id', int), ('point_id', int), ('observation_id', int)]
 
-intrinsics = np.array([525., 319.50, 239.5, 0])
+intrinsics = np.array([525., 319.5, 239.5, 0])
 
 slam_data = np.load('slam_final_data.npz')
 observations=slam_data['observations']
@@ -24,10 +24,84 @@ cameras=slam_data['camera_positions']
 points=slam_data['accumulated_keypoints3d']
 ground_truth=slam_data['ground_truth']
 
+has_ground_truth = True
+if len(ground_truth) == 0:
+	has_ground_truth = False
+
+print 'Total number of keypoints', points.shape[1]
+print 'Total number of camera positions', cameras.shape[1]
+print 'Total number of observations', len(observations)
+print 'Total number of points with one observation', np.count_nonzero(np.bincount(observations['point_id']) == 1)
+print 'Total number of images with less then 3 observations', np.count_nonzero(np.bincount(observations['cam_id']) < 3)
+
+valid_points_idx = np.nonzero(np.bincount(observations['point_id']) > 3)[0]
+idx = np.in1d(observations['point_id'], valid_points_idx)
+observations = observations[idx]
+points = points[:,valid_points_idx]
+new_point_idx = np.searchsorted(valid_points_idx, observations['point_id'])
+observations['point_id'] = new_point_idx
+
+print 'Total number of keypoints', points.shape[1]
+print 'Total number of camera positions', cameras.shape[1]
+print 'Total number of observations', len(observations)
+print 'Total number of points with one observation', np.count_nonzero(np.bincount(observations['point_id']) == 1)
+print 'Total number of images with less then 3 observations', np.count_nonzero(np.bincount(observations['cam_id']) < 3)
+
 
 num_cameras = cameras.shape[1]
 num_points = points.shape[1]
 num_observations = observations.shape[0]
+
+if has_ground_truth:
+	plt.plot(ground_truth[0], ground_truth[1],'r')
+	plt.plot(ground_truth[0], ground_truth[2],'g')
+	plt.plot(ground_truth[0], ground_truth[3],'b')
+
+plt.plot(cameras[0], cameras[1],'r--')
+plt.plot(cameras[0], cameras[2],'g--')
+plt.plot(cameras[0], cameras[3],'b--')
+
+plt.show()
+
+plt.hist(np.bincount(observations['point_id']), 50, normed=1)
+plt.show()
+plt.hist(np.bincount(observations['cam_id']), 50, normed=1)
+plt.show()
+
+mlab.points3d(points[0], points[1], points[2], mode='point', color=(1,1,1))
+#mlab.plot3d(cameras[1], cameras[2], cameras[3], tube_radius=None, color=(0,1,0))
+#mlab.plot3d(ground_truth[1], ground_truth[2], ground_truth[3], tube_radius=None, color=(1,0,0))
+
+'''
+for i in range(cameras.shape[1]):
+	pos_item = cameras[:,i]
+	
+	idx = observations[observations['cam_id'] == i]['point_id']
+	cam_points = points[:,idx]
+	
+	lines = np.empty((3, cam_points.shape[1]*3), dtype = np.float64)
+	lines[:, 0::3] = pos_item[1:4, np.newaxis]
+	lines[:, 2::3] = pos_item[1:4, np.newaxis]
+	lines[:, 1::3] = cam_points[0:3, :]
+	
+	mlab.plot3d(lines[0], lines[1], lines[2], tube_radius=None, color=(1,1,1), line_width = 0.01)
+'''
+
+'''
+for i in range(camera_positions.shape[1]):
+	
+	pos_item = camera_positions[:,i]
+
+	r = tf.transformations.quaternion_matrix(pos_item[4:8])
+	r[0:3,3] = pos_item[1:4]
+
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,0], r[1,0], r[2,0], color=(1,0,0), mode='2ddash', scale_factor=0.1)
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,1], r[1,1], r[2,1], color=(0,1,0), mode='2ddash', scale_factor=0.1)
+	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,2], r[1,2], r[2,2], color=(0,0,1), mode='2ddash', scale_factor=0.1)
+'''
+mlab.show()
+
+
 
 def fill_hessian(cameras, points, observations):
 
@@ -48,8 +122,11 @@ def fill_hessian(cameras, points, observations):
 		cam = cameras[:,cam_id]
 		p = points[:,point_id]
 		
+		#print 'Quaternion norm', np.dot(cam[4:8], cam[4:8])
+		
 		R = tf.transformations.quaternion_matrix(cam[4:8])
 		e, Jr, Jt, Ji, JX = compute_error_and_jacobian(R[0:3,0:3], cam[1:4], intrinsics, p, o['coord'])
+		#print e
 		
 		Jc = np.hstack([Jr, Jt])
 		
@@ -178,28 +255,23 @@ while iteration < max_iterations:
 
 
 '''
-print 'Total number of keypoints', accumulated_keypoints3d.shape[1]
-print 'Total number of camera positions', camera_positions.shape[1]
-print 'Total number of observations', len(observations)
-print 'Total number of points with one observation', np.count_nonzero(np.bincount(observations['point_id']) == 1)
-
 plt.plot(ground_truth[0], ground_truth[1],'r')
 plt.plot(ground_truth[0], ground_truth[2],'g')
 plt.plot(ground_truth[0], ground_truth[3],'b')
 
-plt.plot(camera_positions[0], camera_positions[1],'r--')
-plt.plot(camera_positions[0], camera_positions[2],'g--')
-plt.plot(camera_positions[0], camera_positions[3],'b--')
+plt.plot(cameras[0], cameras[1],'r--')
+plt.plot(cameras[0], cameras[2],'g--')
+plt.plot(cameras[0], cameras[3],'b--')
 
 plt.show()
 
 plt.hist(np.bincount(observations['point_id']), 50, normed=1)
 plt.show()
-
-mlab.points3d(accumulated_keypoints3d[0], accumulated_keypoints3d[1], accumulated_keypoints3d[2], mode='point', color=(1,1,1))
-mlab.plot3d(camera_positions[1], camera_positions[2], camera_positions[3], tube_radius=None, color=(0,1,0))
-mlab.plot3d(ground_truth[1], ground_truth[2], ground_truth[3], tube_radius=None, color=(1,0,0))
 '''
+mlab.points3d(points[0], points[1], points[2], mode='point', color=(1,1,1))
+mlab.plot3d(cameras[1], cameras[2], cameras[3], tube_radius=None, color=(0,1,0))
+#mlab.plot3d(ground_truth[1], ground_truth[2], ground_truth[3], tube_radius=None, color=(1,0,0))
+
 '''
 for i in range(camera_positions.shape[1]):
 	
@@ -212,6 +284,4 @@ for i in range(camera_positions.shape[1]):
 	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,1], r[1,1], r[2,1], color=(0,1,0), mode='2ddash', scale_factor=0.1)
 	mlab.quiver3d(r[0,3], r[1,3], r[2,3], r[0,2], r[1,2], r[2,2], color=(0,0,1), mode='2ddash', scale_factor=0.1)
 '''
-'''
 mlab.show()
-'''

@@ -1,0 +1,25 @@
+<package>
+  <description brief="rm_multi_mapper">
+
+     rm_multi_mapper
+
+  </description>
+  <author>vsu</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rm_multi_mapper</url>
+  <depend package="roscpp"/>
+  <depend package="rm_capture_server"/>
+  <depend package="libg2o"/>
+  <depend package="octomap"/>
+  <depend package="tf"/>
+  <depend package="tf_conversions"/>
+  <depend package="opencv2"/>
+  <depend package="pcl"/>
+  <depend package="turtlebot_actions"/>
+  <depend package="eigen_conversions"/>
+  <rosdep name="suitesparse" />
+
+</package>
+
+
