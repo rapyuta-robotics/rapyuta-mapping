@@ -92,6 +92,8 @@ public:
 		set_map_service = nh_.advertiseService("set_map",
 				&CaptureServer::SetMapCallback, this);
 
+		boost::thread t(boost::bind(&CaptureServer::publishTf, this));
+
 	}
 
 	~CaptureServer(void) {
@@ -163,9 +165,12 @@ public:
 
 	void publishTf() {
 
+		while(true){
 		br.sendTransform(
 				tf::StampedTransform(map_to_odom, ros::Time::now(), "/map",
 						odom_frame));
+		usleep(33000);
+		}
 
 	}
 
@@ -176,12 +181,7 @@ int main(int argc, char** argv) {
 
 	CaptureServer cs;
 
-	ros::Rate r(30);
-	while (ros::ok()) {
-		cs.publishTf();
-		r.sleep();
-		ros::spinOnce();
-	}
+	ros::spin();
 
 	return 0;
 }
