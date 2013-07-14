@@ -1,0 +1,20 @@
+<package>
+  <description brief="rm_localization">
+
+     rm_localization
+
+  </description>
+  <author>vsu</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rm_localization</url>
+  <depend package="roscpp"/>
+  <depend package="pcl"/>
+  <depend package="pcl_ros"/>
+  <depend package="opencv2"/>
+  <depend package="tf"/>
+  <depend package="tf_conversions"/>
+
+</package>
+
+
