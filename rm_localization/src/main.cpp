@@ -61,7 +61,7 @@ public:
 
 	CaptureServer(): nh_private("~") {
 
-		ROS_INFO("Creating capture server");
+		ROS_INFO("Creating localization");
 
 
 		tf_prefix_ = tf::getPrefixParam(nh_private);
@@ -105,6 +105,8 @@ public:
 		map_descriptors = descriptors->image;
 		pcl::fromROSMsg(req.keypoints3d, map_keypoints3d);
 
+		ROS_INFO("Recieved map with %d points and %d descriptors", map_keypoints3d.size(), map_descriptors.rows);
+
 		return true;
 	}
 
@@ -112,12 +114,14 @@ public:
 			const sensor_msgs::Image::ConstPtr& depth_msg,
 			const sensor_msgs::CameraInfo::ConstPtr& info_msg) {
 
+		ROS_INFO("Recieved frame");
+		
 		if (map_keypoints3d.size() < 10) {
 			return;
 		}
 
-		cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvShare(yuv2_msg,
-				sensor_msgs::image_encodings::MONO8);
+		cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvCopy(yuv2_msg,
+				sensor_msgs::image_encodings::RGB8);
 		cv_bridge::CvImageConstPtr depth = cv_bridge::toCvShare(depth_msg);
 
 		intrinsics << 525.0, 525.0, 319.5, 239.5;
