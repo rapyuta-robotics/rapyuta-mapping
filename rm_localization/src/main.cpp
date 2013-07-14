@@ -30,6 +30,7 @@ protected:
 	typedef message_filters::Synchronizer<SyncPolicy> Synchronizer;
 
 	ros::NodeHandle nh_;
+	ros::NodeHandle nh_private;
 
 	ros::ServiceServer set_map_service;
 
@@ -53,11 +54,18 @@ protected:
 	tf::TransformBroadcaster br;
 	tf::TransformListener listener;
 
+	std::string tf_prefix_;
+	std::string odom_frame;
+
 public:
 
-	CaptureServer() {
+	CaptureServer(): nh_private("~") {
 
 		ROS_INFO("Creating capture server");
+
+
+		tf_prefix_ = tf::getPrefixParam(nh_private);
+		odom_frame = tf::resolve(tf_prefix_, "odom_combined");
 
 		de = new cv::SurfDescriptorExtractor;
 		dm = new cv::FlannBasedMatcher;
@@ -152,7 +160,7 @@ public:
 
 		br.sendTransform(
 				tf::StampedTransform(map_to_odom, ros::Time::now(), "/map",
-						"odom_combined"));
+						odom_frame));
 
 	}
 

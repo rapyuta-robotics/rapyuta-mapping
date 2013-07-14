@@ -14,11 +14,7 @@
 #include <opencv2/nonfree/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <pcl/point_types.h>
-#include <pcl/PolygonMesh.h>
-#include <nav_msgs/OccupancyGrid.h>
 
-#include <octomap/OcTree.h>
-#include <octomap/ColorOcTree.h>
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/publisher.h>
