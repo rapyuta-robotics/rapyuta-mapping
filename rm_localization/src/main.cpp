@@ -66,6 +66,7 @@ public:
 
 		tf_prefix_ = tf::getPrefixParam(nh_private);
 		odom_frame = tf::resolve(tf_prefix_, "odom_combined");
+		map_to_odom.setIdentity();
 
 		de = new cv::SurfDescriptorExtractor;
 		dm = new cv::FlannBasedMatcher;
