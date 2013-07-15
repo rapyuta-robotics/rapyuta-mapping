@@ -804,7 +804,7 @@ void keypoint_map::publish_keypoints(ros::Publisher & pub) {
 			point_cloud->header.stamp = ros::Time::now();
 
 			pub.publish(point_cloud);
-			usleep(300000);
+			usleep(10000);
 		}
 
 
