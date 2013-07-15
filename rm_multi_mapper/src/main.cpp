@@ -37,6 +37,13 @@ int main(int argc, char **argv) {
 	ros::ServiceClient client = nh.serviceClient<rm_capture_server::Capture>(
 			"/cloudbot1/capture");
 
+	ros::ServiceClient clear_costmaps_client =
+			nh.serviceClient<std_srvs::Empty>(
+					"/cloudbot1/move_base/clear_costmaps");
+
+	ros::ServiceClient clear_unknown_space_client = nh.serviceClient<
+			std_srvs::Empty>("/cloudbot1/move_base/clear_unknown_space");
+
 	ros::Publisher servo_pub = nh.advertise<std_msgs::Float32>(
 			"/cloudbot1/mobile_base/commands/servo_angle", 1);
 
@@ -59,7 +66,7 @@ int main(int argc, char **argv) {
 	ROS_INFO("Action server started, sending goal.");
 	// send a goal to the action
 
-	for (int j = 0; j < 3; j++) {
+	for (int j = 0; j < 50; j++) {
 		for (int i = 0; i < 12; i++) {
 			move_base_msgs::MoveBaseGoal goal;
 			goal.target_pose.header.frame_id = "base_link";
@@ -148,34 +155,6 @@ int main(int argc, char **argv) {
 		servo_pub.publish(angle_msg);
 		sleep(1);
 
-		move_base_msgs::MoveBaseGoal goal;
-		goal.target_pose.header.frame_id = "/map";
-		goal.target_pose.header.stamp = ros::Time::now();
-
-		goal.target_pose.pose.position.x = j * 1.0;
-		goal.target_pose.pose.position.y = 0;
-		goal.target_pose.pose.position.z = 0;
-
-		tf::Quaternion q;
-		q.setEuler(0, 0, 0);
-		tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
-
-		ac.sendGoal(goal);
-
-		//turtlebot_actions::TurtlebotMoveGoal goal;
-		//goal.forward_distance = 0.5;
-		//goal.turn_distance = 0;
-		//ac.sendGoal(goal);
-
-		//wait for the action to return
-		bool finished_before_timeout = ac.waitForResult(ros::Duration(30.0));
-
-		if (finished_before_timeout) {
-			actionlib::SimpleClientGoalState state = ac.getState();
-			ROS_INFO("Action finished: %s", state.toString().c_str());
-		} else
-			ROS_INFO("Action did not finish before the time out.");
-
 		map->save("map_" + boost::lexical_cast<std::string>(j) + "_all");
 		map->remove_bad_points(1);
 		map->save("map_" + boost::lexical_cast<std::string>(j));
@@ -195,6 +174,42 @@ int main(int argc, char **argv) {
 		data.request.descriptors = *(desc.toImageMsg());
 
 		set_map_client.call(data);
+
+		while (true) {
+
+			std_srvs::Empty empty;
+			clear_unknown_space_client.call(empty);
+			clear_costmaps_client.call(empty);
+
+			move_base_msgs::MoveBaseGoal goal;
+			goal.target_pose.header.frame_id = "base_link";
+			goal.target_pose.header.stamp = ros::Time::now();
+
+			goal.target_pose.pose.position.x =
+					1.0 * ((float) rand()) / RAND_MAX;
+			goal.target_pose.pose.position.y =
+					1.0 * ((float) rand()) / RAND_MAX;
+			goal.target_pose.pose.position.z = 0;
+
+			tf::Quaternion q;
+			q.setEuler(0, 0, 0);
+			tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
+
+			ac.sendGoal(goal);
+
+			//wait for the action to return
+			bool finished_before_timeout = ac.waitForResult(
+					ros::Duration(30.0));
+
+			if (finished_before_timeout) {
+				actionlib::SimpleClientGoalState state = ac.getState();
+				ROS_INFO("Action finished: %s", state.toString().c_str());
+				if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
+					break;
+			} else
+				ROS_INFO("Action did not finish before the time out.");
+
+		}
 
 	}
 
