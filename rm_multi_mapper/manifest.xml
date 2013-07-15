@@ -10,6 +10,7 @@
   <url>http://ros.org/wiki/rm_multi_mapper</url>
   <depend package="roscpp"/>
   <depend package="rm_capture_server"/>
+  <depend package="rm_localization"/>
   <depend package="libg2o"/>
   <depend package="octomap"/>
   <depend package="tf"/>

@@ -799,12 +799,12 @@ void keypoint_map::publish_keypoints(ros::Publisher & pub) {
 
 			point_cloud->sensor_orientation_ = camera_positions[i].rotation();
 			point_cloud->sensor_origin_ = camera_positions[i].translation().homogeneous();
-			point_cloud->header.frame_id = "/cloudbot1/odom_combined";
+			point_cloud->header.frame_id = "/map";
 			point_cloud->header.seq = i;
 			point_cloud->header.stamp = ros::Time::now();
 
 			pub.publish(point_cloud);
-			usleep(10000);
+			usleep(300000);
 		}
 
 

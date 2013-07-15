@@ -8,30 +8,19 @@
 #include <eigen_conversions/eigen_msg.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <octomap/OcTree.h>
+#include <std_srvs/Empty.h>
+#include <rm_localization/SetMap.h>
 
 #include <move_base_msgs/MoveBaseAction.h>
 #include <octomap_msgs/BoundingBoxQuery.h>
 
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
+
 #include <tf/transform_broadcaster.h>
+#include <pcl_ros/publisher.h>
 
 #include <util.h>
-
-void publish_transforms() {
-	tf::TransformBroadcaster br;
-
-	while (true) {
-		tf::Transform transform;
-		transform.setIdentity();
-
-		br.sendTransform(
-				tf::StampedTransform(transform, ros::Time::now(), "/map",
-						"/cloudbot1/odom_combined"));
-
-		usleep(33000);
-
-	}
-
-}
 
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "multi_mapper");
@@ -39,8 +28,6 @@ int main(int argc, char **argv) {
 	ros::NodeHandle nh;
 
 	boost::shared_ptr<keypoint_map> map;
-
-	boost::thread t(publish_transforms);
 
 	// create the action client
 	// true causes the client to spin its own thread
@@ -52,6 +39,18 @@ int main(int argc, char **argv) {
 
 	ros::Publisher servo_pub = nh.advertise<std_msgs::Float32>(
 			"/cloudbot1/mobile_base/commands/servo_angle", 1);
+
+	ros::Publisher pub_cloud =
+			nh.advertise<pcl::PointCloud<pcl::PointXYZRGBA> >("/map_cloud", 10);
+
+	ros::Publisher pub_keypoints =
+			nh.advertise<pcl::PointCloud<pcl::PointXYZ> >("keypoints", 10);
+
+	ros::ServiceClient octomap_reset = nh.serviceClient<std_srvs::Empty>(
+			"/octomap_server/reset");
+
+	ros::ServiceClient set_map_client =
+			nh.serviceClient<rm_localization::SetMap>("/cloudbot1/set_map");
 
 	ROS_INFO("Waiting for action server to start.");
 	// wait for the action server to start
@@ -71,7 +70,7 @@ int main(int argc, char **argv) {
 			goal.target_pose.pose.position.z = 0;
 
 			tf::Quaternion q;
-			q.setRotation(tf::Vector3(0,0,1), M_PI/4);
+			q.setRotation(tf::Vector3(0, 0, 1), M_PI / 4);
 			tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
 
 			ac.sendGoal(goal);
@@ -112,6 +111,11 @@ int main(int argc, char **argv) {
 					if (map.get()) {
 						keypoint_map map1(rgb, depth, transform);
 						map->merge_keypoint_map(map1);
+						map->keypoints3d.header.frame_id = "/map";
+						map->keypoints3d.header.stamp = ros::Time::now();
+						map->keypoints3d.header.seq = 12 * j + i;
+
+						pub_keypoints.publish(map->keypoints3d);
 
 					} else {
 						map.reset(new keypoint_map(rgb, depth, transform));
@@ -139,6 +143,25 @@ int main(int argc, char **argv) {
 			}
 		}
 
+		std_msgs::Float32 angle_msg;
+		angle_msg.data = 0;
+		servo_pub.publish(angle_msg);
+		sleep(1);
+
+		move_base_msgs::MoveBaseGoal goal;
+		goal.target_pose.header.frame_id = "/map";
+		goal.target_pose.header.stamp = ros::Time::now();
+
+		goal.target_pose.pose.position.x = j * 1.0;
+		goal.target_pose.pose.position.y = 0;
+		goal.target_pose.pose.position.z = 0;
+
+		tf::Quaternion q;
+		q.setEuler(0, 0, 0);
+		tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
+
+		ac.sendGoal(goal);
+
 		//turtlebot_actions::TurtlebotMoveGoal goal;
 		//goal.forward_distance = 0.5;
 		//goal.turn_distance = 0;
@@ -158,30 +181,20 @@ int main(int argc, char **argv) {
 		map->save("map_" + boost::lexical_cast<std::string>(j));
 		map->optimize();
 
-		/*
-		 octomap::OcTree tree(0.05);
-		 map->get_octree(tree);
+		std_srvs::Empty msg;
+		octomap_reset.call(msg);
+		map->publish_keypoints(pub_cloud);
 
-		 octomap::point3d max = tree.getBBXMax();
-		 octomap::point3d min = tree.getBBXMin();
+		rm_localization::SetMap data;
 
-		 ROS_INFO("Bounding volume x: %f %f, y: %f %f, z: %f %f\n", min.x(),
-		 max.x(), min.y(), max.y(), min.z(), max.z());
+		pcl::toROSMsg(map->keypoints3d, data.request.keypoints3d);
 
+		cv_bridge::CvImage desc;
+		desc.image = map->descriptors;
+		desc.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+		data.request.descriptors = *(desc.toImageMsg());
 
-		 grid->info.height = 100;
-		 grid->info.width = 100;
-		 grid->info.map_load_time = ros::Time::now();
-		 grid->info.resolution = 0.05f;
-
-		 grid->info.origin;
-
-		 grid->header.frame_id = "odom_combined";
-		 grid->header.seq = 0;
-		 grid->header.stamp = ros::Time::now();
-
-		 grid->data.resize(grid->info.height*grid->info.width, 0);
-		 */
+		set_map_client.call(data);
 
 	}
 
