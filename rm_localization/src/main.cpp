@@ -164,7 +164,7 @@ public:
 			tf::Quaternion orientation = map_to_odom.getRotation();
 			double roll, pitch, yaw;
 			tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-			orientation.setEuler(yaw, 0, 0);
+			orientation.setEuler(0, 0, yaw);
 			tf::Vector3 translation = map_to_odom.getOrigin();
 			translation.setZ(0);
 			map_to_odom.setRotation(orientation);
