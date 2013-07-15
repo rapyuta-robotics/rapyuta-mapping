@@ -61,7 +61,7 @@ public:
 
 	CaptureServer(): nh_private("~") {
 
-		ROS_INFO("Creating capture server");
+		ROS_INFO("Creating localization");
 
 
 		tf_prefix_ = tf::getPrefixParam(nh_private);
@@ -92,6 +92,8 @@ public:
 		set_map_service = nh_.advertiseService("set_map",
 				&CaptureServer::SetMapCallback, this);
 
+		boost::thread t(boost::bind(&CaptureServer::publishTf, this));
+
 	}
 
 	~CaptureServer(void) {
@@ -105,6 +107,8 @@ public:
 		map_descriptors = descriptors->image;
 		pcl::fromROSMsg(req.keypoints3d, map_keypoints3d);
 
+		ROS_INFO("Recieved map with %d points and %d descriptors", map_keypoints3d.size(), map_descriptors.rows);
+
 		return true;
 	}
 
@@ -112,12 +116,14 @@ public:
 			const sensor_msgs::Image::ConstPtr& depth_msg,
 			const sensor_msgs::CameraInfo::ConstPtr& info_msg) {
 
+		ROS_INFO("Recieved frame");
+		
 		if (map_keypoints3d.size() < 10) {
 			return;
 		}
 
-		cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvShare(yuv2_msg,
-				sensor_msgs::image_encodings::MONO8);
+		cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvCopy(yuv2_msg,
+				sensor_msgs::image_encodings::RGB8);
 		cv_bridge::CvImageConstPtr depth = cv_bridge::toCvShare(depth_msg);
 
 		intrinsics << 525.0, 525.0, 319.5, 239.5;
@@ -159,9 +165,12 @@ public:
 
 	void publishTf() {
 
+		while(true){
 		br.sendTransform(
 				tf::StampedTransform(map_to_odom, ros::Time::now(), "/map",
 						odom_frame));
+		usleep(33000);
+		}
 
 	}
 
@@ -172,12 +181,7 @@ int main(int argc, char** argv) {
 
 	CaptureServer cs;
 
-	ros::Rate r(30);
-	while (ros::ok()) {
-		cs.publishTf();
-		r.sleep();
-		ros::spinOnce();
-	}
+	ros::spin();
 
 	return 0;
 }
