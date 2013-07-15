@@ -102,13 +102,15 @@ public:
 	bool SetMapCallback(rm_localization::SetMap::Request &req,
 			rm_localization::SetMap::Response &res) {
 
+		std::vector<cv::Mat> map_desc_vec(1);
 		cv_bridge::CvImagePtr descriptors = cv_bridge::toCvCopy(
 				req.descriptors);
 		map_descriptors = descriptors->image;
 		pcl::fromROSMsg(req.keypoints3d, map_keypoints3d);
 
+		map_desc_vec[0] = map_descriptors;
 		dm->clear();
-		dm->add(map_descriptors);
+		dm->add(map_desc_vec);
 
 		ROS_INFO("Recieved map with %d points and %d descriptors",
 				map_keypoints3d.size(), map_descriptors.rows);
