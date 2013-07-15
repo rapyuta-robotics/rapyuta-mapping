@@ -59,10 +59,10 @@ protected:
 
 public:
 
-	CaptureServer(): nh_private("~") {
+	CaptureServer() :
+			nh_private("~") {
 
 		ROS_INFO("Creating localization");
-
 
 		tf_prefix_ = tf::getPrefixParam(nh_private);
 		odom_frame = tf::resolve(tf_prefix_, "odom_combined");
@@ -107,7 +107,8 @@ public:
 		map_descriptors = descriptors->image;
 		pcl::fromROSMsg(req.keypoints3d, map_keypoints3d);
 
-		ROS_INFO("Recieved map with %d points and %d descriptors", map_keypoints3d.size(), map_descriptors.rows);
+		ROS_INFO("Recieved map with %d points and %d descriptors",
+				map_keypoints3d.size(), map_descriptors.rows);
 
 		return true;
 	}
@@ -116,8 +117,8 @@ public:
 			const sensor_msgs::Image::ConstPtr& depth_msg,
 			const sensor_msgs::CameraInfo::ConstPtr& info_msg) {
 
-		ROS_INFO("Recieved frame");
-		
+		//ROS_INFO("Recieved frame");
+
 		if (map_keypoints3d.size() < 10) {
 			return;
 		}
@@ -159,17 +160,27 @@ public:
 
 			map_to_odom = map_to_cam_new * map_to_cam.inverse() * map_to_odom;
 
+			// leave xy translation and z rotation only;
+			tf::Quaternion orientation = map_to_odom.getRotation();
+			double roll, pitch, yaw;
+			tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
+			orientation.setEuler(yaw, 0, 0);
+			tf::Vector3 translation = map_to_odom.getOrigin();
+			translation.setZ(0);
+			map_to_odom.setRotation(orientation);
+			map_to_odom.setOrigin(translation);
+
 		}
 
 	}
 
 	void publishTf() {
 
-		while(true){
-		br.sendTransform(
-				tf::StampedTransform(map_to_odom, ros::Time::now(), "/map",
-						odom_frame));
-		usleep(33000);
+		while (true) {
+			br.sendTransform(
+					tf::StampedTransform(map_to_odom, ros::Time::now(), "/map",
+							odom_frame));
+			usleep(33000);
 		}
 
 	}
