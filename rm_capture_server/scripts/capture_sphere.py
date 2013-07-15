@@ -54,7 +54,7 @@ def main():
   
 
   # Call the action
-  for j in range(1):
+  for j in range(3):
     for i in range(18):
       rospy.loginfo("Calling the action server...")
       action_goal = TurtlebotMoveGoal()
@@ -66,15 +66,15 @@ def main():
         total_angle += action_client.get_result().turn_distance * 180/math.pi
         print action_client.get_result().turn_distance * 180/math.pi
         print total_angle
-        time.sleep(2)
+        time.sleep(1)
         
-        for angle in np.linspace(-np.pi/3, np.pi/3, 12):
+        for angle in np.linspace(-np.pi/4, np.pi/4, 9):
 			servo_pub.publish(angle)
-			time.sleep(2)
-			servo_pub.publish(np.nan)
-			time.sleep(2)
+			time.sleep(1)
+			#servo_pub.publish(np.nan)
+			#time.sleep(2)
 			r = capture(0)
-			time.sleep(2)
+			#time.sleep(2)
 			rgb_buf = np.fromstring(r.rgb_png_data, dtype=np.uint8)
 			depth_buf = np.fromstring(r.depth_png_data, dtype=np.uint8)
 			img = cv2.imdecode(rgb_buf, cv2.CV_LOAD_IMAGE_UNCHANGED)
@@ -84,7 +84,9 @@ def main():
 			cv2.imwrite(join(depth_folder, str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + '.png'), depth_img*5)
 			rgb_file.write(str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + ' ' + join('rgb', str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + '.png') + '\n')
 			depth_file.write(str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + ' ' + join('depth', str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + '.png') + '\n')
-			pos_file.write(str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + ' ' + str(r.transform))
+			pos_file.write(str(r.header.stamp.secs) + '.' + str(r.header.stamp.nsecs) + ' '
+			 + str(r.transform.translation.x) + ' ' + str(r.transform.translation.y) + ' ' + str(r.transform.translation.z) 
+			 + ' ' + str(r.transform.rotation.x) + ' '+ str(r.transform.rotation.y) + ' ' + str(r.transform.rotation.z) + ' ' + str(r.transform.rotation.w) + '\n')
 
 			cv2.imshow('img', img)
 			cv2.imshow('depth', depth_img*5)
@@ -95,10 +97,10 @@ def main():
     action_goal = TurtlebotMoveGoal()
     action_goal.turn_distance = 0
     action_goal.forward_distance = 0.5 # metres
-    #if action_client.send_goal_and_wait(action_goal, rospy.Duration(50.0), rospy.Duration(50.0)) == GoalStatus.SUCCEEDED:
-	#	rospy.loginfo('Call to action server succeeded')
-    #else:
-	#e	rospy.logerr('Call to action server failed')
+    if action_client.send_goal_and_wait(action_goal, rospy.Duration(50.0), rospy.Duration(50.0)) == GoalStatus.SUCCEEDED:
+		rospy.loginfo('Call to action server succeeded')
+    else:
+		rospy.logerr('Call to action server failed')
     
   rgb_file.close()
   depth_file.close()

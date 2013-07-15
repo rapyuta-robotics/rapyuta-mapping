@@ -89,7 +89,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			listener.lookupTransform("odom_combined", yuv2_msg->header.frame_id,
+			listener.lookupTransform("/map", yuv2_msg->header.frame_id,
 					ros::Time(0), transform);
 		} catch (tf::TransformException ex) {
 			ROS_ERROR("%s", ex.what());
