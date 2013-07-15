@@ -124,7 +124,7 @@ public:
 		}
 
 		cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvCopy(yuv2_msg,
-				sensor_msgs::image_encodings::RGB8);
+				sensor_msgs::image_encodings::MONO8);
 		cv_bridge::CvImageConstPtr depth = cv_bridge::toCvShare(depth_msg);
 
 		intrinsics << 525.0, 525.0, 319.5, 239.5;

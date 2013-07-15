@@ -13,7 +13,12 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		std::vector<cv::KeyPoint> & filtered_keypoints,
 		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
 	cv::Mat gray;
-	cv::cvtColor(rgb, gray, cv::COLOR_BGR2GRAY);
+
+	if (rgb.channels() != 1) {
+		cv::cvtColor(rgb, gray, cv::COLOR_BGR2GRAY);
+	} else {
+		gray = rgb;
+	}
 
 	int threshold = 400;
 	fd->setInt("hessianThreshold", threshold);
