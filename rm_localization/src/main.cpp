@@ -107,6 +107,9 @@ public:
 		map_descriptors = descriptors->image;
 		pcl::fromROSMsg(req.keypoints3d, map_keypoints3d);
 
+		dm->clear();
+		dm->add(map_descriptors);
+
 		ROS_INFO("Recieved map with %d points and %d descriptors",
 				map_keypoints3d.size(), map_descriptors.rows);
 
@@ -137,7 +140,7 @@ public:
 				keypoints, keypoints3d, descriptors);
 
 		std::vector<cv::DMatch> matches;
-		dm->match(descriptors, map_descriptors, matches);
+		dm->match(descriptors, matches);
 
 		Eigen::Affine3f transform;
 		std::vector<bool> inliers;
@@ -150,7 +153,7 @@ public:
 			tf::StampedTransform map_to_cam;
 			try {
 				listener.lookupTransform("/map", yuv2_msg->header.frame_id,
-						ros::Time(0), map_to_cam);
+						yuv2_msg->header.stamp, map_to_cam);
 			} catch (tf::TransformException ex) {
 				ROS_ERROR("%s", ex.what());
 			}
