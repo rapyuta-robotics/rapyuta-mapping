@@ -31,13 +31,11 @@
 			<remap from="map" to="/map"/>
 			<remap from="/scan" to="/$(env HOSTNAME)/scan"/>
   		</node>
-		<!--
 		<node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" respawn="false" name="depthimage_to_laserscan" output="screen">
 			<remap from="image" to="depth/image_raw"/>
 			<remap from="camera_info" to="rgb/camera_info"/>
 			<param name="output_frame_id" value="/$(env HOSTNAME)/camera_rgb_frame"/>
 		</node>
-		-->
 		<node pkg="rm_localization" type="localization" respawn="false" name="localization" output="screen">
 		 </node>	
 
