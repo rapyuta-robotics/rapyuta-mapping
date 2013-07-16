@@ -56,6 +56,7 @@ protected:
 
 	std::string tf_prefix_;
 	std::string odom_frame;
+	boost::mutex m;
 
 public:
 
@@ -102,6 +103,8 @@ public:
 	bool SetMapCallback(rm_localization::SetMap::Request &req,
 			rm_localization::SetMap::Response &res) {
 
+
+		m.lock();
 		std::vector<cv::Mat> map_desc_vec(1);
 		cv_bridge::CvImagePtr descriptors = cv_bridge::toCvCopy(
 				req.descriptors);
@@ -111,6 +114,8 @@ public:
 		map_desc_vec[0] = map_descriptors;
 		dm->clear();
 		dm->add(map_desc_vec);
+		dm->train();
+		m.unlock();
 
 		ROS_INFO("Recieved map with %d points and %d descriptors",
 				map_keypoints3d.size(), map_descriptors.rows);
@@ -142,7 +147,9 @@ public:
 				keypoints, keypoints3d, descriptors);
 
 		std::vector<cv::DMatch> matches;
+		m.lock();
 		dm->match(descriptors, matches);
+		m.unlock();
 
 		Eigen::Affine3f transform;
 		std::vector<bool> inliers;
@@ -185,6 +192,7 @@ public:
 			br.sendTransform(
 					tf::StampedTransform(map_to_odom, ros::Time::now(), "/map",
 							odom_frame));
+			//ROS_INFO("Published map odom transform");
 			usleep(33000);
 		}
 
