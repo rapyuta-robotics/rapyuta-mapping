@@ -32,10 +32,10 @@ int main(int argc, char **argv) {
 	ros::ServiceClient octomap_reset = nh.serviceClient<std_srvs::Empty>(
 			"/octomap_server/reset");
 
-	keypoint_map map("map_2");
+	keypoint_map map("map_3");
 
 	ros::ServiceClient client = nh.serviceClient<rm_localization::SetMap>(
-			"/cloudbot1/set_map");
+			"/cloudbot2/set_map");
 
 	rm_localization::SetMap data;
 

@@ -22,51 +22,38 @@
 
 #include <util.h>
 
-int main(int argc, char **argv) {
-	ros::init(argc, argv, "multi_mapper");
+class robot_mapper {
 
-	ros::NodeHandle nh;
+public:
 
-	boost::shared_ptr<keypoint_map> map;
+	typedef boost::shared_ptr<robot_mapper> Ptr;
 
-	// create the action client
-	// true causes the client to spin its own thread
-	actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> ac(
-			"/cloudbot1/move_base", true);
+	robot_mapper(ros::NodeHandle & nh, const std::string & robot_prefix,
+			const int robot_num) :
+			prefix(
+					"/" + robot_prefix
+							+ boost::lexical_cast<std::string>(robot_num)), move_base_action_client(
+					prefix + "/move_base", true) {
 
-	ros::ServiceClient client = nh.serviceClient<rm_capture_server::Capture>(
-			"/cloudbot1/capture");
+		capture_client = nh.serviceClient<rm_capture_server::Capture>(
+				prefix + "/capture");
 
-	ros::ServiceClient clear_costmaps_client =
-			nh.serviceClient<std_srvs::Empty>(
-					"/cloudbot1/move_base/clear_costmaps");
+		clear_unknown_space_client = nh.serviceClient<std_srvs::Empty>(
+				prefix + "/move_base/clear_unknown_space");
 
-	ros::ServiceClient clear_unknown_space_client = nh.serviceClient<
-			std_srvs::Empty>("/cloudbot1/move_base/clear_unknown_space");
+		servo_pub = nh.advertise<std_msgs::Float32>(
+				prefix + "/mobile_base/commands/servo_angle", 1);
 
-	ros::Publisher servo_pub = nh.advertise<std_msgs::Float32>(
-			"/cloudbot1/mobile_base/commands/servo_angle", 1);
+		pub_keypoints = nh.advertise<pcl::PointCloud<pcl::PointXYZ> >(
+				prefix + "/keypoints", 10);
 
-	ros::Publisher pub_cloud =
-			nh.advertise<pcl::PointCloud<pcl::PointXYZRGBA> >("/map_cloud", 10);
+		set_map_client = nh.serviceClient<rm_localization::SetMap>(
+				prefix + "/set_map");
 
-	ros::Publisher pub_keypoints =
-			nh.advertise<pcl::PointCloud<pcl::PointXYZ> >("keypoints", 10);
+	}
 
-	ros::ServiceClient octomap_reset = nh.serviceClient<std_srvs::Empty>(
-			"/octomap_server/reset");
+	void capture_sphere() {
 
-	ros::ServiceClient set_map_client =
-			nh.serviceClient<rm_localization::SetMap>("/cloudbot1/set_map");
-
-	ROS_INFO("Waiting for action server to start.");
-	// wait for the action server to start
-	ac.waitForServer(); //will wait for infinite time
-
-	ROS_INFO("Action server started, sending goal.");
-	// send a goal to the action
-
-	for (int j = 0; j < 50; j++) {
 		for (int i = 0; i < 12; i++) {
 			move_base_msgs::MoveBaseGoal goal;
 			goal.target_pose.header.frame_id = "base_link";
@@ -77,17 +64,18 @@ int main(int argc, char **argv) {
 			goal.target_pose.pose.position.z = 0;
 
 			tf::Quaternion q;
-			q.setRotation(tf::Vector3(0, 0, 1), M_PI / 4);
+			q.setRotation(tf::Vector3(0, 0, 1), M_PI / 6);
 			tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
 
-			ac.sendGoal(goal);
+			move_base_action_client.sendGoal(goal);
 
 			//wait for the action to return
-			bool finished_before_timeout = ac.waitForResult(
-					ros::Duration(30.0));
+			bool finished_before_timeout =
+					move_base_action_client.waitForResult(ros::Duration(30.0));
 
 			if (finished_before_timeout) {
-				actionlib::SimpleClientGoalState state = ac.getState();
+				actionlib::SimpleClientGoalState state =
+						move_base_action_client.getState();
 				ROS_INFO("Action finished: %s", state.toString().c_str());
 			} else
 				ROS_INFO("Action did not finish before the time out.");
@@ -102,7 +90,7 @@ int main(int argc, char **argv) {
 
 				rm_capture_server::Capture srv;
 				srv.request.num_frames = 1;
-				if (client.call(srv)) {
+				if (capture_client.call(srv)) {
 
 					cv::Mat rgb = cv::imdecode(srv.response.rgb_png_data,
 							CV_LOAD_IMAGE_UNCHANGED);
@@ -120,7 +108,7 @@ int main(int argc, char **argv) {
 						map->merge_keypoint_map(map1);
 						map->keypoints3d.header.frame_id = "/map";
 						map->keypoints3d.header.stamp = ros::Time::now();
-						map->keypoints3d.header.seq = 12 * j + i;
+						map->keypoints3d.header.seq = i;
 
 						pub_keypoints.publish(map->keypoints3d);
 
@@ -134,17 +122,9 @@ int main(int argc, char **argv) {
 							<< map->descriptors.rows << " "
 							<< map->weights.size() << std::endl;
 
-					//vis.removeAllPointClouds();
-					//vis.addPointCloud<pcl::PointXYZ>(
-					//		accumulated_keypoints3d.makeShared(), "keypoints");
-					//vis.spinOnce(2);
-
-					//cv::imshow("Image", rgb);
-					//cv::waitKey(2);
-
 				} else {
 					ROS_ERROR("Failed to call service /cloudbot1/capture");
-					return 1;
+					return;
 				}
 
 			}
@@ -153,19 +133,13 @@ int main(int argc, char **argv) {
 		std_msgs::Float32 angle_msg;
 		angle_msg.data = 0;
 		servo_pub.publish(angle_msg);
-		sleep(1);
 
-		map->save("map_" + boost::lexical_cast<std::string>(j) + "_all");
-		map->remove_bad_points(1);
-		map->save("map_" + boost::lexical_cast<std::string>(j));
 		map->optimize();
 
-		std_srvs::Empty msg;
-		octomap_reset.call(msg);
-		map->publish_keypoints(pub_cloud);
+	}
 
+	void set_map() {
 		rm_localization::SetMap data;
-
 		pcl::toROSMsg(map->keypoints3d, data.request.keypoints3d);
 
 		cv_bridge::CvImage desc;
@@ -174,12 +148,14 @@ int main(int argc, char **argv) {
 		data.request.descriptors = *(desc.toImageMsg());
 
 		set_map_client.call(data);
+	}
+
+	void move_to_random_point() {
 
 		while (true) {
 
 			std_srvs::Empty empty;
 			clear_unknown_space_client.call(empty);
-			clear_costmaps_client.call(empty);
 
 			move_base_msgs::MoveBaseGoal goal;
 			goal.target_pose.header.frame_id = "base_link";
@@ -195,14 +171,15 @@ int main(int argc, char **argv) {
 			q.setEuler(0, 0, 0);
 			tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
 
-			ac.sendGoal(goal);
+			move_base_action_client.sendGoal(goal);
 
 			//wait for the action to return
-			bool finished_before_timeout = ac.waitForResult(
-					ros::Duration(30.0));
+			bool finished_before_timeout =
+					move_base_action_client.waitForResult(ros::Duration(30.0));
 
 			if (finished_before_timeout) {
-				actionlib::SimpleClientGoalState state = ac.getState();
+				actionlib::SimpleClientGoalState state =
+						move_base_action_client.getState();
 				ROS_INFO("Action finished: %s", state.toString().c_str());
 				if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
 					break;
@@ -213,25 +190,41 @@ int main(int argc, char **argv) {
 
 	}
 
-	pcl::visualization::PCLVisualizer vis;
-	vis.removeAllPointClouds();
-	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
-			"keypoints");
-	vis.spin();
+	std::string prefix;
 
-	std::cerr << "Error " << map->compute_error() << " Mean error "
-			<< map->compute_error() / map->observations.size() << std::endl;
+	actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> move_base_action_client;
+	ros::ServiceClient capture_client;
+	ros::ServiceClient clear_unknown_space_client;
+	ros::ServiceClient set_map_client;
+	ros::Publisher servo_pub;
+	ros::Publisher pub_keypoints;
 
-	map->optimize();
+	boost::shared_ptr<keypoint_map> map;
 
-	std::cerr << "Error " << map->compute_error() << " Mean error "
-			<< map->compute_error() / map->observations.size() << std::endl;
+};
 
-	vis.removeAllPointClouds();
-	vis.addPointCloud<pcl::PointXYZ>(map->keypoints3d.makeShared(),
-			"keypoints");
-	vis.spin();
+int main(int argc, char **argv) {
+	ros::init(argc, argv, "multi_mapper");
 
-//exit
+	ros::NodeHandle nh;
+
+	int num_robots = 2;
+	std::string prefix = "cloudbot";
+	std::vector<robot_mapper::Ptr> robot_mappers(2);
+
+	boost::thread_group tg;
+
+	for (int i = 0; i < num_robots; i++) {
+		robot_mappers[i].reset(new robot_mapper(nh, prefix, i + 1));
+	}
+
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(boost::bind(&robot_mapper::capture_sphere, robot_mappers[i].get()));
+	}
+
+	tg.join_all();
+
+	ROS_INFO("All threads finished successfully");
+
 	return 0;
 }
