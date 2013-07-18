@@ -72,8 +72,8 @@ public:
 		dm = new cv::FlannBasedMatcher;
 		fd = new cv::SurfFeatureDetector;
 		fd->setInt("hessianThreshold", 400);
-		fd->setBool("extended", true);
-		fd->setBool("upright", true);
+		fd->setInt("extended", 1);
+		fd->setInt("upright", 1);
 
 		queue_size_ = 1;
 
