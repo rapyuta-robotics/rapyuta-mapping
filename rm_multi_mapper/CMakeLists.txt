@@ -29,14 +29,14 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
 
-rosbuild_add_executable(multi_mapper src/main.cpp src/util.cpp)
-target_link_libraries(multi_mapper cholmod vtkCommon vtkFiltering)
+rosbuild_add_executable(multi_mapper src/main.cpp src/robot_mapper.cpp src/keypoint_map.cpp)
+target_link_libraries(multi_mapper cholmod vtkCommon vtkFiltering rm_localization_util)
 
-rosbuild_add_executable(ransac_test src/test.cpp src/util.cpp)
-target_link_libraries(ransac_test cholmod vtkCommon vtkFiltering)
+rosbuild_add_executable(ransac_test src/test.cpp src/robot_mapper.cpp src/keypoint_map.cpp)
+target_link_libraries(ransac_test cholmod vtkCommon vtkFiltering rm_localization_util)
 
-rosbuild_add_executable(test2 src/test2.cpp src/util.cpp)
-target_link_libraries(test2 cholmod vtkCommon vtkFiltering)
+rosbuild_add_executable(test2 src/test2.cpp src/robot_mapper.cpp src/keypoint_map.cpp)
+target_link_libraries(test2 cholmod vtkCommon vtkFiltering rm_localization_util)
 
 rosbuild_add_executable(ba_demo src/ba_demo.cpp)
 target_link_libraries(ba_demo cholmod)

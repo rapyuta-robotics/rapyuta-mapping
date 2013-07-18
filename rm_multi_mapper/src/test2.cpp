@@ -5,7 +5,7 @@
  *      Author: vsu
  */
 
-#include <util.h>
+#include <keypoint_map.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <ros/ros.h>
 #include <pcl_ros/publisher.h>
@@ -22,7 +22,6 @@ int main(int argc, char **argv) {
 	ros::init(argc, argv, "test_map");
 	ros::NodeHandle nh;
 
-	ros::Publisher pub = nh.advertise<nav_msgs::OccupancyGrid>("/map", 1);
 	ros::Publisher pub_cloud =
 			nh.advertise<pcl::PointCloud<pcl::PointXYZRGBA> >("/map_cloud", 10);
 

@@ -28,4 +28,4 @@ rosbuild_gensrv()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
 
 rosbuild_add_executable(localization src/main.cpp src/util.cpp)
-#target_link_libraries(example ${PROJECT_NAME})
+rosbuild_add_library(rm_localization_util src/util.cpp)

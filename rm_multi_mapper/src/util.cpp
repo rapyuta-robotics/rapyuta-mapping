@@ -59,8 +59,8 @@ keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 	dm = new cv::FlannBasedMatcher;
 	fd = new cv::SurfFeatureDetector;
 	fd->setInt("hessianThreshold", 400);
-	fd->setBool("extended", true);
-	fd->setBool("upright", true);
+	fd->setInt("extended", 1);
+	fd->setInt("upright", 1);
 
 	intrinsics << 525.0, 525.0, 319.5, 239.5;
 
@@ -95,8 +95,8 @@ keypoint_map::keypoint_map(const std::string & dir_name) {
 	dm = new cv::FlannBasedMatcher;
 	fd = new cv::SurfFeatureDetector;
 	fd->setInt("hessianThreshold", 400);
-	fd->setBool("extended", true);
-	fd->setBool("upright", true);
+	fd->setInt("extended", 1);
+	fd->setInt("upright", 1);
 
 	intrinsics << 525.0, 525.0, 319.5, 239.5;
 
@@ -821,6 +821,10 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 
 	int threshold = 400;
 	fd->setInt("hessianThreshold", threshold);
+
+	//std::cerr << "Uprignt " << fd->getInt("upright") << std::endl;
+	//std::cerr << "Extended " << fd->getInt("extended") << std::endl;
+
 	std::vector<cv::KeyPoint> keypoints;
 
 	cv::Mat mask(depth.size(), CV_8UC1);
