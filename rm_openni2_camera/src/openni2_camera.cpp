@@ -77,7 +77,7 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 	depth_video_mode.setPixelFormat(PIXEL_FORMAT_DEPTH_1_MM);
 	depth_video_mode.setResolution(640, 480);
 
-	color_video_mode.setFps(30);
+	color_video_mode.setFps(15);
 	color_video_mode.setPixelFormat(PIXEL_FORMAT_YUV422);
 	color_video_mode.setResolution(640, 480);
 

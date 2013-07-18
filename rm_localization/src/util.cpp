@@ -73,6 +73,9 @@ bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 
 	int max_inliers = 0;
 
+	if(matches.size() < min_num_inliers)
+		return false;
+
 	for (int iter = 0; iter < num_iter; iter++) {
 
 		int rand_idx[3];
