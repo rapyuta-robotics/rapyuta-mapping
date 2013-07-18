@@ -6,6 +6,7 @@
 #include <message_filters/sync_policies/approximate_time.h>
 
 #include <rm_localization/SetMap.h>
+#include <rm_localization/SetInitialPose.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -33,6 +34,7 @@ protected:
 	ros::NodeHandle nh_private;
 
 	ros::ServiceServer set_map_service;
+	ros::ServiceServer set_initial_pose;
 
 	message_filters::Subscriber<sensor_msgs::Image> rgb_sub;
 	message_filters::Subscriber<sensor_msgs::Image> depth_sub;
@@ -93,11 +95,22 @@ public:
 		set_map_service = nh_.advertiseService("set_map",
 				&CaptureServer::SetMapCallback, this);
 
+		set_initial_pose = nh_.advertiseService("set_initial_pose",
+				&CaptureServer::SetInitialPose, this);
+
 		boost::thread t(boost::bind(&CaptureServer::publishTf, this));
 
 	}
 
 	~CaptureServer(void) {
+	}
+
+	bool SetInitialPose(rm_localization::SetInitialPose::Request &req,
+				rm_localization::SetInitialPose::Response &res) {
+
+		tf::transformMsgToTF(req.pose, map_to_odom);
+
+		return true;
 	}
 
 	bool SetMapCallback(rm_localization::SetMap::Request &req,

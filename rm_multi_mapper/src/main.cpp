@@ -2,7 +2,6 @@
 
 #include <robot_mapper.h>
 
-
 int main(int argc, char **argv) {
 	ros::init(argc, argv, "multi_mapper");
 
@@ -19,14 +18,36 @@ int main(int argc, char **argv) {
 	}
 
 	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(boost::bind(&robot_mapper::capture_sphere, robot_mappers[i].get()));
+		tg.create_thread(
+				boost::bind(&robot_mapper::capture_sphere,
+						robot_mappers[i].get()));
+	}
+
+	tg.join_all();
+
+	for (int i = 0; i < num_robots; i++) {
+		robot_mappers[i]->set_map();
+	}
+
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(
+				boost::bind(&robot_mapper::move_to_random_point,
+						robot_mappers[i].get()));
+	}
+
+	tg.join_all();
+
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(
+				boost::bind(&robot_mapper::capture_sphere,
+						robot_mappers[i].get()));
 	}
 
 	tg.join_all();
 
 	ROS_INFO("All threads finished successfully");
 
-	if(robot_mappers[0]->map->merge_keypoint_map(*robot_mappers[1]->map)) {
+	if (robot_mappers[0]->map->merge_keypoint_map(*robot_mappers[1]->map, 200)) {
 		ROS_INFO("Merged 2 maps");
 		robot_mappers[0]->map->save("merged_map");
 	}
