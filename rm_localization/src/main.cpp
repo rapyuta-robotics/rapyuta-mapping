@@ -77,6 +77,8 @@ public:
 		fd->setInt("hessianThreshold", 400);
 		fd->setInt("extended", 1);
 		fd->setInt("upright", 1);
+		de->setInt("extended", 1);
+		de->setInt("upright", 1);
 
 		queue_size_ = 1;
 
