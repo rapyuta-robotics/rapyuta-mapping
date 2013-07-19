@@ -7,7 +7,8 @@
 
 #include <openni2_camera.h>
 
-OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private) {
+OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh,
+		ros::NodeHandle & nh_private) {
 
 	Status rc = OpenNI::initialize();
 	if (rc != STATUS_OK) {
@@ -56,20 +57,19 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 				OpenNI::getExtendedError());
 	}
 
-        rc = color.getCameraSettings()->setAutoWhiteBalanceEnabled(true);
-        if (rc != STATUS_OK) {
-                printf("Couldn't disable auto white balance\n%s\n",
-                                OpenNI::getExtendedError());
-                exit(2);
-        }
+	rc = color.getCameraSettings()->setAutoWhiteBalanceEnabled(false);
+	if (rc != STATUS_OK) {
+		printf("Couldn't disable auto white balance\n%s\n",
+				OpenNI::getExtendedError());
+		exit(2);
+	}
 
-        rc = color.getCameraSettings()->setAutoExposureEnabled(true);
-        if (rc != STATUS_OK) {
-                printf("Couldn't disable auto exposure\n%s\n",
-                                OpenNI::getExtendedError());
-                exit(2);
-        }
-
+	rc = color.getCameraSettings()->setAutoExposureEnabled(false);
+	if (rc != STATUS_OK) {
+		printf("Couldn't disable auto exposure\n%s\n",
+				OpenNI::getExtendedError());
+		exit(2);
+	}
 
 	VideoMode depth_video_mode, color_video_mode;
 
@@ -111,15 +111,12 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 				OpenNI::getExtendedError());
 		exit(2);
 	}
-	/*
-        rc = color.getCameraSettings()->setExposure(1000);
-        if (rc != STATUS_OK) {
-                printf("Couldn't set exposure\n%s\n",
-                                OpenNI::getExtendedError());
-                exit(2);
-        }
-	*/
 
+	rc = color.getCameraSettings()->setExposure(10);
+	if (rc != STATUS_OK) {
+		printf("Couldn't set exposure\n%s\n", OpenNI::getExtendedError());
+		exit(2);
+	}
 
 	dc.reset(new FrameCallback(nh, nh_private, "depth"));
 	rgbc.reset(new FrameCallback(nh, nh_private, "rgb"));
