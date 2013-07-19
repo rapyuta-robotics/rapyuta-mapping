@@ -56,14 +56,14 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 				OpenNI::getExtendedError());
 	}
 
-        rc = color.getCameraSettings()->setAutoWhiteBalanceEnabled(false);
+        rc = color.getCameraSettings()->setAutoWhiteBalanceEnabled(true);
         if (rc != STATUS_OK) {
                 printf("Couldn't disable auto white balance\n%s\n",
                                 OpenNI::getExtendedError());
                 exit(2);
         }
 
-        rc = color.getCameraSettings()->setAutoExposureEnabled(false);
+        rc = color.getCameraSettings()->setAutoExposureEnabled(true);
         if (rc != STATUS_OK) {
                 printf("Couldn't disable auto exposure\n%s\n",
                                 OpenNI::getExtendedError());
