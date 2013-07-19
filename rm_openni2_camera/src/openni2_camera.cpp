@@ -111,13 +111,14 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh, ros::NodeHandle & nh_private)
 				OpenNI::getExtendedError());
 		exit(2);
 	}
-
+	/*
         rc = color.getCameraSettings()->setExposure(1000);
         if (rc != STATUS_OK) {
                 printf("Couldn't set exposure\n%s\n",
                                 OpenNI::getExtendedError());
                 exit(2);
         }
+	*/
 
 
 	dc.reset(new FrameCallback(nh, nh_private, "depth"));
