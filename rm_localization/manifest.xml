@@ -15,6 +15,7 @@
   <depend package="tf"/>
   <depend package="tf_conversions"/>
   <depend package="cv_bridge"/>
+  <depend package="eigen_conversions"/>
   
   <export>
     <cpp cflags="-I${prefix}/include"  lflags="-L${prefix}/lib"/>

@@ -56,14 +56,8 @@ static void read(const cv::FileNode& node, observation& x,
 
 keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 		Eigen::Affine3f & transform) {
-	de = new cv::SurfDescriptorExtractor;
-	dm = new cv::FlannBasedMatcher;
-	fd = new cv::SurfFeatureDetector;
-	fd->setInt("hessianThreshold", 400);
-	fd->setInt("extended", 1);
-	fd->setInt("upright", 1);
-	de->setInt("extended", 1);
-	de->setInt("upright", 1);
+
+	init_feature_detector(fd, de, dm);
 
 	intrinsics << 525.0, 525.0, 319.5, 239.5;
 
@@ -71,6 +65,11 @@ keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 
 	compute_features(rgb, depth, intrinsics, fd, de, keypoints, keypoints3d,
 			descriptors);
+
+	//offset = Eigen::Vector3f(0,0,0);
+	offset = transform.translation();
+	Eigen::Affine3f rotation;
+	rotation.fromPositionOrientationScale(Eigen::Vector3f(0,0,0), transform.rotation(), Eigen::Vector3f(1,1,1));
 
 	for (int keypoint_id = 0; keypoint_id < keypoints.size(); keypoint_id++) {
 		observation o;
@@ -81,12 +80,12 @@ keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 		observations.push_back(o);
 		weights.push_back(1.0f);
 
-		keypoints3d[keypoint_id].getVector4fMap() = transform
-				* keypoints3d[keypoint_id].getVector4fMap();
+		keypoints3d[keypoint_id].getVector3fMap() = rotation
+				* keypoints3d[keypoint_id].getVector3fMap();
 
 	}
 
-	camera_positions.push_back(transform);
+	camera_positions.push_back(rotation);
 	rgb_imgs.push_back(rgb);
 	depth_imgs.push_back(depth);
 
@@ -94,14 +93,7 @@ keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 
 keypoint_map::keypoint_map(const std::string & dir_name) {
 
-	de = new cv::SurfDescriptorExtractor;
-	dm = new cv::FlannBasedMatcher;
-	fd = new cv::SurfFeatureDetector;
-	fd->setInt("hessianThreshold", 400);
-	fd->setInt("extended", 1);
-	fd->setInt("upright", 1);
-	de->setInt("extended", 1);
-	de->setInt("upright", 1);
+	init_feature_detector(fd, de, dm);
 
 	intrinsics << 525.0, 525.0, 319.5, 239.5;
 
@@ -205,7 +197,8 @@ bool keypoint_map::merge_keypoint_map(const keypoint_map & other,
 	size_t current_camera_positions_size = camera_positions.size();
 
 	for (size_t i = 0; i < other.camera_positions.size(); i++) {
-		camera_positions.push_back(transform.cast<float>() * other.camera_positions[i]);
+		camera_positions.push_back(
+				transform.cast<float>() * other.camera_positions[i]);
 		camera_positions[i].makeAffine();
 		rgb_imgs.push_back(other.rgb_imgs[i]);
 		depth_imgs.push_back(other.depth_imgs[i]);
@@ -642,7 +635,11 @@ void keypoint_map::align_z_axis() {
 
 	transform = transform.inverse();
 
-	transform.matrix().coeffRef(2, 3) = coefficients->values[3];
+	//transform.matrix().coeffRef(2, 3) = coefficients->values[3];
+
+	offset.coeffRef(2) = coefficients->values[3];
+	//Eigen::Affine3f rotation;
+	//rotation.fromPositionOrientationScale(Eigen::Vector3f(0,0,0), transform.rotation(), Eigen::Vector3f(1,1,1));
 
 	pcl::transformPointCloud(keypoints3d, keypoints3d, transform);
 
@@ -704,7 +701,7 @@ void keypoint_map::save(const std::string & dir_name) {
 
 }
 
-void keypoint_map::publish_keypoints(ros::Publisher & pub) {
+void keypoint_map::publish_pointclouds(ros::Publisher & pub) {
 
 	for (size_t i = 0; i < depth_imgs.size(); i++) {
 
@@ -729,6 +726,7 @@ void keypoint_map::publish_keypoints(ros::Publisher & pub) {
 
 					if (tmp[2] < 0.6 && tmp[2] > 0.2) {
 						p.getVector4fMap() = tmp;
+						p.getVector3fMap() += offset;
 						point_cloud->push_back(p);
 
 					}
@@ -738,8 +736,8 @@ void keypoint_map::publish_keypoints(ros::Publisher & pub) {
 		}
 
 		point_cloud->sensor_orientation_ = camera_positions[i].rotation();
-		point_cloud->sensor_origin_ =
-				camera_positions[i].translation().homogeneous();
+		point_cloud->sensor_origin_ = (camera_positions[i].translation()
+				+ offset).homogeneous();
 		point_cloud->header.frame_id = "/map";
 		point_cloud->header.seq = i;
 		point_cloud->header.stamp = ros::Time::now();
@@ -747,5 +745,25 @@ void keypoint_map::publish_keypoints(ros::Publisher & pub) {
 		pub.publish(point_cloud);
 		usleep(10000);
 	}
+
+}
+
+void keypoint_map::publish_keypoints(ros::Publisher & pub) {
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
+			new pcl::PointCloud<pcl::PointXYZ>);
+
+	Eigen::Affine3f t;
+
+	t.setIdentity();
+	t.translate(offset);
+
+	pcl::transformPointCloud(keypoints3d, *cloud, t);
+
+	cloud->header.frame_id = "/map";
+	cloud->header.stamp = ros::Time::now();
+	cloud->header.seq = 0;
+
+	pub.publish(cloud);
 
 }

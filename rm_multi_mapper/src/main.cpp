@@ -7,7 +7,7 @@ int main(int argc, char **argv) {
 
 	ros::NodeHandle nh;
 
-	int num_robots = 2;
+	int num_robots = 1;
 	std::string prefix = "cloudbot";
 	std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
 
@@ -25,28 +25,36 @@ int main(int argc, char **argv) {
 
 	tg.join_all();
 
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(
+				boost::bind(&robot_mapper::set_map,
+						robot_mappers[i].get()));
+	}
+
+	tg.join_all();
+
 	/*
-	for (int i = 0; i < num_robots; i++) {
-		robot_mappers[i]->set_map();
-	}
+	 for (int i = 0; i < num_robots; i++) {
+	 robot_mappers[i]->set_map();
+	 }
 
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::move_to_random_point,
-						robot_mappers[i].get()));
-	}
+	 for (int i = 0; i < num_robots; i++) {
+	 tg.create_thread(
+	 boost::bind(&robot_mapper::move_to_random_point,
+	 robot_mappers[i].get()));
+	 }
 
-	tg.join_all();
+	 tg.join_all();
 
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::capture_sphere,
-						robot_mappers[i].get()));
-	}
+	 for (int i = 0; i < num_robots; i++) {
+	 tg.create_thread(
+	 boost::bind(&robot_mapper::capture_sphere,
+	 robot_mappers[i].get()));
+	 }
 
-	tg.join_all();
+	 tg.join_all();
 
-	*/
+	 */
 
 	ROS_INFO("All threads finished successfully");
 
