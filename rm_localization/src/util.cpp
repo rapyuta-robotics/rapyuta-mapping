@@ -7,7 +7,7 @@
 
 #include <util.h>
 
-/*
+
  void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
  cv::Ptr<cv::DescriptorExtractor> & de, cv::Ptr<cv::DescriptorMatcher> & dm) {
  de = new cv::SurfDescriptorExtractor;
@@ -26,8 +26,9 @@
  de->setInt("nOctaveLayers", 1);
 
  }
- */
 
+
+/*
 void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,
 		cv::Ptr<cv::DescriptorMatcher> & dm) {
@@ -36,6 +37,7 @@ void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
 	fd = new cv::BRISK(100);
 
 }
+*/
 
 void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		const Eigen::Vector4f & intrinsics, cv::Ptr<cv::FeatureDetector> & fd,
@@ -50,11 +52,12 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		gray = rgb;
 	}
 
-	//int threshold = 400;
-	//fd->setInt("hessianThreshold", threshold);
+	int threshold = 400;
+	fd->setInt("hessianThreshold", threshold);
 
-	int threshold = 100;
-	fd->setInt("thres", threshold);
+	//int threshold = 100;
+	//fd->setInt("thres", threshold);
+
 	std::vector<cv::KeyPoint> keypoints;
 
 	cv::Mat mask(depth.size(), CV_8UC1);
@@ -65,8 +68,8 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	for (int i = 0; i < 5; i++) {
 		if (keypoints.size() < 300) {
 			threshold = threshold / 2;
-			//fd->setInt("hessianThreshold", threshold);
-			fd->setInt("thres", threshold);
+			fd->setInt("hessianThreshold", threshold);
+			//fd->setInt("thres", threshold);
 			keypoints.clear();
 			fd->detect(gray, keypoints, mask);
 		} else {

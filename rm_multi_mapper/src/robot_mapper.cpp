@@ -146,12 +146,14 @@ void robot_mapper::set_map() {
 
 	cv_bridge::CvImage desc;
 	desc.image = map->descriptors;
-	desc.encoding = sensor_msgs::image_encodings::TYPE_8UC1;
+	desc.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 	data.request.descriptors = *(desc.toImageMsg());
 
 	tf::pointEigenToMsg(map->offset.cast<double>(), data.request.offset);
 
 	set_map_client.call(data);
+
+	map->publish_pointclouds(pub_cloud);
 }
 
 void robot_mapper::move_to_random_point() {
