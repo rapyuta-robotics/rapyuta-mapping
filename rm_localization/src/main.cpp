@@ -183,12 +183,15 @@ public:
 				ROS_ERROR("%s", ex.what());
 			}
 
-			transform.translate(offset);
+
+			//transform.translate(offset);
 
 			tf::Transform map_to_cam_new;
 			tf::transformEigenToTF(transform.cast<double>(), map_to_cam_new);
 
 			map_to_odom = map_to_cam_new * map_to_cam.inverse() * map_to_odom;
+
+
 
 			// leave xy translation and z rotation only;
 			tf::Quaternion orientation = map_to_odom.getRotation();
@@ -196,7 +199,10 @@ public:
 			tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
 			orientation.setEuler(0, 0, yaw);
 			tf::Vector3 translation = map_to_odom.getOrigin();
-			translation.setZ(0);
+			translation.setZ(offset[2]);
+
+
+
 			map_to_odom.setRotation(orientation);
 			map_to_odom.setOrigin(translation);
 

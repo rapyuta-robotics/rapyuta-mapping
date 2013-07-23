@@ -45,7 +45,7 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 void robot_mapper::capture_sphere() {
 
 	int map_idx = 0;
-	for (int i = 0; i < 18; i++) {
+	for (int i = 0; i < 3; i++) {
 		move_base_msgs::MoveBaseGoal goal;
 		goal.target_pose.header.frame_id = "base_link";
 		goal.target_pose.header.stamp = ros::Time::now();
@@ -135,10 +135,8 @@ void robot_mapper::capture_sphere() {
 
 	map->remove_bad_points(1);
 	map->optimize();
-	map->keypoints3d.header.frame_id = "/map";
-	map->keypoints3d.header.stamp = ros::Time::now();
-	map->keypoints3d.header.seq = 13;
-	pub_keypoints.publish(map->keypoints3d);
+
+	map->publish_keypoints(pub_keypoints);
 
 }
 
