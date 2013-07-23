@@ -19,6 +19,9 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/publisher.h>
 
+void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
+		cv::Ptr<cv::DescriptorExtractor> & de, cv::Ptr<cv::DescriptorMatcher> & dm);
+
 void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		const Eigen::Vector4f & intrinsics, cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,
@@ -30,6 +33,5 @@ bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 		const std::vector<cv::DMatch> matches, int num_iter,
 		float distance2_threshold, int min_num_inliers, Eigen::Affine3f & trans,
 		std::vector<bool> & inliers);
-
 
 #endif /* UTIL_H_ */

@@ -53,6 +53,8 @@ public:
 
 	void publish_keypoints(ros::Publisher & pub);
 
+	void publish_pointclouds(ros::Publisher & pub);
+
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
 	cv::Ptr<cv::DescriptorMatcher> dm;

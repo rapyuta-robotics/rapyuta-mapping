@@ -45,7 +45,7 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 void robot_mapper::capture_sphere() {
 
 	int map_idx = 0;
-	for (int i = 0; i < 12; i++) {
+	for (int i = 0; i < 3; i++) {
 		move_base_msgs::MoveBaseGoal goal;
 		goal.target_pose.header.frame_id = "base_link";
 		goal.target_pose.header.stamp = ros::Time::now();
@@ -55,7 +55,7 @@ void robot_mapper::capture_sphere() {
 		goal.target_pose.pose.position.z = 0;
 
 		tf::Quaternion q;
-		q.setRotation(tf::Vector3(0, 0, 1), M_PI / 6);
+		q.setRotation(tf::Vector3(0, 0, 1), M_PI / 9);
 		tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
 
 		move_base_action_client.sendGoal(goal);
@@ -76,7 +76,7 @@ void robot_mapper::capture_sphere() {
 			std_msgs::Float32 angle_msg;
 			angle_msg.data = angle;
 			servo_pub.publish(angle_msg);
-			sleep(1);
+			usleep(100000);
 
 			rm_capture_server::Capture srv;
 			srv.request.num_frames = 1;
@@ -94,26 +94,23 @@ void robot_mapper::capture_sphere() {
 
 				if (map.get()) {
 
-					transform.setIdentity();
 					keypoint_map map1(rgb, depth, transform);
 					map1.save(
-							"cloudot_"
+							"maps/cloudot_"
 									+ boost::lexical_cast<std::string>(
 											robot_num) + "_map_"
 									+ boost::lexical_cast<std::string>(map_idx));
 					map->merge_keypoint_map(map1, 50);
-					map->keypoints3d.header.frame_id = "/map";
-					map->keypoints3d.header.stamp = ros::Time::now();
-					map->keypoints3d.header.seq = i;
 
-					pub_keypoints.publish(map->keypoints3d);
+					map->publish_keypoints(pub_keypoints);
+
 
 				} else {
 
 					map.reset(new keypoint_map(rgb, depth, transform));
 					map->align_z_axis();
 					map->save(
-							"cloudot_"
+							"maps/cloudot_"
 									+ boost::lexical_cast<std::string>(
 											robot_num) + "_map_"
 									+ boost::lexical_cast<std::string>(map_idx));
@@ -138,10 +135,8 @@ void robot_mapper::capture_sphere() {
 
 	map->remove_bad_points(1);
 	map->optimize();
-	map->keypoints3d.header.frame_id = "/map";
-	map->keypoints3d.header.stamp = ros::Time::now();
-	map->keypoints3d.header.seq = 13;
-	pub_keypoints.publish(map->keypoints3d);
+
+	map->publish_keypoints(pub_keypoints);
 
 }
 
@@ -154,7 +149,11 @@ void robot_mapper::set_map() {
 	desc.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 	data.request.descriptors = *(desc.toImageMsg());
 
+	tf::pointEigenToMsg(map->offset.cast<double>(), data.request.offset);
+
 	set_map_client.call(data);
+
+	map->publish_pointclouds(pub_cloud);
 }
 
 void robot_mapper::move_to_random_point() {

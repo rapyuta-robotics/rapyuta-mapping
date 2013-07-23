@@ -19,6 +19,7 @@
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
 #include <tf_conversions/tf_eigen.h>
+#include <eigen_conversions/eigen_msg.h>
 
 #include <util.h>
 
@@ -60,6 +61,8 @@ protected:
 	std::string odom_frame;
 	boost::mutex m;
 
+	Eigen::Vector3f offset;
+
 public:
 
 	CaptureServer() :
@@ -71,14 +74,7 @@ public:
 		odom_frame = tf::resolve(tf_prefix_, "odom_combined");
 		map_to_odom.setIdentity();
 
-		de = new cv::SurfDescriptorExtractor;
-		dm = new cv::FlannBasedMatcher;
-		fd = new cv::SurfFeatureDetector;
-		fd->setInt("hessianThreshold", 400);
-		fd->setInt("extended", 1);
-		fd->setInt("upright", 1);
-		de->setInt("extended", 1);
-		de->setInt("upright", 1);
+		init_feature_detector(fd, de, dm);
 
 		queue_size_ = 1;
 
@@ -130,6 +126,11 @@ public:
 		dm->clear();
 		dm->add(map_desc_vec);
 		dm->train();
+
+		Eigen::Vector3d vec;
+		tf::pointMsgToEigen(req.offset, vec);
+		offset = vec.cast<float>();
+
 		m.unlock();
 
 		ROS_INFO("Recieved map with %d points and %d descriptors",
@@ -182,10 +183,15 @@ public:
 				ROS_ERROR("%s", ex.what());
 			}
 
+
+			transform.translate(offset);
+
 			tf::Transform map_to_cam_new;
 			tf::transformEigenToTF(transform.cast<double>(), map_to_cam_new);
 
 			map_to_odom = map_to_cam_new * map_to_cam.inverse() * map_to_odom;
+
+
 
 			// leave xy translation and z rotation only;
 			tf::Quaternion orientation = map_to_odom.getRotation();
@@ -194,6 +200,9 @@ public:
 			orientation.setEuler(0, 0, yaw);
 			tf::Vector3 translation = map_to_odom.getOrigin();
 			translation.setZ(0);
+
+
+
 			map_to_odom.setRotation(orientation);
 			map_to_odom.setOrigin(translation);
 
