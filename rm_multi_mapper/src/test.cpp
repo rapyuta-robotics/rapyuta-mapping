@@ -13,14 +13,12 @@ int main() {
 	Eigen::Vector4f intrinsics;
 	intrinsics << 525.0, 525.0, 319.5, 239.5;
 
-	cv::Ptr<cv::FeatureDetector> fd = new cv::SurfFeatureDetector;
-	fd->setInt("hessianThreshold", 400);
-	fd->setBool("extended", true);
-	fd->setBool("upright", true);
+	cv::Ptr<cv::FeatureDetector> fd;
+	cv::Ptr<cv::DescriptorExtractor> de;
+	cv::Ptr<cv::DescriptorMatcher> dm;
 
-	cv::Ptr<cv::DescriptorExtractor> de = new cv::SurfDescriptorExtractor;
+	init_feature_detector(fd, de, dm);
 
-	cv::Ptr<cv::DescriptorMatcher> dm = new cv::BFMatcher;
 
 	cv::Mat rgb1 = cv::imread("../panorama5/rgb/1372788772.32563458.png",
 			CV_LOAD_IMAGE_UNCHANGED);

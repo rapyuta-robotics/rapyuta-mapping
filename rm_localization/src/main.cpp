@@ -184,7 +184,7 @@ public:
 			}
 
 
-			//transform.translate(offset);
+			transform.translate(offset);
 
 			tf::Transform map_to_cam_new;
 			tf::transformEigenToTF(transform.cast<double>(), map_to_cam_new);
@@ -199,7 +199,7 @@ public:
 			tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
 			orientation.setEuler(0, 0, yaw);
 			tf::Vector3 translation = map_to_odom.getOrigin();
-			translation.setZ(offset[2]);
+			translation.setZ(0);
 
 
 

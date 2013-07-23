@@ -31,9 +31,9 @@
 void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,
 		cv::Ptr<cv::DescriptorMatcher> & dm) {
-	de = new cv::BRISK(100, 0);
+	de = new cv::BRISK(100);
 	dm = new cv::FlannBasedMatcher(new cv::flann::LshIndexParams(20, 10, 2));
-	fd = new cv::BRISK(100, 0);
+	fd = new cv::BRISK(100);
 
 }
 

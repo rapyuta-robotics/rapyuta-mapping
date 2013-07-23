@@ -207,12 +207,13 @@ bool keypoint_map::merge_keypoint_map(const keypoint_map & other,
 	for (size_t i = 0; i < matches.size(); i++) {
 
 		if (inliers[i]) {
-			descriptors.row(matches[i].trainIdx) = (descriptors.row(
+			/*descriptors.row(matches[i].trainIdx) = (descriptors.row(
 					matches[i].trainIdx) * weights[matches[i].trainIdx]
 					+ other.descriptors.row(matches[i].queryIdx)
 							* other.weights[matches[i].queryIdx])
 					/ (weights[matches[i].trainIdx]
 							+ other.weights[matches[i].queryIdx]);
+			*/
 
 			weights[matches[i].trainIdx] += other.weights[matches[i].queryIdx];
 
