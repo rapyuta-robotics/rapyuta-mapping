@@ -49,7 +49,7 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 void robot_mapper::capture_sphere() {
 
 	int map_idx = 0;
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 12; i++) {
 		move_base_msgs::MoveBaseGoal goal;
 		goal.target_pose.header.frame_id = "base_link";
 		goal.target_pose.header.stamp = ros::Time::now();
@@ -59,7 +59,7 @@ void robot_mapper::capture_sphere() {
 		goal.target_pose.pose.position.z = 0;
 
 		tf::Quaternion q;
-		q.setRotation(tf::Vector3(0, 0, 1), M_PI / 9);
+		q.setRotation(tf::Vector3(0, 0, 1), M_PI / 6);
 		tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
 
 		move_base_action_client.sendGoal(goal);
