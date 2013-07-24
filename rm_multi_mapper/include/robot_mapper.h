@@ -31,6 +31,7 @@
 #include <tf/transform_broadcaster.h>
 #include <pcl_ros/publisher.h>
 #include <tf_conversions/tf_eigen.h>
+#include <octomap_server.h>
 
 #include <keypoint_map.h>
 
@@ -63,6 +64,8 @@ public:
 	boost::shared_ptr<keypoint_map> map;
 
 	Eigen::Affine3f initial_transformation;
+
+	RmOctomapServer::Ptr octomap_server;
 
 };
 

@@ -59,6 +59,7 @@ protected:
 
 	std::string tf_prefix_;
 	std::string odom_frame;
+	std::string map_frame;
 	boost::mutex m;
 
 	Eigen::Vector3f offset;
@@ -72,6 +73,7 @@ public:
 
 		tf_prefix_ = tf::getPrefixParam(nh_private);
 		odom_frame = tf::resolve(tf_prefix_, "odom_combined");
+		map_frame = tf::resolve(tf_prefix_, "map");
 		map_to_odom.setIdentity();
 
 		init_feature_detector(fd, de, dm);
@@ -214,7 +216,7 @@ public:
 
 		while (true) {
 			br.sendTransform(
-					tf::StampedTransform(map_to_odom, ros::Time::now(), "/map",
+					tf::StampedTransform(map_to_odom, ros::Time::now(), map_frame,
 							odom_frame));
 			//ROS_INFO("Published map odom transform");
 			usleep(33000);

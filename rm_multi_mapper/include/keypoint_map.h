@@ -15,6 +15,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <pcl/point_types.h>
 
+#include <octomap_server.h>
 #include <octomap/OcTree.h>
 #include <octomap/ColorOcTree.h>
 #include <ros/ros.h>
@@ -51,9 +52,9 @@ public:
 
 	void save(const std::string & dir_name);
 
-	void publish_keypoints(ros::Publisher & pub);
+	void publish_keypoints(ros::Publisher & pub, const std::string & frame_prefix);
 
-	void publish_pointclouds(ros::Publisher & pub);
+	void publish_pointclouds(RmOctomapServer::Ptr & server, const std::string & frame_prefix);
 
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
@@ -71,7 +72,6 @@ public:
 	std::vector<cv::Mat> rgb_imgs;
 	std::vector<cv::Mat> depth_imgs;
 
-	Eigen::Vector3f offset;
 
 };
 

@@ -30,6 +30,7 @@
 
 #include <boost/filesystem.hpp>
 #include <opencv2/core/core.hpp>
+#include <octomap_server.h>
 
 #include <octomap/ColorOcTree.h>
 
@@ -66,10 +67,6 @@ keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 	compute_features(rgb, depth, intrinsics, fd, de, keypoints, keypoints3d,
 			descriptors);
 
-	//offset = Eigen::Vector3f(0,0,0);
-	offset = transform.translation();
-	Eigen::Affine3f rotation;
-	rotation.fromPositionOrientationScale(Eigen::Vector3f(0,0,0), transform.rotation(), Eigen::Vector3f(1,1,1));
 
 	for (int keypoint_id = 0; keypoint_id < keypoints.size(); keypoint_id++) {
 		observation o;
@@ -80,12 +77,12 @@ keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
 		observations.push_back(o);
 		weights.push_back(1.0f);
 
-		keypoints3d[keypoint_id].getVector3fMap() = rotation
+		keypoints3d[keypoint_id].getVector3fMap() = transform
 				* keypoints3d[keypoint_id].getVector3fMap();
 
 	}
 
-	camera_positions.push_back(rotation);
+	camera_positions.push_back(transform);
 	rgb_imgs.push_back(rgb);
 	depth_imgs.push_back(depth);
 
@@ -208,12 +205,12 @@ bool keypoint_map::merge_keypoint_map(const keypoint_map & other,
 
 		if (inliers[i]) {
 			/*descriptors.row(matches[i].trainIdx) = (descriptors.row(
-					matches[i].trainIdx) * weights[matches[i].trainIdx]
-					+ other.descriptors.row(matches[i].queryIdx)
-							* other.weights[matches[i].queryIdx])
-					/ (weights[matches[i].trainIdx]
-							+ other.weights[matches[i].queryIdx]);
-			*/
+			 matches[i].trainIdx) * weights[matches[i].trainIdx]
+			 + other.descriptors.row(matches[i].queryIdx)
+			 * other.weights[matches[i].queryIdx])
+			 / (weights[matches[i].trainIdx]
+			 + other.weights[matches[i].queryIdx]);
+			 */
 
 			weights[matches[i].trainIdx] += other.weights[matches[i].queryIdx];
 
@@ -607,6 +604,7 @@ void keypoint_map::align_z_axis() {
 	seg.setModelType(pcl::SACMODEL_PLANE);
 	seg.setMethodType(pcl::SAC_RANSAC);
 	seg.setDistanceThreshold(0.005);
+	seg.setProbability(0.99);
 
 	seg.setInputCloud(point_cloud);
 	seg.segment(*inliers, *coefficients);
@@ -636,11 +634,7 @@ void keypoint_map::align_z_axis() {
 
 	transform = transform.inverse();
 
-	//transform.matrix().coeffRef(2, 3) = coefficients->values[3];
-
-	offset.coeffRef(2) = coefficients->values[3];
-	//Eigen::Affine3f rotation;
-	//rotation.fromPositionOrientationScale(Eigen::Vector3f(0,0,0), transform.rotation(), Eigen::Vector3f(1,1,1));
+	transform.matrix().coeffRef(2, 3) = coefficients->values[3];
 
 	pcl::transformPointCloud(keypoints3d, keypoints3d, transform);
 
@@ -702,32 +696,31 @@ void keypoint_map::save(const std::string & dir_name) {
 
 }
 
-void keypoint_map::publish_pointclouds(ros::Publisher & pub) {
+void keypoint_map::publish_pointclouds(RmOctomapServer::Ptr & server, const std::string & frame_prefix) {
 
 	for (size_t i = 0; i < depth_imgs.size(); i++) {
 
-		pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud(
-				new pcl::PointCloud<pcl::PointXYZRGBA>);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud(
+				new pcl::PointCloud<pcl::PointXYZ>);
 
 		for (int v = 0; v < depth_imgs[i].rows; v++) {
 			for (int u = 0; u < depth_imgs[i].cols; u++) {
 				if (depth_imgs[i].at<unsigned short>(v, u) != 0) {
-					pcl::PointXYZRGBA p;
+					pcl::PointXYZ p;
 					p.z = depth_imgs[i].at<unsigned short>(v, u) / 1000.0f;
 					p.x = (u - intrinsics[2]) * p.z / intrinsics[0];
 					p.y = (v - intrinsics[3]) * p.z / intrinsics[1];
-					cv::Vec3b brg = rgb_imgs[i].at<cv::Vec3b>(v, u);
-					p.r = brg[2];
-					p.g = brg[1];
-					p.b = brg[0];
-					p.a = 255;
+					//cv::Vec3b brg = rgb_imgs[i].at<cv::Vec3b>(v, u);
+					//p.r = brg[2];
+					//p.g = brg[1];
+					//p.b = brg[0];
+					//p.a = 255;
 
 					Eigen::Vector4f tmp = camera_positions[i]
 							* p.getVector4fMap();
 
 					if (tmp[2] < 0.6 && tmp[2] > 0.2) {
 						p.getVector4fMap() = tmp;
-						p.getVector3fMap() += offset;
 						point_cloud->push_back(p);
 
 					}
@@ -737,34 +730,26 @@ void keypoint_map::publish_pointclouds(ros::Publisher & pub) {
 		}
 
 		point_cloud->sensor_orientation_ = camera_positions[i].rotation();
-		point_cloud->sensor_origin_ = (camera_positions[i].translation()
-				+ offset).homogeneous();
-		point_cloud->header.frame_id = "/map";
+		point_cloud->sensor_origin_ = camera_positions[i].translation().homogeneous();
+		point_cloud->header.frame_id = frame_prefix + "/map";
 		point_cloud->header.seq = i;
 		point_cloud->header.stamp = ros::Time::now();
 
-		pub.publish(point_cloud);
-		usleep(10000);
+		Eigen::Vector3f pos = camera_positions[i].translation();
+
+		server->insertScan(tf::Point(pos[0], pos[1], pos[2]), *point_cloud, pcl::PointCloud<pcl::PointXYZ>());
+		server->publishAll(ros::Time::now());
 	}
 
 }
 
-void keypoint_map::publish_keypoints(ros::Publisher & pub) {
+void keypoint_map::publish_keypoints(ros::Publisher & pub, const std::string & frame_prefix) {
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
-			new pcl::PointCloud<pcl::PointXYZ>);
+	keypoints3d.header.frame_id = frame_prefix + "/map";
+	keypoints3d.header.stamp = ros::Time::now();
+	keypoints3d.header.seq = 0;
 
-	Eigen::Affine3f t;
-
-	t.setIdentity();
-	t.translate(offset);
-
-	pcl::transformPointCloud(keypoints3d, *cloud, t);
-
-	cloud->header.frame_id = "/map";
-	cloud->header.stamp = ros::Time::now();
-	cloud->header.seq = 0;
-
-	pub.publish(cloud);
+	pub.publish(keypoints3d);
 
 }
+

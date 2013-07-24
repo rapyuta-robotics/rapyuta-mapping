@@ -19,6 +19,19 @@
 
 int main(int argc, char **argv) {
 
+	octomap::OcTree tree(0.05);
+
+	for (float x = -100; x < 100; x += 0.05) {
+		for (float y = -100; y < 100; y += 0.05) {
+			tree.updateNode(x, y, 0, false);
+
+		}
+	}
+
+	tree.writeBinary("free_space.bt");
+
+	return 0;
+
 	ros::init(argc, argv, "test_map");
 	ros::NodeHandle nh;
 
@@ -49,7 +62,7 @@ int main(int argc, char **argv) {
 
 	std_srvs::Empty msg;
 	octomap_reset.call(msg);
-	map.publish_keypoints(pub_cloud);
+	map.publish_keypoints(pub_cloud, "/cloudbot2");
 
 	ros::Rate r(1);
 	int seq = 0;
