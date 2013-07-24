@@ -28,7 +28,6 @@
 			<param name="local_costmap/robot_base_frame" value="base_footprint"/>
 			<param name="local_costmap/global_frame" value="odom_combined"/>
     			<remap from="cmd_vel" to="mobile_base/commands/velocity"/>
-			<remap from="map" to="/map"/>
 			<remap from="/scan" to="/$(env HOSTNAME)/scan"/>
   		</node>
 		<node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" respawn="false" name="depthimage_to_laserscan" output="screen">
