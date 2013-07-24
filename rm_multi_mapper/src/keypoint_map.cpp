@@ -738,9 +738,10 @@ void keypoint_map::publish_pointclouds(RmOctomapServer::Ptr & server, const std:
 		Eigen::Vector3f pos = camera_positions[i].translation();
 
 		server->insertScan(tf::Point(pos[0], pos[1], pos[2]), *point_cloud, pcl::PointCloud<pcl::PointXYZ>());
-		server->publishAll(ros::Time::now());
+
 	}
 
+	server->publishAll(ros::Time::now());
 }
 
 void keypoint_map::publish_keypoints(ros::Publisher & pub, const std::string & frame_prefix) {

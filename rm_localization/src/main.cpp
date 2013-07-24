@@ -179,14 +179,12 @@ public:
 
 			tf::StampedTransform map_to_cam;
 			try {
-				listener.lookupTransform("/map", yuv2_msg->header.frame_id,
+				listener.lookupTransform(map_frame, yuv2_msg->header.frame_id,
 						yuv2_msg->header.stamp, map_to_cam);
 			} catch (tf::TransformException ex) {
 				ROS_ERROR("%s", ex.what());
 			}
 
-
-			transform.translate(offset);
 
 			tf::Transform map_to_cam_new;
 			tf::transformEigenToTF(transform.cast<double>(), map_to_cam_new);
