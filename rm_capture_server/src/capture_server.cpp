@@ -16,6 +16,7 @@ class CaptureServer {
 protected:
 
 	ros::NodeHandle nh_;
+	ros::NodeHandle nh_private;
 
 	ros::ServiceServer rgbd_service;
 
@@ -31,15 +32,21 @@ protected:
 
 	tf::TransformListener listener;
 
+	std::string tf_prefix_;
+	std::string map_frame;
+
 	int queue_size_;
 
 public:
 
-	CaptureServer() {
+	CaptureServer() : nh_private("~") {
 
 		ROS_INFO("Creating capture server");
 
 		queue_size_ = 1;
+
+		tf_prefix_ = tf::getPrefixParam(nh_private);
+		map_frame = tf::resolve(tf_prefix_, "map");
 
 		yuv2_sub = nh_.subscribe<sensor_msgs::Image>("rgb/image_raw",
 				queue_size_, &CaptureServer::RGBCallback, this);
@@ -89,7 +96,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			listener.lookupTransform("/map", yuv2_msg->header.frame_id,
+			listener.lookupTransform(map_frame, yuv2_msg->header.frame_id,
 					ros::Time(0), transform);
 		} catch (tf::TransformException ex) {
 			ROS_ERROR("%s", ex.what());

@@ -20,6 +20,7 @@
   <depend package="turtlebot_actions"/>
   <depend package="eigen_conversions"/>
   <depend package="move_base_msgs"/>
+  <depend package="octomap_server"/>
   
   <rosdep name="suitesparse" />
 

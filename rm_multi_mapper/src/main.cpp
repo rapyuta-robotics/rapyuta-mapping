@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
 	boost::thread_group tg;
 
 	for (int i = 0; i < num_robots; i++) {
-		robot_mappers[i].reset(new robot_mapper(nh, prefix, i + 1));
+		robot_mappers[i].reset(new robot_mapper(nh, prefix, i + 2));
 	}
 
 	for (int i = 0; i < num_robots; i++) {
@@ -56,7 +56,9 @@ int main(int argc, char **argv) {
 
 	 */
 
-	ROS_INFO("All threads finished successfully");
+	ROS_INFO("All threads finished successfully");\
+
+	ros::spin();
 
 	if (robot_mappers[0]->map->merge_keypoint_map(*robot_mappers[1]->map, 50)) {
 		ROS_INFO("Merged 2 maps");

@@ -7,6 +7,11 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 						+ boost::lexical_cast<std::string>(robot_num)), move_base_action_client(
 				prefix + "/move_base", true) {
 
+	std::string pref = robot_prefix
+			+ boost::lexical_cast<std::string>(robot_num);
+	octomap_server.reset(new RmOctomapServer(ros::NodeHandle(nh, pref), pref));
+	octomap_server->openFile("free_space.bt");
+
 	capture_client = nh.serviceClient<rm_capture_server::Capture>(
 			prefix + "/capture");
 
@@ -19,15 +24,13 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 	pub_keypoints = nh.advertise<pcl::PointCloud<pcl::PointXYZ> >(
 			prefix + "/keypoints", 10);
 
-	pub_cloud = nh.advertise<pcl::PointCloud<pcl::PointXYZRGBA> >("/map_cloud",
-			10);
-
 	set_map_client = nh.serviceClient<rm_localization::SetMap>(
 			prefix + "/set_map");
 
 	set_intial_pose = nh.serviceClient<rm_localization::SetInitialPose>(
 			prefix + "/set_initial_pose");
 
+	/*
 	initial_transformation.setIdentity();
 	initial_transformation.translate(
 			Eigen::Vector3f(0, (robot_num - 1) * 30, 0));
@@ -39,6 +42,7 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 	if (!set_intial_pose.call(data)) {
 		ROS_ERROR("Coudld not set initial pose to robot");
 	}
+	*/
 
 }
 
@@ -102,7 +106,7 @@ void robot_mapper::capture_sphere() {
 									+ boost::lexical_cast<std::string>(map_idx));
 					map->merge_keypoint_map(map1, 50);
 
-					map->publish_keypoints(pub_keypoints);
+					map->publish_keypoints(pub_keypoints, prefix);
 
 
 				} else {
@@ -136,7 +140,7 @@ void robot_mapper::capture_sphere() {
 	map->remove_bad_points(1);
 	map->optimize();
 
-	map->publish_keypoints(pub_keypoints);
+	map->publish_keypoints(pub_keypoints, prefix);
 
 }
 
@@ -149,11 +153,10 @@ void robot_mapper::set_map() {
 	desc.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 	data.request.descriptors = *(desc.toImageMsg());
 
-	tf::pointEigenToMsg(map->offset.cast<double>(), data.request.offset);
 
 	set_map_client.call(data);
 
-	map->publish_pointclouds(pub_cloud);
+	map->publish_pointclouds(octomap_server, prefix);
 }
 
 void robot_mapper::move_to_random_point() {
