@@ -22,7 +22,6 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/publisher.h>
 
-
 typedef struct {
 	int cam_id;
 	int point_id;
@@ -36,7 +35,10 @@ public:
 	keypoint_map(cv::Mat & rgb, cv::Mat & depth, Eigen::Affine3f & transform);
 	keypoint_map(const std::string & dir_name);
 
-	bool merge_keypoint_map(const keypoint_map & other, int min_num_inliers);
+	bool merge_keypoint_map(const keypoint_map & other, int min_num_inliers, int num_iterations);
+
+	bool merge_images(cv::Mat & rgb, cv::Mat & depth,
+			Eigen::Affine3f & transform);
 
 	void remove_bad_points(int min_num_observations);
 
@@ -52,9 +54,11 @@ public:
 
 	void save(const std::string & dir_name);
 
-	void publish_keypoints(ros::Publisher & pub, const std::string & frame_prefix);
+	void publish_keypoints(ros::Publisher & pub,
+			const std::string & frame_prefix);
 
-	void publish_pointclouds(RmOctomapServer::Ptr & server, const std::string & frame_prefix);
+	void publish_pointclouds(RmOctomapServer::Ptr & server,
+			const std::string & frame_prefix);
 
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
@@ -72,6 +76,7 @@ public:
 	std::vector<cv::Mat> rgb_imgs;
 	std::vector<cv::Mat> depth_imgs;
 
+	//boost::mutex merge_mutex;
 
 };
 

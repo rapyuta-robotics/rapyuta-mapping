@@ -5,82 +5,41 @@
  *      Author: vsu
  */
 
-#include <keypoint_map.h>
-#include <pcl/visualization/pcl_visualizer.h>
-#include <ros/ros.h>
-#include <pcl_ros/publisher.h>
-
-#include <tf/transform_broadcaster.h>
-#include <boost/thread.hpp>
-#include <cv_bridge/cv_bridge.h>
-#include <sensor_msgs/image_encodings.h>
-#include <rm_localization/SetMap.h>
-#include <std_srvs/Empty.h>
+#include <robot_mapper.h>
 
 int main(int argc, char **argv) {
-
-	octomap::OcTree tree(0.05);
-
-	for (float x = -100; x < 100; x += 0.05) {
-		for (float y = -100; y < 100; y += 0.05) {
-			tree.updateNode(x, y, 0, false);
-
-		}
-	}
-
-	tree.writeBinary("free_space.bt");
-
-	return 0;
 
 	ros::init(argc, argv, "test_map");
 	ros::NodeHandle nh;
 
-	ros::Publisher pub_cloud =
-			nh.advertise<pcl::PointCloud<pcl::PointXYZRGBA> >("/map_cloud", 10);
+	int num_robots = 2;
+	std::string prefix = "cloudbot";
+	std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
 
-	ros::Publisher pub_keypoints =
-			nh.advertise<pcl::PointCloud<pcl::PointXYZ> >("keypoints", 10);
+	boost::thread_group tg;
 
-	ros::ServiceClient octomap_reset = nh.serviceClient<std_srvs::Empty>(
-			"/octomap_server/reset");
-
-	keypoint_map map("map_3");
-
-	ros::ServiceClient client = nh.serviceClient<rm_localization::SetMap>(
-			"/cloudbot2/set_map");
-
-	rm_localization::SetMap data;
-
-	pcl::toROSMsg(map.keypoints3d, data.request.keypoints3d);
-
-	cv_bridge::CvImage desc;
-	desc.image = map.descriptors;
-	desc.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-	data.request.descriptors = *(desc.toImageMsg());
-
-	client.call(data);
-
-	std_srvs::Empty msg;
-	octomap_reset.call(msg);
-	map.publish_keypoints(pub_cloud, "/cloudbot2");
-
-	ros::Rate r(1);
-	int seq = 0;
-	while (ros::ok()) {
-		map.keypoints3d.header.frame_id = "/map";
-		map.keypoints3d.header.stamp = ros::Time::now();
-		map.keypoints3d.header.seq = seq;
-
-		pub_keypoints.publish(map.keypoints3d);
-
-		seq++;
-		r.sleep();
-		ros::spinOnce();
+	for (int i = 0; i < num_robots; i++) {
+		robot_mappers[i].reset(new robot_mapper(nh, prefix, i + 1));
+		robot_mappers[i]->map.reset(
+				new keypoint_map(
+						"maps/cloudbot"
+								+ boost::lexical_cast<std::string>(i + 1)
+								+ "_full"));
 	}
 
-	return 0;
+	//for (int i = 0; i < num_robots; i++) {
+	//		robot_mappers[i]->set_map();
+	//}
 
-	//map.publish_keypoints(pub_cloud);
+	if (robot_mappers[0]->map->merge_keypoint_map(*robot_mappers[1]->map, 50,
+			5000)) {
+		ROS_INFO("Merged 2 maps");
+		robot_mappers[0]->map->save("merged_map");
+	} else {
+		ROS_INFO("Could not merge 2 maps");
+	}
+
+	//ros::spin();
 
 	return 0;
 }

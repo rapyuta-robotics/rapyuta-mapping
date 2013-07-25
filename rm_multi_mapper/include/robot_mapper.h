@@ -49,8 +49,12 @@ public:
 	void set_map();
 	void move_to_random_point();
 
+	void merge(robot_mapper::Ptr & other);
+
 	int robot_num;
 	std::string prefix;
+
+	bool merged;
 
 	actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> move_base_action_client;
 	ros::ServiceClient capture_client;
