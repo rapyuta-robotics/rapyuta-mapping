@@ -173,9 +173,11 @@ public:
 		std::vector<bool> inliers;
 
 		bool res = estimate_transform_ransac(keypoints3d, map_keypoints3d,
-				matches, 1000, 0.03 * 0.03, 20, transform, inliers);
+				matches, 300, 0.03 * 0.03, 20, transform, inliers);
 
 		if (res) {
+
+			ROS_INFO("Transformation computation successfull");
 
 			tf::StampedTransform map_to_cam;
 			try {
@@ -206,6 +208,8 @@ public:
 			map_to_odom.setRotation(orientation);
 			map_to_odom.setOrigin(translation);
 
+		} else {
+			ROS_INFO("Transformation computation unsuccessfull");
 		}
 
 	}

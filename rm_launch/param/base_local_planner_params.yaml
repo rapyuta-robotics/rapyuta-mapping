@@ -2,8 +2,8 @@ controller_frequency: 5.0
 TrajectoryPlannerROS:
   max_vel_x: 0.1
   min_vel_x: 0.05
-  max_rotational_vel: 0.5
-  min_in_place_rotational_vel: 0.1
+  max_rotational_vel: 1.0
+  min_in_place_rotational_vel: 0.5
   acc_lim_th: 0.25
   acc_lim_x: 0.05
   acc_lim_y: 0.05
