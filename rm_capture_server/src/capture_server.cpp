@@ -94,6 +94,8 @@ public:
 			return false;
 		}
 
+		res.camera_info = *(this->yuv2_info_msg);
+
 		tf::StampedTransform transform;
 		try {
 			listener.lookupTransform(map_frame, yuv2_msg->header.frame_id,

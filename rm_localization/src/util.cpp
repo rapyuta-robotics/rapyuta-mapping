@@ -52,6 +52,8 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		gray = rgb;
 	}
 
+	cv::GaussianBlur(gray, gray, cv::Size(3,3), 3);
+
 	int threshold = 400;
 	fd->setInt("hessianThreshold", threshold);
 
