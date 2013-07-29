@@ -22,6 +22,9 @@
 void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de, cv::Ptr<cv::DescriptorMatcher> & dm);
 
+void init_feature_detector_gft(cv::Ptr<cv::FeatureDetector> & fd,
+		cv::Ptr<cv::DescriptorExtractor> & de, cv::Ptr<cv::DescriptorMatcher> & dm);
+
 void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		const Eigen::Vector4f & intrinsics, cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,

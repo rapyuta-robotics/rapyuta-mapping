@@ -15,18 +15,31 @@
  fd = new cv::SurfFeatureDetector;
 
  fd->setInt("hessianThreshold", 400);
- fd->setInt("extended", 0);
+ fd->setInt("extended", 1);
  fd->setInt("upright", 1);
- fd->setInt("nOctaves", 1);
- fd->setInt("nOctaveLayers", 1);
+ //fd->setInt("nOctaves", 1);
+ //fd->setInt("nOctaveLayers", 1);
 
  de->setInt("extended", 1);
- de->setInt("upright", 0);
- de->setInt("nOctaves", 1);
- de->setInt("nOctaveLayers", 1);
+ de->setInt("upright", 1);
+ //de->setInt("nOctaves", 1);
+ //de->setInt("nOctaveLayers", 1);
 
  }
 
+void init_feature_detector_gft(cv::Ptr<cv::FeatureDetector> & fd,
+ 		cv::Ptr<cv::DescriptorExtractor> & de, cv::Ptr<cv::DescriptorMatcher> & dm) {
+
+	de = new cv::SurfDescriptorExtractor;
+	dm = new cv::FlannBasedMatcher;
+	fd = new cv::GoodFeaturesToTrackDetector;
+
+	de->setInt("extended", 1);
+	de->setInt("upright", 0);
+	de->setInt("nOctaves", 1);
+	de->setInt("nOctaveLayers", 1);
+
+}
 
 /*
 void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
