@@ -35,8 +35,10 @@
 			<remap from="camera_info" to="rgb/camera_info"/>
 			<param name="output_frame_id" value="/$(env HOSTNAME)/camera_rgb_frame"/>
 		</node>
+		<!--
 		<node pkg="rm_localization" type="localization" respawn="false" name="localization" output="screen">
-		 </node>	
+		 </node>
+		-->	
 
 	</group>
 </launch>

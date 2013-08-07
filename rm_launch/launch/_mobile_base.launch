@@ -9,7 +9,10 @@
     <param name="bonus" value="false" />
     <param name="update_rate" value="30.0" />
     <param name="port" value="/dev/ttySAC1" />
-    <param name="has_gyro" value="false" />
+    <param name="has_gyro" value="true" />
+    <param name="gyro_measurement_range" value="250.0" />
+    <param name="odom_angular_scale_correction" value="1.051570" />
+    <param name="gyro_scale_correction" value="1.46094975" />
     <remap from="cmd_vel" to="mobile_base/commands/velocity" />
     <remap from="turtlebot_node/sensor_state" to="mobile_base/sensors/core" />
     <remap from="imu/data" to="mobile_base/sensors/imu_data" />
@@ -29,7 +32,7 @@
     <param name="sensor_timeout" value="1.0"/>
     <param name="publish_tf" value="true"/>
     <param name="odom_used" value="true"/>
-    <param name="imu_used" value="false"/>
+    <param name="imu_used" value="true"/>
     <param name="vo_used" value="false"/>
   </node>
 

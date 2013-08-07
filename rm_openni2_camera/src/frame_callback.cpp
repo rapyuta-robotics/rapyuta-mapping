@@ -26,7 +26,7 @@ FrameCallback::FrameCallback(ros::NodeHandle & nh, ros::NodeHandle & nh_private,
 		//if (camera_name == "depth") {
 		//	info = getDefaultCameraInfo(640, 480, 570.0);
 		//} else {
-			info = getDefaultCameraInfo(640, 480, 525.0);
+			info = getDefaultCameraInfo(640/2, 480/2, 525.0/2);
 		//}
 	}
 
