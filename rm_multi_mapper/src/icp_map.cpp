@@ -12,11 +12,13 @@ keyframe::keyframe(const cv::Mat & rgb, const cv::Mat & depth,
 		rgb(rgb), depth(depth), position(position) {
 	intrinsics << 525.0, 319.5, 239.5;
 
+	intrinsics /= 2;
+
 	int num_points = 0;
 	centroid.setZero();
 
-	for (int v = 0; v < depth.rows; v += 2) {
-		for (int u = 0; u < depth.cols; u += 2) {
+	for (int v = 0; v < depth.rows; v++) {
+		for (int u = 0; u < depth.cols; u++) {
 			if (depth.at<unsigned short>(v, u) != 0) {
 				pcl::PointXYZ p;
 				p.z = depth.at<unsigned short>(v, u) / 1000.0f;
@@ -42,8 +44,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr keyframe::get_pointcloud() const {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
 			new pcl::PointCloud<pcl::PointXYZ>);
 
-	for (int v = 0; v < depth.rows; v += 2) {
-		for (int u = 0; u < depth.cols; u += 2) {
+	for (int v = 0; v < depth.rows; v+=2) {
+		for (int u = 0; u < depth.cols; u+=2) {
 			if (depth.at<unsigned short>(v, u) != 0) {
 				pcl::PointXYZ p;
 				p.z = depth.at<unsigned short>(v, u) / 1000.0f;
@@ -65,8 +67,8 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr keyframe::get_colored_pointcloud() const 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
 			new pcl::PointCloud<pcl::PointXYZRGB>);
 
-	for (int v = 0; v < depth.rows; v += 2) {
-		for (int u = 0; u < depth.cols; u += 2) {
+	for (int v = 0; v < depth.rows; v+=2) {
+		for (int u = 0; u < depth.cols; u+=2) {
 			if (depth.at<unsigned short>(v, u) != 0) {
 
 				cv::Vec3b color = rgb.at<cv::Vec3b>(v, u);
@@ -82,7 +84,8 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr keyframe::get_colored_pointcloud() const 
 
 				p.getVector3fMap() = position * p.getVector3fMap();
 
-				cloud->push_back(p);
+				if(p.z < 2.0)
+					cloud->push_back(p);
 
 			}
 		}

@@ -2,7 +2,7 @@
 
 #include <robot_mapper.h>
 
-const int robot_offset = 1;
+const int robot_offset = 0;
 const int num_robots = 1;
 const std::string prefix = "cloudbot";
 std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
@@ -54,50 +54,16 @@ int main(int argc, char **argv) {
 
 	boost::thread t(publishTf);
 
-	while (true) {
+	//while (true) {
 		for (int i = 0; i < num_robots; i++) {
 			tg.create_thread(
-					boost::bind(&robot_mapper::capture_circle,
+					boost::bind(&robot_mapper::capture_sphere,
 							robot_mappers[i].get()));
 		}
 
 		tg.join_all();
 
-		for (int i = 0; i < num_robots; i++) {
-			tg.create_thread(
-					boost::bind(&robot_mapper::set_map,
-							robot_mappers[i].get()));
-		}
-
-		tg.join_all();
-
-		for (int i = 0; i < num_robots; i++) {
-			tg.create_thread(
-					boost::bind(&robot_mapper::move_to_random_point,
-							robot_mappers[i].get()));
-		}
-
-		ROS_INFO("All threads finished successfully");
-
-		for (int i = 0; i < num_robots; i++) {
-			robot_mappers[i]->map->save(
-					"maps/cloudbot" + boost::lexical_cast<std::string>(i + 1)
-							+ "_full");
-		}
-
-		for (int i = 0; i < num_robots; i++) {
-			if (!robot_mappers[i]->merged) {
-				for (int j = 0; j < num_robots; j++) {
-					if (!robot_mappers[j]->merged && i < j) {
-						robot_mappers[i]->merge(robot_mappers[j]);
-					}
-
-				}
-			}
-
-		}
-
-	}
+	//}
 
 	return 0;
 }

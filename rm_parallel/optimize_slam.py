@@ -23,10 +23,28 @@ observations=slam_data['observations']
 cameras=slam_data['camera_positions']
 points=slam_data['accumulated_keypoints3d']
 ground_truth=slam_data['ground_truth']
+#rgb_image_list=slam_data['rgb_image_list']
+#depth_image_list=slam_data['depth_image_list']
 
 has_ground_truth = True
 if len(ground_truth) == 0:
 	has_ground_truth = False
+	
+def remove_bad_observations(observations, cameras, points, ground_truth):
+	valid_points_idx = np.nonzero(np.bincount(observations['point_id']) > 3)[0]
+	idx = np.in1d(observations['point_id'], valid_points_idx)
+	observations = observations[idx]
+	points = points[:,valid_points_idx]
+	new_point_idx = np.searchsorted(valid_points_idx, observations['point_id'])
+	observations['point_id'] = new_point_idx
+
+
+	valid_cam_idx = np.nonzero(np.bincount(observations['cam_id']) > 2)[0]
+	idx = np.in1d(observations['cam_id'], valid_cam_idx)
+	observations = observations[idx]
+	cameras = cameras[:,valid_cam_idx]
+	new_cam_idx = np.searchsorted(valid_cam_idx, observations['cam_id'])
+	observations['cam_id'] = new_cam_idx
 
 print 'Total number of keypoints', points.shape[1]
 print 'Total number of camera positions', cameras.shape[1]
@@ -34,12 +52,7 @@ print 'Total number of observations', len(observations)
 print 'Total number of points with one observation', np.count_nonzero(np.bincount(observations['point_id']) == 1)
 print 'Total number of images with less then 3 observations', np.count_nonzero(np.bincount(observations['cam_id']) < 3)
 
-valid_points_idx = np.nonzero(np.bincount(observations['point_id']) > 3)[0]
-idx = np.in1d(observations['point_id'], valid_points_idx)
-observations = observations[idx]
-points = points[:,valid_points_idx]
-new_point_idx = np.searchsorted(valid_points_idx, observations['point_id'])
-observations['point_id'] = new_point_idx
+remove_bad_observations(observations, cameras, points, ground_truth)
 
 print 'Total number of keypoints', points.shape[1]
 print 'Total number of camera positions', cameras.shape[1]

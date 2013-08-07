@@ -214,6 +214,7 @@ if isfile(join(DATASET_FOLDER, 'groundtruth.txt')):
 
 rgb_list_item = rgb_image_list[0]
 rgb = cv2.imread(join(DATASET_FOLDER, rgb_list_item['filename']))
+print rgb_list_item['filename']
 
 depth_idx = find_closest_idx(depth_image_list['timestamp'], rgb_list_item['timestamp'])
 depth_list_item = depth_image_list[depth_idx]
@@ -246,6 +247,7 @@ for i in range(len(accumulated_keypoints)):
 
 for rgb_list_item in rgb_image_list[1:]:
 	rgb = cv2.imread(join(DATASET_FOLDER, rgb_list_item['filename']))
+	print rgb_list_item['filename']
 
 	depth_idx = find_closest_idx(depth_image_list['timestamp'], rgb_list_item['timestamp'])
 	depth_list_item = depth_image_list[depth_idx]

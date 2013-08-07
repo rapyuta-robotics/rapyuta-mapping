@@ -33,7 +33,9 @@
 #include <tf_conversions/tf_eigen.h>
 #include <octomap_server.h>
 
-#include <keypoint_map.h>
+//#include <keypoint_map.h>
+#include <opencv2/highgui/highgui.hpp>
+#include <icp_map.h>
 
 class robot_mapper {
 
@@ -45,7 +47,7 @@ public:
 			const int robot_num);
 
 	void save_image();
-	void save_circle();
+	//void save_circle();
 
 	void capture();
 	void capture_sphere();
@@ -54,7 +56,7 @@ public:
 	void set_map();
 	void move_to_random_point();
 
-	void merge(robot_mapper::Ptr & other);
+	//void merge(robot_mapper::Ptr & other);
 
 	int robot_num;
 	std::string prefix;
@@ -70,7 +72,8 @@ public:
 	ros::Publisher pub_keypoints;
 	ros::Publisher pub_cloud;
 
-	boost::shared_ptr<keypoint_map> map;
+	//boost::shared_ptr<keypoint_map> map;
+	icp_map map;
 
 	Eigen::Affine3f initial_transformation;
 
