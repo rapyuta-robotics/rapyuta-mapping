@@ -44,7 +44,12 @@ public:
 	robot_mapper(ros::NodeHandle & nh, const std::string & robot_prefix,
 			const int robot_num);
 
+	void save_image();
+	void save_circle();
+
+	void capture();
 	void capture_sphere();
+	void capture_circle();
 
 	void set_map();
 	void move_to_random_point();
@@ -70,6 +75,12 @@ public:
 	Eigen::Affine3f initial_transformation;
 
 	RmOctomapServer::Ptr octomap_server;
+
+	Eigen::Vector3f visualization_offset;
+
+	cv::Mat camera_matrix, dist_params;
+	Eigen::Vector4f intrinsics;
+	int map_idx;
 
 };
 

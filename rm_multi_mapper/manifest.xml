@@ -21,6 +21,9 @@
   <depend package="eigen_conversions"/>
   <depend package="move_base_msgs"/>
   <depend package="octomap_server"/>
+  <depend package="sophus"/>
+  <depend package="rostime"/>
+  <depend package="pcl_ros"/>
   
   <rosdep name="suitesparse" />
 

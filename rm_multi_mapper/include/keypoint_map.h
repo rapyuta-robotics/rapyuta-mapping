@@ -32,7 +32,7 @@ class keypoint_map {
 
 public:
 
-	keypoint_map(cv::Mat & rgb, cv::Mat & depth, Eigen::Affine3f & transform);
+	keypoint_map(cv::Mat & rgb, cv::Mat & depth, Eigen::Affine3f & transform, Eigen::Vector4f & intrinsics);
 	keypoint_map(const std::string & dir_name);
 
 	bool merge_keypoint_map(const keypoint_map & other, int min_num_inliers, int num_iterations);
@@ -47,6 +47,8 @@ public:
 	void get_octree(octomap::OcTree & tree);
 
 	void extract_surface();
+
+	void save_pointcloud();
 
 	float compute_error();
 
@@ -76,7 +78,7 @@ public:
 	std::vector<cv::Mat> rgb_imgs;
 	std::vector<cv::Mat> depth_imgs;
 
-	//boost::mutex merge_mutex;
+	boost::mutex merge_mutex;
 
 };
 

@@ -2,8 +2,10 @@
 
 #include <robot_mapper.h>
 
-const int num_robots = 2;
+const int robot_offset = 1;
+const int num_robots = 1;
 const std::string prefix = "cloudbot";
+std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
 
 void publishTf() {
 
@@ -12,16 +14,27 @@ void publishTf() {
 	while (true) {
 		for (int i = 0; i < num_robots; i++) {
 
-			tf::Transform map_to_odom;
+			Eigen::Vector3f offset = robot_mappers[i]->visualization_offset;
+
+			tf::Transform map_to_odom, map_to_odom2;
 			map_to_odom.setIdentity();
-			map_to_odom.setOrigin(tf::Vector3(0, i * 20, 0));
+			map_to_odom.setOrigin(tf::Vector3(offset[0], offset[1], offset[2]));
+
+			map_to_odom2.setIdentity();
 
 			br.sendTransform(
 					tf::StampedTransform(map_to_odom, ros::Time::now(),
 							"/world",
-							"/cloudbot"
-									+ boost::lexical_cast<std::string>(i + 1)
+							"/cloudbot" + boost::lexical_cast<std::string>(i+robot_offset)
 									+ "/map"));
+
+			br.sendTransform(
+					tf::StampedTransform(map_to_odom2, ros::Time::now(),
+							"/cloudbot" + boost::lexical_cast<std::string>(i+robot_offset)
+									+ "/map",
+							"/cloudbot" + boost::lexical_cast<std::string>(i+robot_offset)
+									+ "/odom_combined"));
+
 		}
 		usleep(33000);
 	}
@@ -33,19 +46,18 @@ int main(int argc, char **argv) {
 
 	ros::NodeHandle nh;
 
-	boost::thread t(publishTf);
-
-	std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
 	boost::thread_group tg;
 
 	for (int i = 0; i < num_robots; i++) {
-		robot_mappers[i].reset(new robot_mapper(nh, prefix, i + 1));
+		robot_mappers[i].reset(new robot_mapper(nh, prefix, i+robot_offset));
 	}
+
+	boost::thread t(publishTf);
 
 	while (true) {
 		for (int i = 0; i < num_robots; i++) {
 			tg.create_thread(
-					boost::bind(&robot_mapper::capture_sphere,
+					boost::bind(&robot_mapper::capture_circle,
 							robot_mappers[i].get()));
 		}
 

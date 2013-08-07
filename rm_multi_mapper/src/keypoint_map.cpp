@@ -57,11 +57,11 @@ static void read(const cv::FileNode& node, observation& x,
 }
 
 keypoint_map::keypoint_map(cv::Mat & rgb, cv::Mat & depth,
-		Eigen::Affine3f & transform) {
+		Eigen::Affine3f & transform, Eigen::Vector4f & intrinsics) {
 
 	init_feature_detector(fd, de, dm);
 
-	intrinsics << 525.0, 525.0, 319.5, 239.5;
+	this->intrinsics = intrinsics;
 
 	std::vector<cv::KeyPoint> keypoints;
 
@@ -144,7 +144,11 @@ keypoint_map::keypoint_map(const std::string & dir_name) {
 bool keypoint_map::merge_keypoint_map(const keypoint_map & other,
 		int min_num_inliers, int num_iterations) {
 
-	//merge_mutex.lock();
+	boost::lock_guard<boost::mutex> guard(merge_mutex);
+
+	if (other.keypoints3d.size() < 1) {
+		return false;
+	}
 
 	std::vector<cv::DMatch> matches;
 	dm->match(other.descriptors, descriptors, matches);
@@ -153,7 +157,8 @@ bool keypoint_map::merge_keypoint_map(const keypoint_map & other,
 	std::vector<bool> inliers;
 
 	bool res = estimate_transform_ransac(other.keypoints3d, keypoints3d,
-			matches, num_iterations, 0.03 * 0.03, min_num_inliers, transform, inliers);
+			matches, num_iterations, 0.03 * 0.03, min_num_inliers, transform,
+			inliers);
 
 	if (!res)
 		return false;
@@ -230,8 +235,6 @@ bool keypoint_map::merge_keypoint_map(const keypoint_map & other,
 
 		}
 	}
-
-	//merge_mutex.unlock();
 
 	return true;
 
@@ -535,16 +538,13 @@ void keypoint_map::get_octree(octomap::OcTree & tree) {
 void keypoint_map::extract_surface() {
 
 	octomap::ColorOcTree tree(0.05f);
+	//pcl::VoxelGrid<pcl::PointXYZRGBA> sor;
+	//sor.setLeafSize(0.05f, 0.05f, 0.05f);
 
-	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud(
-			new pcl::PointCloud<pcl::PointXYZRGBA>);
+	//pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud(
+	//		new pcl::PointCloud<pcl::PointXYZRGBA>);
 
 	for (size_t i = 0; i < depth_imgs.size(); i++) {
-
-		cv::imwrite("rgb/" + boost::lexical_cast<std::string>(i) + ".png",
-				rgb_imgs[i]);
-		cv::imwrite("depth/" + boost::lexical_cast<std::string>(i) + ".png",
-				depth_imgs[i]);
 
 		octomap::Pointcloud octomap_cloud;
 		octomap::point3d sensor_origin(0.0, 0.0, 0.0);
@@ -555,7 +555,6 @@ void keypoint_map::extract_surface() {
 		octomap::pose6d frame_origin(
 				octomath::Vector3(trans.x(), trans.y(), trans.z()),
 				octomath::Quaternion(rot.w(), rot.x(), rot.y(), rot.z()));
-		//std::cerr << camera_positions[i].matrix() << std::endl;
 
 		for (int v = 0; v < depth_imgs[i].rows; v++) {
 			for (int u = 0; u < depth_imgs[i].cols; u++) {
@@ -586,7 +585,7 @@ void keypoint_map::extract_surface() {
 
 						//ROS_INFO("Point %f %f %f from  %f %f ", p.x, p.y, p.z, keypoints[i].pt.x, keypoints[i].pt.y);
 
-						point_cloud->push_back(p);
+						//point_cloud->push_back(p);
 
 					}
 
@@ -594,20 +593,74 @@ void keypoint_map::extract_surface() {
 			}
 		}
 		tree.insertScan(octomap_cloud, sensor_origin, frame_origin);
-		tree.updateInnerOccupancy();
+
 	}
+	tree.updateInnerOccupancy();
 
 	tree.write("room.ot");
 
-	pcl::io::savePCDFileASCII("room.pcd", *point_cloud);
+	//pcl::io::savePCDFileASCII("room.pcd", *point_cloud);
+	//pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud_filtered(
+	//		new pcl::PointCloud<pcl::PointXYZRGBA>);
+	//sor.setInputCloud(point_cloud);
+	//sor.filter(*point_cloud_filtered);
+	//pcl::io::savePCDFileASCII("room_sub.pcd", *point_cloud_filtered);
+
+}
+
+void keypoint_map::save_pointcloud() {
+
+	pcl::VoxelGrid<pcl::PointXYZRGBA> sor;
+	sor.setLeafSize(0.05f, 0.05f, 0.05f);
+
+	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud(
+			new pcl::PointCloud<pcl::PointXYZRGBA>);
+
+	for (size_t i = 0; i < depth_imgs.size(); i++) {
+
+		pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud(
+				new pcl::PointCloud<pcl::PointXYZRGBA>);
+
+		for (int v = 0; v < depth_imgs[i].rows; v++) {
+			for (int u = 0; u < depth_imgs[i].cols; u++) {
+				if (depth_imgs[i].at<unsigned short>(v, u) != 0) {
+					pcl::PointXYZRGBA p;
+					p.z = depth_imgs[i].at<unsigned short>(v, u) / 1000.0f;
+					p.x = (u - intrinsics[2]) * p.z / intrinsics[0];
+					p.y = (v - intrinsics[3]) * p.z / intrinsics[1];
+					cv::Vec3b brg = rgb_imgs[i].at<cv::Vec3b>(v, u);
+					p.r = brg[2];
+					p.g = brg[1];
+					p.b = brg[0];
+					p.a = 255;
+
+					Eigen::Vector4f tmp = camera_positions[i]
+							* p.getVector4fMap();
+
+					if (tmp[2] < 2.0) {
+						p.getVector4fMap() = tmp;
+
+						//ROS_INFO("Point %f %f %f from  %f %f ", p.x, p.y, p.z, keypoints[i].pt.x, keypoints[i].pt.y);
+
+						cloud->push_back(p);
+
+					}
+
+				}
+			}
+		}
+
+		sor.setInputCloud(cloud);
+		sor.filter(*cloud);
+
+		*point_cloud += *cloud;
+
+	}
 
 	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud_filtered(
 			new pcl::PointCloud<pcl::PointXYZRGBA>);
-	pcl::VoxelGrid<pcl::PointXYZRGBA> sor;
 	sor.setInputCloud(point_cloud);
-	sor.setLeafSize(0.05f, 0.05f, 0.05f);
 	sor.filter(*point_cloud_filtered);
-
 	pcl::io::savePCDFileASCII("room_sub.pcd", *point_cloud_filtered);
 
 }
@@ -723,6 +776,10 @@ void keypoint_map::align_z_axis() {
 }
 
 void keypoint_map::save(const std::string & dir_name) {
+
+	if (keypoints3d.size() < 1) {
+		return;
+	}
 
 	if (boost::filesystem::exists(dir_name)) {
 		boost::filesystem::remove_all(dir_name);
