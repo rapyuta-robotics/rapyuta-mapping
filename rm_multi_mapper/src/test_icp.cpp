@@ -9,7 +9,6 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/visualization/pcl_visualizer.h>
@@ -17,27 +16,10 @@
 
 #include <icp_map.h>
 
-
 int main() {
 
 	icp_map map;
-
-	for (int i = 1; i < 35; i++) {
-		cv::Mat depth = cv::imread(
-				"depth1/" + boost::lexical_cast<std::string>(i) + ".png",
-				CV_LOAD_IMAGE_UNCHANGED);
-
-		cv::Mat rgb = cv::imread(
-				"rgb1/" + boost::lexical_cast<std::string>(i) + ".png",
-				CV_LOAD_IMAGE_UNCHANGED);
-
-		Sophus::SE3f transform(
-				Eigen::AngleAxisf(-0.21 * (i - 1), Eigen::Vector3f(0, 1, 0)).matrix(),
-				Eigen::Vector3f(0, 0, 0));
-
-		map.add_frame(rgb, depth, transform);
-
-	}
+	map.load("icp_map1");
 
 	pcl::visualization::PCLVisualizer vis;
 
@@ -49,14 +31,19 @@ int main() {
 
 	vis.spin();
 
-	for (int i = 0; i < 30; i++)
+	for (int i = 0; i < 30; i++) {
 		map.optimize();
 
-	vis.removeAllPointClouds();
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 = map.get_map_pointcloud();
-	pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
-			cloud1);
-	vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
+		vis.removeAllPointClouds();
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 =
+				map.get_map_pointcloud();
+		pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
+				cloud1);
+		vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
+
+		vis.spinOnce();
+
+	}
 
 	vis.spin();
 

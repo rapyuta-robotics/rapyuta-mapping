@@ -8,6 +8,8 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 				false), move_base_action_client(prefix + "/move_base", true), map_idx(
 				0) {
 
+	map_to_odom.setIdentity();
+
 	std::string pref = robot_prefix
 			+ boost::lexical_cast<std::string>(robot_num);
 	octomap_server.reset(new RmOctomapServer(ros::NodeHandle(nh, pref), pref));
@@ -16,8 +18,8 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 	capture_client = nh.serviceClient<rm_capture_server::Capture>(
 			prefix + "/capture");
 
-	clear_unknown_space_client = nh.serviceClient<std_srvs::Empty>(
-			prefix + "/move_base/clear_unknown_space");
+	clear_costmaps_client = nh.serviceClient<std_srvs::Empty>(
+			prefix + "/move_base/clear_costmaps");
 
 	servo_pub = nh.advertise<std_msgs::Float32>(
 			prefix + "/mobile_base/commands/servo_angle", 1);
@@ -134,7 +136,7 @@ void robot_mapper::capture() {
 		Sophus::SE3f transform(transform_f.rotation(),
 				transform_f.translation());
 
-		map.add_frame(rgb, depth, transform);
+		last_frame = map.add_frame(rgb, depth, transform);
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
 		cloud->header.frame_id = prefix + "/map";
@@ -163,7 +165,6 @@ void robot_mapper::capture_sphere() {
 	for (int i = 0; i < 20; i++) {
 
 		servo_pub.publish(start_angle);
-
 
 		move_base_msgs::MoveBaseGoal goal;
 		goal.target_pose.header.frame_id = "base_link";
@@ -205,14 +206,21 @@ void robot_mapper::capture_sphere() {
 	angle_msg.data = 0;
 	servo_pub.publish(angle_msg);
 
-	for (int i = 0; i < 20; i++) {
+	map.save("icp_map1");
+
+	for(int i=0; i<20; i++) {
 		map.optimize();
+
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
-		cloud->header.frame_id = prefix + "/map";
-		cloud->header.stamp = ros::Time::now();
-		cloud->header.seq = 0;
-		pub_keypoints.publish(cloud);
+				cloud->header.frame_id = prefix + "/map";
+				cloud->header.stamp = ros::Time::now();
+				cloud->header.seq = 0;
+				pub_keypoints.publish(cloud);
 	}
+
+	map.set_octomap(octomap_server);
+	std_srvs::Empty emt;
+	clear_costmaps_client.call(emt);
 
 }
 
@@ -279,16 +287,12 @@ void robot_mapper::capture_circle() {
 void robot_mapper::move_to_random_point() {
 
 	//while (true) {
-
-	std_srvs::Empty empty;
-	clear_unknown_space_client.call(empty);
-
 	move_base_msgs::MoveBaseGoal goal;
 	goal.target_pose.header.frame_id = "base_link";
 	goal.target_pose.header.stamp = ros::Time::now();
 
-	goal.target_pose.pose.position.x = (((float) rand()) / RAND_MAX - 0.5);
-	goal.target_pose.pose.position.y = (((float) rand()) / RAND_MAX - 0.5);
+	goal.target_pose.pose.position.x = 0; //(((float) rand()) / RAND_MAX - 0.5);
+	goal.target_pose.pose.position.y = 1; //(((float) rand()) / RAND_MAX - 0.5);
 	goal.target_pose.pose.position.z = 0;
 
 	tf::Quaternion q;
@@ -311,6 +315,26 @@ void robot_mapper::move_to_random_point() {
 		ROS_INFO("Action did not finish before the time out.");
 
 	//}
+
+}
+
+void robot_mapper::update_map_to_odom() {
+
+	if (map.frames.size() > 0) {
+
+		Sophus::SE3f delta;
+		map.position_modification_mutex.lock();
+		delta = (*last_frame)->get_position()
+				* (*last_frame)->get_initial_position().inverse();
+		(*last_frame)->get_initial_position() = (*last_frame)->get_position();
+		map.position_modification_mutex.unlock();
+
+		tf::Transform delta_tf;
+		tf::transformEigenToTF(Eigen::Affine3d(delta.cast<double>().matrix()),
+				delta_tf);
+
+		map_to_odom = delta_tf * map_to_odom;
+	}
 
 }
 
