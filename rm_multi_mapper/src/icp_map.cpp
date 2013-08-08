@@ -7,6 +7,7 @@
 
 #include <icp_map.h>
 #include <boost/filesystem.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <fstream>
 
@@ -35,6 +36,10 @@ keyframe::keyframe(const cv::Mat & rgb, const cv::Mat & depth,
 	}
 
 	centroid /= num_points;
+
+	cv::Mat tmp;
+	cv::cvtColor(rgb, tmp, CV_RGB2GRAY);
+	tmp.convertTo(intencity, CV_32F, 1/255.0);
 
 }
 
@@ -111,7 +116,38 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr keyframe::get_colored_pointcloud() const 
 
 				p.getVector3fMap() = position * p.getVector3fMap();
 
-				if (p.z < 2.5)
+				cloud->push_back(p);
+
+			}
+		}
+	}
+
+	return cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr keyframe::get_colored_pointcloud(
+		float min_height, float max_height) const {
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
+			new pcl::PointCloud<pcl::PointXYZRGB>);
+
+	for (int v = 0; v < depth.rows; v += 2) {
+		for (int u = 0; u < depth.cols; u += 2) {
+			if (depth.at<unsigned short>(v, u) != 0) {
+
+				cv::Vec3b color = rgb.at<cv::Vec3b>(v, u);
+
+				pcl::PointXYZRGB p;
+				p.z = depth.at<unsigned short>(v, u) / 1000.0f;
+				p.x = (u - intrinsics[1]) * p.z / intrinsics[0];
+				p.y = (v - intrinsics[2]) * p.z / intrinsics[0];
+
+				p.b = color[0];
+				p.g = color[1];
+				p.r = color[2];
+
+				p.getVector3fMap() = position * p.getVector3fMap();
+
+				if (p.z > min_height && p.z < max_height)
 					cloud->push_back(p);
 
 			}
@@ -129,8 +165,46 @@ Sophus::SE3f & keyframe::get_initial_position() {
 	return initial_position;
 }
 
-reduce_jacobian::reduce_jacobian(tbb::concurrent_vector<keyframe::Ptr> & frames,
-		int size) :
+cv::Mat keyframe::get_subsampled_intencity(int level) {
+
+	if (level > 0) {
+		int size_reduction = 1 << level;
+		cv::Mat res(rgb.rows / size_reduction, rgb.cols / size_reduction,
+				intencity.type());
+
+		for (int v = 0; v < res.rows; v++) {
+			for (int u = 0; u < res.cols; u++) {
+
+				float value = 0;
+
+				for (int i = 0; i < size_reduction; i++) {
+					for (int j = 0; j < size_reduction; j++) {
+						value += intencity.at<float>(size_reduction * v + i,
+								size_reduction * u + j);
+					}
+				}
+
+				value /= size_reduction * size_reduction;
+				res.at<float>(v, u) = value;
+
+			}
+		}
+
+		//std::cerr << "Res size" << res.rows << " " << res.cols << std::endl;
+		return res;
+
+	} else {
+		return intencity;
+	}
+
+}
+Eigen::Vector3f keyframe::get_subsampled_intrinsics(int level) {
+	int size_reduction = 1 << level;
+	return intrinsics / size_reduction;
+}
+
+reduce_jacobian_icp::reduce_jacobian_icp(
+		tbb::concurrent_vector<keyframe::Ptr> & frames, int size) :
 		size(size), frames(frames) {
 
 	JtJ.setZero(size * 6, size * 6);
@@ -138,13 +212,13 @@ reduce_jacobian::reduce_jacobian(tbb::concurrent_vector<keyframe::Ptr> & frames,
 
 }
 
-reduce_jacobian::reduce_jacobian(reduce_jacobian& rb, tbb::split) :
+reduce_jacobian_icp::reduce_jacobian_icp(reduce_jacobian_icp& rb, tbb::split) :
 		size(rb.size), frames(rb.frames) {
 	JtJ.setZero(size * 6, size * 6);
 	Jte.setZero(size * 6);
 }
 
-void reduce_jacobian::operator()(
+void reduce_jacobian_icp::operator()(
 		const tbb::blocked_range<
 				tbb::concurrent_vector<std::pair<int, int> >::iterator>& r) {
 	for (tbb::concurrent_vector<std::pair<int, int> >::iterator it = r.begin();
@@ -192,7 +266,62 @@ void reduce_jacobian::operator()(
 	}
 }
 
-void reduce_jacobian::join(reduce_jacobian& rb) {
+void reduce_jacobian_icp::join(reduce_jacobian_icp& rb) {
+	JtJ += rb.JtJ;
+	Jte += rb.Jte;
+}
+
+reduce_jacobian_rgb::reduce_jacobian_rgb(
+		tbb::concurrent_vector<keyframe::Ptr> & frames, int size,
+		int subsample_level) :
+		size(size), subsample_level(subsample_level), frames(frames) {
+
+	JtJ.setZero(size * 3, size * 3);
+	Jte.setZero(size * 3);
+
+}
+
+reduce_jacobian_rgb::reduce_jacobian_rgb(reduce_jacobian_icp& rb, tbb::split) :
+		size(rb.size), subsample_level(subsample_level), frames(rb.frames) {
+	JtJ.setZero(size * 3, size * 3);
+	Jte.setZero(size * 3);
+}
+
+void reduce_jacobian_rgb::operator()(
+		const tbb::blocked_range<
+				tbb::concurrent_vector<std::pair<int, int> >::iterator>& r) {
+	for (tbb::concurrent_vector<std::pair<int, int> >::iterator it = r.begin();
+			it != r.end(); it++) {
+		int i = it->first;
+		int j = it->second;
+
+		Eigen::Vector3f intrinsics = frames[i]->get_subsampled_intrinsics(
+				subsample_level);
+		cv::Mat intensity_i = frames[i]->get_subsampled_intencity(
+				subsample_level);
+		cv::Mat intensity_j = frames[j]->get_subsampled_intencity(
+				subsample_level);
+
+		Eigen::Quaternionf Qij =
+				frames[i]->get_position().unit_quaternion().inverse()
+						* frames[j]->get_position().unit_quaternion();
+		Eigen::Matrix3f K, K_inv;
+		K << intrinsics[0], 0, intrinsics[1], 0, intrinsics[0], intrinsics[2], 0, 0, 1;
+		K_inv = K.inverse();
+
+		Eigen::Matrix3f H = K * Qij.matrix() * K_inv.inverse();
+		cv::Mat cvH(4, 4, CV_32F, H.data());
+
+		cv::Mat intensity_j_warped;
+		cv::warpPerspective(intensity_j, intensity_j_warped, cvH,
+				intensity_j.size());
+
+		cv::Mat error = intensity_i - intensity_j_warped;
+
+	}
+}
+
+void reduce_jacobian_rgb::join(reduce_jacobian_icp& rb) {
 	JtJ += rb.JtJ;
 	Jte += rb.Jte;
 }
@@ -227,7 +356,7 @@ void icp_map::optimize() {
 
 			float angle = 2 * std::acos(std::abs(diff_quat.w()));
 
-			if (angle < 0.5) {
+			if (angle < M_PI / 6) {
 				overlaping_keyframes.push_back(std::make_pair(i, j));
 				//std::cerr << i << " and " << j
 				//		<< " are connected with angle distance " << angle
@@ -236,7 +365,7 @@ void icp_map::optimize() {
 		}
 	}
 
-	reduce_jacobian rj(frames, size);
+	reduce_jacobian_icp rj(frames, size);
 
 	tbb::parallel_reduce(
 			tbb::blocked_range<
@@ -312,6 +441,9 @@ void icp_map::save(const std::string & dir_name) {
 	boost::filesystem::create_directory(dir_name);
 	boost::filesystem::create_directory(dir_name + "/rgb");
 	boost::filesystem::create_directory(dir_name + "/depth");
+	boost::filesystem::create_directory(dir_name + "/intencity");
+	boost::filesystem::create_directory(dir_name + "/intencity_sub_1");
+	boost::filesystem::create_directory(dir_name + "/intencity_sub_2");
 
 	for (size_t i = 0; i < frames.size(); i++) {
 		cv::imwrite(
@@ -320,6 +452,23 @@ void icp_map::save(const std::string & dir_name) {
 		cv::imwrite(
 				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
 						+ ".png", frames[i]->depth);
+
+		cv::imwrite(
+				dir_name + "/intencity/" + boost::lexical_cast<std::string>(i)
+						+ ".png", frames[i]->intencity * 255);
+
+
+		cv::imwrite(
+				dir_name + "/intencity_sub_1/"
+						+ boost::lexical_cast<std::string>(i) + ".png",
+				frames[i]->get_subsampled_intencity(1) * 255);
+
+		cv::imwrite(
+				dir_name + "/intencity_sub_2/"
+						+ boost::lexical_cast<std::string>(i) + ".png",
+				frames[i]->get_subsampled_intencity(2) * 255);
+
+
 	}
 
 	std::ofstream f((dir_name + "/positions.txt").c_str());

@@ -20,6 +20,7 @@ int main() {
 
 	icp_map map;
 	map.load("icp_map1");
+	map.save("icp_map2");
 
 	pcl::visualization::PCLVisualizer vis;
 
@@ -31,7 +32,7 @@ int main() {
 
 	vis.spin();
 
-	for (int i = 0; i < 30; i++) {
+	for (int i = 0; i < 10; i++) {
 		map.optimize();
 
 		vis.removeAllPointClouds();

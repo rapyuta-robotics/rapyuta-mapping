@@ -35,12 +35,16 @@ public:
 	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud() const;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud(float min_height, float max_height) const;
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud() const;
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud(float min_height, float max_height) const;
 	Sophus::SE3f & get_position();
 	Sophus::SE3f & get_initial_position();
 
+	cv::Mat get_subsampled_intencity(int level);
+	Eigen::Vector3f get_subsampled_intrinsics(int level);
 
 	cv::Mat rgb;
 	cv::Mat depth;
+	cv::Mat intencity;
 
 protected:
 	Sophus::SE3f position;
@@ -50,7 +54,7 @@ protected:
 
 };
 
-struct reduce_jacobian {
+struct reduce_jacobian_icp {
 
 	Eigen::MatrixXf JtJ;
 	Eigen::VectorXf Jte;
@@ -61,17 +65,42 @@ struct reduce_jacobian {
 	pcl::registration::CorrespondenceEstimation<pcl::PointXYZ, pcl::PointXYZ> ce;
 	pcl::registration::CorrespondenceRejectorOneToOne cr;
 
-	reduce_jacobian(tbb::concurrent_vector<keyframe::Ptr> & frames, int size);
+	reduce_jacobian_icp(tbb::concurrent_vector<keyframe::Ptr> & frames, int size);
 
-	reduce_jacobian(reduce_jacobian& rb, tbb::split);
+	reduce_jacobian_icp(reduce_jacobian_icp& rb, tbb::split);
 
 	void operator()(
 			const tbb::blocked_range<
 					tbb::concurrent_vector<std::pair<int, int> >::iterator>& r);
 
-	void join(reduce_jacobian& rb);
+	void join(reduce_jacobian_icp& rb);
 
 };
+
+struct reduce_jacobian_rgb {
+
+	Eigen::MatrixXf JtJ;
+	Eigen::VectorXf Jte;
+	int size;
+	int subsample_level;
+
+	tbb::concurrent_vector<keyframe::Ptr> & frames;
+
+	pcl::registration::CorrespondenceEstimation<pcl::PointXYZ, pcl::PointXYZ> ce;
+	pcl::registration::CorrespondenceRejectorOneToOne cr;
+
+	reduce_jacobian_rgb(tbb::concurrent_vector<keyframe::Ptr> & frames, int size, int subsample_level);
+
+	reduce_jacobian_rgb(reduce_jacobian_icp& rb, tbb::split);
+
+	void operator()(
+			const tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>& r);
+
+	void join(reduce_jacobian_icp& rb);
+
+};
+
 
 class icp_map {
 public:
