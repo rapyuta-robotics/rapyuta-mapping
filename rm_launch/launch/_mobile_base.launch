@@ -11,8 +11,8 @@
     <param name="port" value="/dev/ttySAC1" />
     <param name="has_gyro" value="true" />
     <param name="gyro_measurement_range" value="250.0" />
-    <param name="odom_angular_scale_correction" value="1.051570" />
-    <param name="gyro_scale_correction" value="1.46094975" />
+    <param name="odom_angular_scale_correction" value="1.5" />
+    <param name="gyro_scale_correction" value="1.4506453732907894" />
     <remap from="cmd_vel" to="mobile_base/commands/velocity" />
     <remap from="turtlebot_node/sensor_state" to="mobile_base/sensors/core" />
     <remap from="imu/data" to="mobile_base/sensors/imu_data" />

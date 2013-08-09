@@ -6,6 +6,7 @@
 		<param name="tf_prefix" value="$(arg prefix)" />
 		<include file="$(find rm_launch)/launch/_mobile_base.launch" />
 		<include file="$(find rm_launch)/launch/_robot.launch" />
+		<include file="$(find rm_launch)/launch/_amcl.launch" />
 		<node pkg="rm_capture_server" type="capture_server" name="capture_server" output="screen"/>
 		<!--
 		<node pkg="turtlebot_actions" type="turtlebot_move_action_server" name="move_action_server">
@@ -29,6 +30,7 @@
 			<param name="local_costmap/global_frame" value="odom_combined"/>
     			<remap from="cmd_vel" to="mobile_base/commands/velocity"/>
 			<remap from="/scan" to="/$(env HOSTNAME)/scan"/>
+			<remap from="odom" to="odom_combined"/>
   		</node>
 		<node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" respawn="false" name="depthimage_to_laserscan" output="screen">
 			<remap from="image" to="depth/image_raw"/>
