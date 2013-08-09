@@ -36,6 +36,7 @@
     <param name="update_min_a" value="0.2"/>
     <param name="odom_frame_id" value="odom_combined"/>
     <param name="base_frame_id" value="base_footprint"/>
+    <param name="global_frame_id" value="/$(env HOSTNAME)/map"/>
     <param name="resample_interval" value="1"/>
     <!-- Increase tolerance because the computer can get quite busy -->
     <param name="transform_tolerance" value="1.0"/>
