@@ -33,7 +33,9 @@
 #include <tf_conversions/tf_eigen.h>
 #include <octomap_server.h>
 
-#include <keypoint_map.h>
+//#include <keypoint_map.h>
+#include <opencv2/highgui/highgui.hpp>
+#include <icp_map.h>
 
 class robot_mapper {
 
@@ -45,7 +47,7 @@ public:
 			const int robot_num);
 
 	void save_image();
-	void save_circle();
+	//void save_circle();
 
 	void capture();
 	void capture_sphere();
@@ -54,7 +56,9 @@ public:
 	void set_map();
 	void move_to_random_point();
 
-	void merge(robot_mapper::Ptr & other);
+	void update_map_to_odom();
+
+	//void merge(robot_mapper::Ptr & other);
 
 	int robot_num;
 	std::string prefix;
@@ -63,20 +67,24 @@ public:
 
 	actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> move_base_action_client;
 	ros::ServiceClient capture_client;
-	ros::ServiceClient clear_unknown_space_client;
+	ros::ServiceClient clear_costmaps_client;
 	ros::ServiceClient set_map_client;
 	ros::ServiceClient set_intial_pose;
 	ros::Publisher servo_pub;
 	ros::Publisher pub_keypoints;
 	ros::Publisher pub_cloud;
 
-	boost::shared_ptr<keypoint_map> map;
+	//boost::shared_ptr<keypoint_map> map;
+	icp_map map;
 
 	Eigen::Affine3f initial_transformation;
 
 	RmOctomapServer::Ptr octomap_server;
 
 	Eigen::Vector3f visualization_offset;
+
+	tf::Transform map_to_odom;
+	icp_map::keyframe_reference last_frame;
 
 	cv::Mat camera_matrix, dist_params;
 	Eigen::Vector4f intrinsics;
