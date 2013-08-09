@@ -28,8 +28,8 @@ void publishTf() {
 									+ boost::lexical_cast<std::string>(
 											i + robot_offset) + "/map"));
 
+			/*
 			robot_mappers[i]->update_map_to_odom();
-
 			br.sendTransform(
 					tf::StampedTransform(robot_mappers[i]->map_to_odom, ros::Time::now(),
 							"/cloudbot"
@@ -39,6 +39,7 @@ void publishTf() {
 									+ boost::lexical_cast<std::string>(
 											i + robot_offset)
 									+ "/odom_combined"));
+			*/
 
 		}
 		usleep(33000);

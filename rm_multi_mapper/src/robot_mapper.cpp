@@ -27,6 +27,9 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 	pub_keypoints = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
 			prefix + "/keypoints", 10);
 
+	pub_position_update = nh.advertise<geometry_msgs::PoseWithCovarianceStamped>(
+			prefix + "/initialpose", 1);
+
 	set_map_client = nh.serviceClient<rm_localization::SetMap>(
 			prefix + "/set_map");
 
@@ -235,9 +238,49 @@ void robot_mapper::capture_sphere() {
 
 	}
 
+	map.align_z_axis();
+
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
+	cloud->header.frame_id = prefix + "/map";
+	cloud->header.stamp = ros::Time::now();
+	cloud->header.seq = 0;
+	pub_keypoints.publish(cloud);
+
 	map.set_octomap(octomap_server);
 	std_srvs::Empty emt;
 	clear_costmaps_client.call(emt);
+
+	geometry_msgs::PoseWithCovarianceStamped p;
+
+	Eigen::Vector3f pos = (*last_frame)->get_position().translation();
+	Eigen::Vector3f Zw = (*last_frame)->get_position().unit_quaternion() * Eigen::Vector3f::UnitZ();
+	float z_rotation = atan2(Zw[1], Zw[0]);
+
+	//std::cerr << "Transformed Z vector " << std::endl << Zw << std::endl << "Rotation " << z_rotation << std::endl;
+	Eigen::Quaternionf orient(Eigen::AngleAxisf(z_rotation, Eigen::Vector3f::UnitZ()));
+	orient.normalize();
+
+	p.header.seq = 0;
+	p.header.frame_id = prefix + "/map";
+	p.pose.pose.position.x = pos[0];
+	p.pose.pose.position.y = pos[1];
+	p.pose.pose.position.z = 0;
+
+	p.pose.pose.orientation.x = orient.x();
+	p.pose.pose.orientation.y = orient.y();
+	p.pose.pose.orientation.z = orient.z();
+	p.pose.pose.orientation.w = orient.w();
+
+	p.pose.covariance = { {
+			0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
+			0.0, 0.1, 0.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+			0.0, 0.0,0.0, 0.0, 0.0, 0.06853891945200942}};
+
+	sleep(3);
+	pub_position_update.publish(p);
 
 }
 

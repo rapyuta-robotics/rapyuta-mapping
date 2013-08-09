@@ -17,6 +17,7 @@
 #include <std_msgs/Float32.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <octomap/OcTree.h>
 #include <std_srvs/Empty.h>
 #include <rm_localization/SetMap.h>
@@ -73,6 +74,7 @@ public:
 	ros::Publisher servo_pub;
 	ros::Publisher pub_keypoints;
 	ros::Publisher pub_cloud;
+	ros::Publisher pub_position_update;
 
 	//boost::shared_ptr<keypoint_map> map;
 	icp_map map;

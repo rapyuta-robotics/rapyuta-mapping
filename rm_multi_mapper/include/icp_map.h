@@ -131,6 +131,8 @@ public:
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();
 	cv::Mat get_panorama_image();
 
+	void align_z_axis();
+
 	void optimization_loop();
 
 	void save(const std::string & dir_name);

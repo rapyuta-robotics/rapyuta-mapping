@@ -20,15 +20,11 @@ int main() {
 
 	icp_map map;
 	map.load("icp_map1");
-	map.save("icp_map2");
-
-
-
 
 
 	cv::imshow("img", map.get_panorama_image() * 255);
 	cv::waitKey();
-/*
+	/*
 	 pcl::visualization::PCLVisualizer vis;
 	 vis.removeAllPointClouds();
 	 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
@@ -36,37 +32,35 @@ int main() {
 	 cloud);
 	 vis.addPointCloud<pcl::PointXYZRGB>(cloud, rgb);
 	 vis.spin();
-*/
+	 */
 
-/*
 	for (int level = 2; level >= 0; level--) {
-		for (int i = 0; i < (level + 1) * 20; i++) {
+		for (int i = 0; i < (level + 1) * 10; i++) {
 			map.optimize_rgb(level);
 
 		}
 	}
-*/
 
-	for (int level = 1; level >= 0; level--) {
-		for (int i = 0; i < (level + 1) * 20; i++) {
+	for (int i = 0; i < 10; i++) {
 
-			map.optimize_rgb_with_intrinsics(level);
+		map.optimize_rgb_with_intrinsics(0);
 
-		}
 	}
+
+	map.save("icp_map1_optimized");
 
 	cv::imshow("img", map.get_panorama_image() * 255);
 	cv::waitKey();
 
 	/*
-	vis.removeAllPointClouds();
-		 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 = map.get_map_pointcloud();
-		 pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
-		 cloud1);
-		 vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
+	 vis.removeAllPointClouds();
+	 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 = map.get_map_pointcloud();
+	 pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
+	 cloud1);
+	 vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
 
-		 vis.spin();
-	*/
+	 vis.spin();
+	 */
 
 	return 0;
 

@@ -986,6 +986,70 @@ cv::Mat icp_map::get_panorama_image() {
 	return res / w;
 }
 
+void icp_map::align_z_axis() {
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud(
+			new pcl::PointCloud<pcl::PointXYZ>);
+
+	for (size_t i = 0; i < frames.size(); i++) {
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frames[i]->get_pointcloud(
+				-0.2, 0.2);
+
+		*point_cloud += *cloud;
+	}
+
+	pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+
+	pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+	// Create the segmentation object
+	pcl::SACSegmentation<pcl::PointXYZ> seg;
+	// Optional
+	seg.setOptimizeCoefficients(true);
+	// Mandatory
+	seg.setModelType(pcl::SACMODEL_PLANE);
+	seg.setMethodType(pcl::SAC_RANSAC);
+	seg.setDistanceThreshold(0.02);
+	seg.setProbability(0.99);
+	seg.setMaxIterations(5000);
+
+	seg.setInputCloud(point_cloud);
+	seg.segment(*inliers, *coefficients);
+
+	std::cerr << "Model coefficients: " << coefficients->values[0] << " "
+			<< coefficients->values[1] << " " << coefficients->values[2] << " "
+			<< coefficients->values[3] << " Num inliers "
+			<< inliers->indices.size() << std::endl;
+
+	Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+	if (coefficients->values[2] > 0) {
+		transform.matrix().coeffRef(0, 2) = coefficients->values[0];
+		transform.matrix().coeffRef(1, 2) = coefficients->values[1];
+		transform.matrix().coeffRef(2, 2) = coefficients->values[2];
+	} else {
+		transform.matrix().coeffRef(0, 2) = -coefficients->values[0];
+		transform.matrix().coeffRef(1, 2) = -coefficients->values[1];
+		transform.matrix().coeffRef(2, 2) = -coefficients->values[2];
+	}
+
+	transform.matrix().col(0).head<3>() =
+			transform.matrix().col(1).head<3>().cross(
+					transform.matrix().col(2).head<3>());
+	transform.matrix().col(1).head<3>() =
+			transform.matrix().col(2).head<3>().cross(
+					transform.matrix().col(0).head<3>());
+
+	transform = transform.inverse();
+
+	transform.matrix().coeffRef(2, 3) = coefficients->values[3];
+
+	Sophus::SE3f t(transform.rotation(), transform.translation());
+
+	for (size_t i = 0; i < frames.size(); i++) {
+		frames[i]->get_position() = t * frames[i]->get_position();
+	}
+
+}
+
 void icp_map::set_octomap(RmOctomapServer::Ptr & server) {
 
 	for (size_t i = 0; i < frames.size(); i++) {
