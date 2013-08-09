@@ -127,10 +127,9 @@ public:
 	void optimize();
 	void optimize_rgb(int level);
 	void optimize_rgb_with_intrinsics(int level);
-
 	void set_octomap(RmOctomapServer::Ptr & server);
-
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();
+	cv::Mat get_panorama_image();
 
 	void optimization_loop();
 

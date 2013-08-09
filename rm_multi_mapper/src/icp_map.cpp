@@ -865,21 +865,19 @@ void icp_map::optimize_rgb_with_intrinsics(int level) {
 	reduce_jacobian_rgb rj(frames, intrinsics_vector, size, intrinsics_size,
 			level);
 
-
-	 tbb::parallel_reduce(
-	 tbb::blocked_range<
-	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
-	 rj);
-
-
-	 /*
-	rj(
+	tbb::parallel_reduce(
 			tbb::blocked_range<
 					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-					overlaping_keyframes.begin(), overlaping_keyframes.end()));
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rj);
 
-	*/
+	/*
+	 rj(
+	 tbb::blocked_range<
+	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
+
+	 */
 
 	Eigen::VectorXf update = -rj.JtJ.block(3, 3,
 			(size - 1) * 3 + intrinsics_size * 3,
@@ -930,6 +928,62 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr icp_map::get_map_pointcloud() {
 
 	return res;
 
+}
+
+cv::Mat icp_map::get_panorama_image() {
+	cv::Mat res = cv::Mat::zeros(800, 1600, CV_32F);
+	cv::Mat w = cv::Mat::zeros(res.size(), res.type());
+
+	cv::Mat map_x(res.size(), res.type()), map_y(res.size(), res.type()),
+			img_projected(res.size(), res.type());
+
+	float cx = res.cols / 2.0;
+	float cy = res.rows / 2.0;
+
+	float scale_x = 1.1 * 2 * M_PI / res.cols;
+	float scale_y = 1.1 * M_PI / res.rows;
+
+	for (int i = 0; i < frames.size(); i++) {
+
+		Eigen::Vector3f intrinsics = frames[i]->get_subsampled_intrinsics(0);
+		Eigen::Quaternionf Qiw =
+				frames[i]->get_position().unit_quaternion().inverse();
+
+		Eigen::Matrix3f K;
+		K << intrinsics[0], 0, intrinsics[1], 0, intrinsics[0], intrinsics[2], 0, 0, 1;
+		Eigen::Matrix3f H = K * Qiw.matrix();
+
+		for (int v = 0; v < map_x.rows; v++) {
+			for (int u = 0; u < map_x.cols; u++) {
+
+				float phi = (u - cx) * scale_x;
+				float theta = (v - cy) * scale_y;
+
+				Eigen::Vector3f vec(cos(theta) * cos(phi),
+						-cos(theta) * sin(phi), -sin(theta));
+				vec = H * vec;
+
+				if (vec[2] > 0.01) {
+					map_x.at<float>(v, u) = vec[0] / vec[2];
+					map_y.at<float>(v, u) = vec[1] / vec[2];
+				} else {
+					map_x.at<float>(v, u) = -1;
+					map_y.at<float>(v, u) = -1;
+				}
+			}
+		}
+
+		img_projected = 0.0f;
+		cv::remap(frames[i]->intencity, img_projected, map_x, map_y,
+				CV_INTER_LINEAR, cv::BORDER_TRANSPARENT, cv::Scalar(0, 0, 0));
+		res += img_projected;
+		cv::Mat mask;
+		mask = (img_projected > 0);
+		mask.convertTo(mask, CV_32F);
+		w += mask;
+	}
+
+	return res / w;
 }
 
 void icp_map::set_octomap(RmOctomapServer::Ptr & server) {

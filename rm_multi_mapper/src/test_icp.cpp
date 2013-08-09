@@ -22,51 +22,51 @@ int main() {
 	map.load("icp_map1");
 	map.save("icp_map2");
 
-	pcl::visualization::PCLVisualizer vis;
 
-	vis.removeAllPointClouds();
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
-	pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(
-			cloud);
-	vis.addPointCloud<pcl::PointXYZRGB>(cloud, rgb);
 
-	vis.spin();
 
+
+	cv::imshow("img", map.get_panorama_image() * 255);
+	cv::waitKey();
+/*
+	 pcl::visualization::PCLVisualizer vis;
+	 vis.removeAllPointClouds();
+	 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
+	 pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(
+	 cloud);
+	 vis.addPointCloud<pcl::PointXYZRGB>(cloud, rgb);
+	 vis.spin();
+*/
+
+/*
 	for (int level = 2; level >= 0; level--) {
-		for (int i = 0; i < (level+1)*20; i++) {
+		for (int i = 0; i < (level + 1) * 20; i++) {
 			map.optimize_rgb(level);
 
-			vis.removeAllPointClouds();
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 =
-					map.get_map_pointcloud();
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
-					cloud1);
-			vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
+		}
+	}
+*/
 
-			vis.spinOnce();
+	for (int level = 1; level >= 0; level--) {
+		for (int i = 0; i < (level + 1) * 20; i++) {
+
+			map.optimize_rgb_with_intrinsics(level);
 
 		}
 	}
 
-	//vis.spin();
+	cv::imshow("img", map.get_panorama_image() * 255);
+	cv::waitKey();
 
-	for (int level = 1; level >= 0; level--) {
-			for (int i = 0; i < (level+1)*20; i++) {
-				map.optimize_rgb_with_intrinsics(level);
+	/*
+	vis.removeAllPointClouds();
+		 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 = map.get_map_pointcloud();
+		 pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
+		 cloud1);
+		 vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
 
-				vis.removeAllPointClouds();
-				pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 =
-						map.get_map_pointcloud();
-				pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
-						cloud1);
-				vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
-
-				vis.spinOnce();
-
-			}
-		}
-
-	vis.spin();
+		 vis.spin();
+	*/
 
 	return 0;
 

@@ -162,12 +162,12 @@ void robot_mapper::capture_sphere() {
 	float stop_angle = -M_PI / 4;
 	float delta = -M_PI / 9;
 
-	for (int i = 0; i < 20; i++) {
+	for (int i = 0; i < 18; i++) {
 
 		servo_pub.publish(start_angle);
 
 		move_base_msgs::MoveBaseGoal goal;
-		goal.target_pose.header.frame_id = "base_link";
+		goal.target_pose.header.frame_id = "camera_rgb_frame";
 		goal.target_pose.header.stamp = ros::Time::now();
 
 		goal.target_pose.pose.position.x = 0;
@@ -208,14 +208,31 @@ void robot_mapper::capture_sphere() {
 
 	map.save("icp_map1");
 
-	for(int i=0; i<20; i++) {
-		map.optimize();
+	for (int level = 2; level >= 0; level--) {
+		for (int i = 0; i < (level + 1) * 10; i++) {
+
+			map.optimize_rgb(level);
+
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
+					map.get_map_pointcloud();
+			cloud->header.frame_id = prefix + "/map";
+			cloud->header.stamp = ros::Time::now();
+			cloud->header.seq = 0;
+			pub_keypoints.publish(cloud);
+
+		}
+	}
+
+	for (int i = 0; i < 10; i++) {
+
+		map.optimize_rgb_with_intrinsics(0);
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
-				cloud->header.frame_id = prefix + "/map";
-				cloud->header.stamp = ros::Time::now();
-				cloud->header.seq = 0;
-				pub_keypoints.publish(cloud);
+		cloud->header.frame_id = prefix + "/map";
+		cloud->header.stamp = ros::Time::now();
+		cloud->header.seq = 0;
+		pub_keypoints.publish(cloud);
+
 	}
 
 	map.set_octomap(octomap_server);
