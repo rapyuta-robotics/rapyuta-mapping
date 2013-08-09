@@ -16,6 +16,7 @@
 #include <pcl/registration/correspondence_rejection_one_to_one.h>
 
 #include <sophus/se3.hpp>
+#include <sophus/so3.hpp>
 
 #include <tbb/concurrent_vector.h>
 #include <tbb/parallel_reduce.h>
@@ -33,9 +34,11 @@ public:
 
 	Eigen::Vector3f get_centroid() const;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud() const;
-	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud(float min_height, float max_height) const;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud(float min_height,
+			float max_height) const;
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud() const;
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud(float min_height, float max_height) const;
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud(
+			float min_height, float max_height) const;
 	Sophus::SE3f & get_position();
 	Sophus::SE3f & get_initial_position();
 
@@ -65,7 +68,8 @@ struct reduce_jacobian_icp {
 	pcl::registration::CorrespondenceEstimation<pcl::PointXYZ, pcl::PointXYZ> ce;
 	pcl::registration::CorrespondenceRejectorOneToOne cr;
 
-	reduce_jacobian_icp(tbb::concurrent_vector<keyframe::Ptr> & frames, int size);
+	reduce_jacobian_icp(tbb::concurrent_vector<keyframe::Ptr> & frames,
+			int size);
 
 	reduce_jacobian_icp(reduce_jacobian_icp& rb, tbb::split);
 
@@ -89,18 +93,22 @@ struct reduce_jacobian_rgb {
 	pcl::registration::CorrespondenceEstimation<pcl::PointXYZ, pcl::PointXYZ> ce;
 	pcl::registration::CorrespondenceRejectorOneToOne cr;
 
-	reduce_jacobian_rgb(tbb::concurrent_vector<keyframe::Ptr> & frames, int size, int subsample_level);
+	reduce_jacobian_rgb(tbb::concurrent_vector<keyframe::Ptr> & frames,
+			int size, int subsample_level);
 
-	reduce_jacobian_rgb(reduce_jacobian_icp& rb, tbb::split);
+	reduce_jacobian_rgb(reduce_jacobian_rgb& rb, tbb::split);
+
+	void compute_frame_jacobian(const Eigen::Vector3f & i,
+			const Eigen::Matrix3f & Rwi, const Eigen::Matrix3f & Rwj,
+			Eigen::Matrix<float, 9, 3> & Ji, Eigen::Matrix<float, 9, 3> & Jj);
 
 	void operator()(
 			const tbb::blocked_range<
 					tbb::concurrent_vector<std::pair<int, int> >::iterator>& r);
 
-	void join(reduce_jacobian_icp& rb);
+	void join(reduce_jacobian_rgb& rb);
 
 };
-
 
 class icp_map {
 public:
@@ -112,6 +120,7 @@ public:
 	keyframe_reference add_frame(const cv::Mat rgb, const cv::Mat depth,
 			const Sophus::SE3f & transform);
 	void optimize();
+	void optimize_rgb(int level);
 
 	void set_octomap(RmOctomapServer::Ptr & server);
 

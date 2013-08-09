@@ -39,7 +39,7 @@ keyframe::keyframe(const cv::Mat & rgb, const cv::Mat & depth,
 
 	cv::Mat tmp;
 	cv::cvtColor(rgb, tmp, CV_RGB2GRAY);
-	tmp.convertTo(intencity, CV_32F, 1/255.0);
+	tmp.convertTo(intencity, CV_32F, 1 / 255.0);
 
 }
 
@@ -99,8 +99,8 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr keyframe::get_colored_pointcloud() const 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
 			new pcl::PointCloud<pcl::PointXYZRGB>);
 
-	for (int v = 0; v < depth.rows; v += 2) {
-		for (int u = 0; u < depth.cols; u += 2) {
+	for (int v = 0; v < depth.rows; v++) {
+		for (int u = 0; u < depth.cols; u++) {
 			if (depth.at<unsigned short>(v, u) != 0) {
 
 				cv::Vec3b color = rgb.at<cv::Vec3b>(v, u);
@@ -130,8 +130,8 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr keyframe::get_colored_pointcloud(
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
 			new pcl::PointCloud<pcl::PointXYZRGB>);
 
-	for (int v = 0; v < depth.rows; v += 2) {
-		for (int u = 0; u < depth.cols; u += 2) {
+	for (int v = 0; v < depth.rows; v++) {
+		for (int u = 0; u < depth.cols; u++) {
 			if (depth.at<unsigned short>(v, u) != 0) {
 
 				cv::Vec3b color = rgb.at<cv::Vec3b>(v, u);
@@ -281,10 +281,197 @@ reduce_jacobian_rgb::reduce_jacobian_rgb(
 
 }
 
-reduce_jacobian_rgb::reduce_jacobian_rgb(reduce_jacobian_icp& rb, tbb::split) :
+reduce_jacobian_rgb::reduce_jacobian_rgb(reduce_jacobian_rgb& rb, tbb::split) :
 		size(rb.size), subsample_level(subsample_level), frames(rb.frames) {
 	JtJ.setZero(size * 3, size * 3);
 	Jte.setZero(size * 3);
+}
+
+void reduce_jacobian_rgb::compute_frame_jacobian(const Eigen::Vector3f & i,
+		const Eigen::Matrix3f & Rwi, const Eigen::Matrix3f & Rwj,
+		Eigen::Matrix<float, 9, 3> & Ji, Eigen::Matrix<float, 9, 3> & Jj) {
+
+	Ji.coeffRef(0, 0) = -Rwj(1, 0) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			/ i(0) + Rwj(2, 0) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0);
+	Ji.coeffRef(0, 1) = Rwj(0, 0) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			- Rwj(2, 0) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0);
+	Ji.coeffRef(0, 2) = -Rwj(0, 0) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
+			/ i(0) + Rwj(1, 0) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0);
+	Ji.coeffRef(1, 0) = -Rwj(1, 1) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			/ i(0) + Rwj(2, 1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0);
+	Ji.coeffRef(1, 1) = Rwj(0, 1) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			- Rwj(2, 1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0);
+	Ji.coeffRef(1, 2) = -Rwj(0, 1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
+			/ i(0) + Rwj(1, 1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0);
+	Ji.coeffRef(2, 0) = Rwj(1, 0) * i(1) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			/ i(0)
+			+ Rwj(1, 1) * i(2) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			- Rwj(1, 2) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			- Rwj(2, 0) * i(1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			- Rwj(2, 1) * i(2) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			+ Rwj(2, 2) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1));
+	Ji.coeffRef(2, 1) = -Rwj(0, 0) * i(1)
+			* (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			- Rwj(0, 1) * i(2) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			+ Rwj(0, 2) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			+ Rwj(2, 0) * i(1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0)
+			+ Rwj(2, 1) * i(2) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0)
+			- Rwj(2, 2) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1));
+	Ji.coeffRef(2, 2) = Rwj(0, 0) * i(1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
+			/ i(0)
+			+ Rwj(0, 1) * i(2) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			- Rwj(0, 2) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
+			- Rwj(1, 0) * i(1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0)
+			- Rwj(1, 1) * i(2) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0)
+			+ Rwj(1, 2) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1));
+	Ji.coeffRef(3, 0) = -Rwj(1, 0) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			/ i(0) + Rwj(2, 0) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0);
+	Ji.coeffRef(3, 1) = Rwj(0, 0) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			- Rwj(2, 0) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0);
+	Ji.coeffRef(3, 2) = -Rwj(0, 0) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
+			/ i(0) + Rwj(1, 0) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0);
+	Ji.coeffRef(4, 0) = -Rwj(1, 1) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			/ i(0) + Rwj(2, 1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0);
+	Ji.coeffRef(4, 1) = Rwj(0, 1) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			- Rwj(2, 1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0);
+	Ji.coeffRef(4, 2) = -Rwj(0, 1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
+			/ i(0) + Rwj(1, 1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0);
+	Ji.coeffRef(5, 0) = Rwj(1, 0) * i(1) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			/ i(0)
+			+ Rwj(1, 1) * i(2) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			- Rwj(1, 2) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			- Rwj(2, 0) * i(1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			- Rwj(2, 1) * i(2) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			+ Rwj(2, 2) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2));
+	Ji.coeffRef(5, 1) = -Rwj(0, 0) * i(1)
+			* (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			- Rwj(0, 1) * i(2) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			+ Rwj(0, 2) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			+ Rwj(2, 0) * i(1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0)
+			+ Rwj(2, 1) * i(2) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0)
+			- Rwj(2, 2) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2));
+	Ji.coeffRef(5, 2) = Rwj(0, 0) * i(1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
+			/ i(0)
+			+ Rwj(0, 1) * i(2) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			- Rwj(0, 2) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
+			- Rwj(1, 0) * i(1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0)
+			- Rwj(1, 1) * i(2) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0)
+			+ Rwj(1, 2) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2));
+	Ji.coeffRef(6, 0) = Rwi(1, 2) * Rwj(2, 0) / i(0)
+			- Rwi(2, 2) * Rwj(1, 0) / i(0);
+	Ji.coeffRef(6, 1) = -Rwi(0, 2) * Rwj(2, 0) / i(0)
+			+ Rwi(2, 2) * Rwj(0, 0) / i(0);
+	Ji.coeffRef(6, 2) = Rwi(0, 2) * Rwj(1, 0) / i(0)
+			- Rwi(1, 2) * Rwj(0, 0) / i(0);
+	Ji.coeffRef(7, 0) = Rwi(1, 2) * Rwj(2, 1) / i(0)
+			- Rwi(2, 2) * Rwj(1, 1) / i(0);
+	Ji.coeffRef(7, 1) = -Rwi(0, 2) * Rwj(2, 1) / i(0)
+			+ Rwi(2, 2) * Rwj(0, 1) / i(0);
+	Ji.coeffRef(7, 2) = Rwi(0, 2) * Rwj(1, 1) / i(0)
+			- Rwi(1, 2) * Rwj(0, 1) / i(0);
+	Ji.coeffRef(8, 0) = -Rwi(1, 2) * Rwj(2, 0) * i(1) / i(0)
+			- Rwi(1, 2) * Rwj(2, 1) * i(2) / i(0) + Rwi(1, 2) * Rwj(2, 2)
+			+ Rwi(2, 2) * Rwj(1, 0) * i(1) / i(0)
+			+ Rwi(2, 2) * Rwj(1, 1) * i(2) / i(0) - Rwi(2, 2) * Rwj(1, 2);
+	Ji.coeffRef(8, 1) = Rwi(0, 2) * Rwj(2, 0) * i(1) / i(0)
+			+ Rwi(0, 2) * Rwj(2, 1) * i(2) / i(0) - Rwi(0, 2) * Rwj(2, 2)
+			- Rwi(2, 2) * Rwj(0, 0) * i(1) / i(0)
+			- Rwi(2, 2) * Rwj(0, 1) * i(2) / i(0) + Rwi(2, 2) * Rwj(0, 2);
+	Ji.coeffRef(8, 2) = -Rwi(0, 2) * Rwj(1, 0) * i(1) / i(0)
+			- Rwi(0, 2) * Rwj(1, 1) * i(2) / i(0) + Rwi(0, 2) * Rwj(1, 2)
+			+ Rwi(1, 2) * Rwj(0, 0) * i(1) / i(0)
+			+ Rwi(1, 2) * Rwj(0, 1) * i(2) / i(0) - Rwi(1, 2) * Rwj(0, 2);
+	Jj.coeffRef(0, 0) = Rwj(1, 0) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			- Rwj(2, 0) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0);
+	Jj.coeffRef(0, 1) = -Rwj(0, 0) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			/ i(0) + Rwj(2, 0) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0);
+	Jj.coeffRef(0, 2) = Rwj(0, 0) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			- Rwj(1, 0) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0);
+	Jj.coeffRef(1, 0) = Rwj(1, 1) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			- Rwj(2, 1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0);
+	Jj.coeffRef(1, 1) = -Rwj(0, 1) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			/ i(0) + Rwj(2, 1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0);
+	Jj.coeffRef(1, 2) = Rwj(0, 1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			- Rwj(1, 1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0);
+	Jj.coeffRef(2, 0) = -Rwj(1, 0) * i(1)
+			* (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			- Rwj(1, 1) * i(2) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			+ Rwj(1, 2) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			+ Rwj(2, 0) * i(1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			+ Rwj(2, 1) * i(2) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			- Rwj(2, 2) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1));
+	Jj.coeffRef(2, 1) = Rwj(0, 0) * i(1) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			/ i(0)
+			+ Rwj(0, 1) * i(2) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1)) / i(0)
+			- Rwj(0, 2) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
+			- Rwj(2, 0) * i(1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0)
+			- Rwj(2, 1) * i(2) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0)
+			+ Rwj(2, 2) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1));
+	Jj.coeffRef(2, 2) = -Rwj(0, 0) * i(1)
+			* (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			- Rwj(0, 1) * i(2) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1)) / i(0)
+			+ Rwj(0, 2) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
+			+ Rwj(1, 0) * i(1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0)
+			+ Rwj(1, 1) * i(2) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1)) / i(0)
+			- Rwj(1, 2) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1));
+	Jj.coeffRef(3, 0) = Rwj(1, 0) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			- Rwj(2, 0) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0);
+	Jj.coeffRef(3, 1) = -Rwj(0, 0) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			/ i(0) + Rwj(2, 0) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0);
+	Jj.coeffRef(3, 2) = Rwj(0, 0) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			- Rwj(1, 0) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0);
+	Jj.coeffRef(4, 0) = Rwj(1, 1) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			- Rwj(2, 1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0);
+	Jj.coeffRef(4, 1) = -Rwj(0, 1) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			/ i(0) + Rwj(2, 1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0);
+	Jj.coeffRef(4, 2) = Rwj(0, 1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			- Rwj(1, 1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0);
+	Jj.coeffRef(5, 0) = -Rwj(1, 0) * i(1)
+			* (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			- Rwj(1, 1) * i(2) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			+ Rwj(1, 2) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			+ Rwj(2, 0) * i(1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			+ Rwj(2, 1) * i(2) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			- Rwj(2, 2) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2));
+	Jj.coeffRef(5, 1) = Rwj(0, 0) * i(1) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			/ i(0)
+			+ Rwj(0, 1) * i(2) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2)) / i(0)
+			- Rwj(0, 2) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
+			- Rwj(2, 0) * i(1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0)
+			- Rwj(2, 1) * i(2) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0)
+			+ Rwj(2, 2) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2));
+	Jj.coeffRef(5, 2) = -Rwj(0, 0) * i(1)
+			* (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			- Rwj(0, 1) * i(2) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2)) / i(0)
+			+ Rwj(0, 2) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
+			+ Rwj(1, 0) * i(1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0)
+			+ Rwj(1, 1) * i(2) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2)) / i(0)
+			- Rwj(1, 2) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2));
+	Jj.coeffRef(6, 0) = -Rwi(1, 2) * Rwj(2, 0) / i(0)
+			+ Rwi(2, 2) * Rwj(1, 0) / i(0);
+	Jj.coeffRef(6, 1) = Rwi(0, 2) * Rwj(2, 0) / i(0)
+			- Rwi(2, 2) * Rwj(0, 0) / i(0);
+	Jj.coeffRef(6, 2) = -Rwi(0, 2) * Rwj(1, 0) / i(0)
+			+ Rwi(1, 2) * Rwj(0, 0) / i(0);
+	Jj.coeffRef(7, 0) = -Rwi(1, 2) * Rwj(2, 1) / i(0)
+			+ Rwi(2, 2) * Rwj(1, 1) / i(0);
+	Jj.coeffRef(7, 1) = Rwi(0, 2) * Rwj(2, 1) / i(0)
+			- Rwi(2, 2) * Rwj(0, 1) / i(0);
+	Jj.coeffRef(7, 2) = -Rwi(0, 2) * Rwj(1, 1) / i(0)
+			+ Rwi(1, 2) * Rwj(0, 1) / i(0);
+	Jj.coeffRef(8, 0) = Rwi(1, 2) * Rwj(2, 0) * i(1) / i(0)
+			+ Rwi(1, 2) * Rwj(2, 1) * i(2) / i(0) - Rwi(1, 2) * Rwj(2, 2)
+			- Rwi(2, 2) * Rwj(1, 0) * i(1) / i(0)
+			- Rwi(2, 2) * Rwj(1, 1) * i(2) / i(0) + Rwi(2, 2) * Rwj(1, 2);
+	Jj.coeffRef(8, 1) = -Rwi(0, 2) * Rwj(2, 0) * i(1) / i(0)
+			- Rwi(0, 2) * Rwj(2, 1) * i(2) / i(0) + Rwi(0, 2) * Rwj(2, 2)
+			+ Rwi(2, 2) * Rwj(0, 0) * i(1) / i(0)
+			+ Rwi(2, 2) * Rwj(0, 1) * i(2) / i(0) - Rwi(2, 2) * Rwj(0, 2);
+	Jj.coeffRef(8, 2) = Rwi(0, 2) * Rwj(1, 0) * i(1) / i(0)
+			+ Rwi(0, 2) * Rwj(1, 1) * i(2) / i(0) - Rwi(0, 2) * Rwj(1, 2)
+			- Rwi(1, 2) * Rwj(0, 0) * i(1) / i(0)
+			- Rwi(1, 2) * Rwj(0, 1) * i(2) / i(0) + Rwi(1, 2) * Rwj(0, 2);
+
 }
 
 void reduce_jacobian_rgb::operator()(
@@ -305,23 +492,78 @@ void reduce_jacobian_rgb::operator()(
 		Eigen::Quaternionf Qij =
 				frames[i]->get_position().unit_quaternion().inverse()
 						* frames[j]->get_position().unit_quaternion();
-		Eigen::Matrix3f K, K_inv;
+
+		Eigen::Matrix3f K;
 		K << intrinsics[0], 0, intrinsics[1], 0, intrinsics[0], intrinsics[2], 0, 0, 1;
-		K_inv = K.inverse();
 
-		Eigen::Matrix3f H = K * Qij.matrix() * K_inv.inverse();
-		cv::Mat cvH(4, 4, CV_32F, H.data());
+		Eigen::Matrix3f H = K * Qij.matrix() * K.inverse();
+		cv::Mat cvH(3, 3, CV_32F, H.data());
 
-		cv::Mat intensity_j_warped;
-		cv::warpPerspective(intensity_j, intensity_j_warped, cvH,
-				intensity_j.size());
+		//std::cerr << "Intrinsics" << std::endl << intrinsics << std::endl << "H"
+		//		<< std::endl << H << std::endl << "cvH" << std::endl << cvH
+		//		<< std::endl;
+
+		cv::Mat intensity_j_warped, intensity_i_dx, intensity_i_dy;
+		intensity_j_warped = cv::Mat::zeros(intensity_j.size(),
+				intensity_j.type());
+		cv::warpPerspective(intensity_j, intensity_j_warped,
+				cvH.t(), intensity_j.size());
+
+		//cv::imshow("intensity_i", intensity_i);
+		//cv::imshow("intensity_j", intensity_j);
+		//cv::imshow("intensity_j_warped", intensity_j_warped);
+		//cv::waitKey();
+
+		cv::Sobel(intensity_i, intensity_i_dx, CV_32F, 1, 0);
+		cv::Sobel(intensity_i, intensity_i_dy, CV_32F, 0, 1);
 
 		cv::Mat error = intensity_i - intensity_j_warped;
+
+		Eigen::Matrix<float, 9, 3> Jwi, Jwj;
+
+		compute_frame_jacobian(intrinsics,
+				frames[i]->get_position().unit_quaternion().matrix(),
+				frames[j]->get_position().unit_quaternion().matrix(), Jwi, Jwj);
+
+		for (int v = 0; v < intensity_i.rows; v++) {
+			for (int u = 0; u < intensity_i.cols; u++) {
+				if (intensity_j_warped.at<float>(v, u) != 0) {
+
+					float e = error.at<float>(v, u);
+
+					float dx = intensity_i_dx.at<float>(v, u);
+					float dy = intensity_i_dy.at<float>(v, u);
+					float udx = dx * u;
+					float vdx = dx * v;
+					float udy = dy * u;
+					float vdy = dy * v;
+
+					float mudxmvdy = -udx - vdy;
+
+					Eigen::Matrix<float, 1, 9> Jp;
+					Jp << udx, vdx, dx, udy, vdy, dy, u * mudxmvdy, v
+							* mudxmvdy, mudxmvdy;
+
+					Eigen::Matrix<float, 1, 3> Ji, Jj;
+					Ji = Jp * Jwi;
+					Jj = Jp * Jwj;
+
+					JtJ.block<3, 3>(i * 3, i * 3) += Ji.transpose() * Ji;
+					JtJ.block<3, 3>(j * 3, j * 3) += Jj.transpose() * Jj;
+					JtJ.block<3, 3>(i * 3, j * 3) += Ji.transpose() * Jj;
+					JtJ.block<3, 3>(j * 3, i * 3) += Jj.transpose() * Ji;
+
+					Jte.segment<3>(i * 3) += Ji.transpose() * e;
+					Jte.segment<3>(j * 3) += Jj.transpose() * e;
+
+				}
+			}
+		}
 
 	}
 }
 
-void reduce_jacobian_rgb::join(reduce_jacobian_icp& rb) {
+void reduce_jacobian_rgb::join(reduce_jacobian_rgb& rb) {
 	JtJ += rb.JtJ;
 	Jte += rb.Jte;
 }
@@ -385,6 +627,73 @@ void icp_map::optimize() {
 
 		frames[i + 1]->get_position() = Sophus::SE3f::exp(
 				update.segment<6>(i * 6)) * frames[i + 1]->get_position();
+
+	}
+	position_modification_mutex.unlock();
+
+}
+
+void icp_map::optimize_rgb(int level) {
+
+	int size = frames.size();
+
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+
+	for (int i = 0; i < size; i++) {
+
+		for (int j = 0; j < size; j++) {
+
+			if (i != j) {
+
+				float centroid_distance = (frames[i]->get_centroid()
+						- frames[j]->get_centroid()).squaredNorm();
+
+				Eigen::Quaternionf diff_quat =
+						frames[i]->get_position().unit_quaternion()
+								* frames[j]->get_position().unit_quaternion().inverse();
+
+				float angle = 2 * std::acos(std::abs(diff_quat.w()));
+
+				if (angle < M_PI / 6) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					std::cerr << i << " and " << j
+							<< " are connected with angle distance " << angle
+							<< std::endl;
+				}
+			}
+		}
+	}
+
+	reduce_jacobian_rgb rj(frames, size, level);
+
+	/*
+	 tbb::parallel_reduce(
+	 tbb::blocked_range<
+	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
+	 rj);
+	 */
+
+	rj(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()));
+
+	Eigen::VectorXf update =
+			-rj.JtJ.block(3, 3, (size - 1) * 3, (size - 1) * 3).ldlt().solve(
+					rj.Jte.segment(3, (size - 1) * 3));
+
+	std::cerr << "Max update " << update.maxCoeff() << " " << update.minCoeff()
+			<< std::endl;
+
+	position_modification_mutex.lock();
+	for (int i = 0; i < size - 1; i++) {
+
+		Sophus::SO3f current_rotation = frames[i + 1]->get_position().so3();
+		current_rotation = Sophus::SO3f::exp(update.segment<3>(i * 3))
+				* current_rotation;
+
+		frames[i + 1]->get_position().so3() = current_rotation;
 
 	}
 	position_modification_mutex.unlock();
@@ -457,7 +766,6 @@ void icp_map::save(const std::string & dir_name) {
 				dir_name + "/intencity/" + boost::lexical_cast<std::string>(i)
 						+ ".png", frames[i]->intencity * 255);
 
-
 		cv::imwrite(
 				dir_name + "/intencity_sub_1/"
 						+ boost::lexical_cast<std::string>(i) + ".png",
@@ -467,7 +775,6 @@ void icp_map::save(const std::string & dir_name) {
 				dir_name + "/intencity_sub_2/"
 						+ boost::lexical_cast<std::string>(i) + ".png",
 				frames[i]->get_subsampled_intencity(2) * 255);
-
 
 	}
 

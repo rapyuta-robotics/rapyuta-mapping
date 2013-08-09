@@ -32,7 +32,25 @@ int main() {
 
 	vis.spin();
 
-	for (int i = 0; i < 10; i++) {
+	for (int level = 2; level >= 0; level--) {
+		for (int i = 0; i < 30; i++) {
+			map.optimize_rgb(level);
+
+			vis.removeAllPointClouds();
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 =
+					map.get_map_pointcloud();
+			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
+					cloud1);
+			vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
+
+			vis.spinOnce();
+
+		}
+	}
+
+	vis.spin();
+
+	for (int i = 0; i < 30; i++) {
 		map.optimize();
 
 		vis.removeAllPointClouds();
