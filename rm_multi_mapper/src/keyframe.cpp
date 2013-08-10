@@ -1,5 +1,6 @@
-
 #include <keyframe.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/search/kdtree.h>
 
 keyframe::keyframe(const cv::Mat & rgb, const cv::Mat & depth,
 		const Sophus::SE3f & position,
@@ -207,4 +208,89 @@ Eigen::Vector3f keyframe::get_subsampled_intrinsics(int level) {
 
 int keyframe::get_intrinsics_idx() {
 	return intrinsics_idx;
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr keyframe::get_original_pointcloud() const {
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
+				new pcl::PointCloud<pcl::PointXYZ>);
+
+		Eigen::Vector3f & intrinsics = intrinsics_vector[intrinsics_idx];
+
+		for (int v = 0; v < depth.rows; v += 2) {
+			for (int u = 0; u < depth.cols; u += 2) {
+				if (depth.at<unsigned short>(v, u) != 0) {
+					pcl::PointXYZ p;
+					p.z = depth.at<unsigned short>(v, u) / 1000.0f;
+					p.x = (u - intrinsics[1]) * p.z / intrinsics[0];
+					p.y = (v - intrinsics[2]) * p.z / intrinsics[0];
+
+					cloud->push_back(p);
+
+				}
+			}
+		}
+
+		return cloud;
+}
+
+
+pcl::PointCloud<pcl::PointNormal>::Ptr keyframe::get_original_pointcloud_with_normals() const {
+	pcl::PointCloud<pcl::PointNormal>::Ptr cloud(
+			new pcl::PointCloud<pcl::PointNormal>);
+
+	Eigen::Vector3f & intrinsics = intrinsics_vector[intrinsics_idx];
+
+	for (int v = 0; v < depth.rows; v += 2) {
+		for (int u = 0; u < depth.cols; u += 2) {
+			if (depth.at<unsigned short>(v, u) != 0) {
+				pcl::PointNormal p;
+				p.z = depth.at<unsigned short>(v, u) / 1000.0f;
+				p.x = (u - intrinsics[1]) * p.z / intrinsics[0];
+				p.y = (v - intrinsics[2]) * p.z / intrinsics[0];
+
+				cloud->push_back(p);
+
+			}
+		}
+	}
+
+	pcl::NormalEstimation<pcl::PointNormal, pcl::PointNormal> ne;
+	ne.setInputCloud(cloud);
+
+	pcl::search::KdTree<pcl::PointNormal>::Ptr tree(
+			new pcl::search::KdTree<pcl::PointNormal>());
+	ne.setSearchMethod(tree);
+	ne.setRadiusSearch(0.03);
+	ne.compute(*cloud);
+
+	return cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZ>::Ptr keyframe::get_transformed_pointcloud(
+		const Sophus::SE3f & transform) const {
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
+				new pcl::PointCloud<pcl::PointXYZ>);
+
+		Eigen::Vector3f & intrinsics = intrinsics_vector[intrinsics_idx];
+
+		Sophus::SE3f t = transform * position;
+
+		for (int v = 0; v < depth.rows; v += 2) {
+			for (int u = 0; u < depth.cols; u += 2) {
+				if (depth.at<unsigned short>(v, u) != 0) {
+					pcl::PointXYZ p;
+					p.z = depth.at<unsigned short>(v, u) / 1000.0f;
+					p.x = (u - intrinsics[1]) * p.z / intrinsics[0];
+					p.y = (v - intrinsics[2]) * p.z / intrinsics[0];
+
+					p.getVector3fMap() = t * p.getVector3fMap();
+
+					cloud->push_back(p);
+
+				}
+			}
+		}
+
+		return cloud;
+
 }

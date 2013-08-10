@@ -10,7 +10,6 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <fstream>
 
-
 icp_map::icp_map()
 // : optimization_loop_thread(boost::bind(&icp_map::optimization_loop, this)) {
 {
@@ -34,27 +33,87 @@ void icp_map::optimize() {
 
 	for (int i = 0; i < size; i++) {
 
-		for (int j = 0; j < i; j++) {
+		for (int j = 0; j < size; j++) {
 
-			float centroid_distance = (frames[i]->get_centroid()
-					- frames[j]->get_centroid()).squaredNorm();
+			if (i != j) {
 
-			Eigen::Quaternionf diff_quat =
-					frames[i]->get_position().unit_quaternion()
-							* frames[j]->get_position().unit_quaternion().inverse();
+				float centroid_distance = (frames[i]->get_centroid()
+						- frames[j]->get_centroid()).squaredNorm();
 
-			float angle = 2 * std::acos(std::abs(diff_quat.w()));
+				Eigen::Quaternionf diff_quat =
+						frames[i]->get_position().unit_quaternion()
+								* frames[j]->get_position().unit_quaternion().inverse();
 
-			if (angle < M_PI / 6) {
-				overlaping_keyframes.push_back(std::make_pair(i, j));
-				//std::cerr << i << " and " << j
-				//		<< " are connected with angle distance " << angle
-				//		<< std::endl;
+				float angle = 2 * std::acos(std::abs(diff_quat.w()));
+
+				if (angle < M_PI / 6) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					//std::cerr << i << " and " << j
+					//		<< " are connected with angle distance " << angle
+					//		<< std::endl;
+				}
 			}
 		}
 	}
 
 	reduce_jacobian_icp rj(frames, size);
+
+	tbb::parallel_reduce(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rj);
+
+	Eigen::VectorXf update =
+			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(
+					rj.Jte.segment(6, (size - 1) * 6));
+
+	std::cerr << "Max update " << update.maxCoeff() << " " << update.minCoeff()
+			<< std::endl;
+
+	position_modification_mutex.lock();
+	for (int i = 0; i < size - 1; i++) {
+
+		frames[i + 1]->get_position() = Sophus::SE3f::exp(
+				update.segment<6>(i * 6)) * frames[i + 1]->get_position();
+
+	}
+	position_modification_mutex.unlock();
+
+}
+
+void icp_map::optimize_p2p() {
+
+	int size = frames.size();
+
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+
+	for (int i = 0; i < size; i++) {
+
+		for (int j = 0; j < size; j++) {
+
+			if (i != j) {
+
+				float centroid_distance = (frames[i]->get_centroid()
+						- frames[j]->get_centroid()).squaredNorm();
+
+				Eigen::Quaternionf diff_quat =
+						frames[i]->get_position().unit_quaternion()
+								* frames[j]->get_position().unit_quaternion().inverse();
+
+				float angle = 2 * std::acos(std::abs(diff_quat.w()));
+
+				if (angle < M_PI / 6) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					//std::cerr << i << " and " << j
+					//		<< " are connected with angle distance " << angle
+					//		<< std::endl;
+				}
+			}
+		}
+	}
+
+	reduce_jacobian_icp_p2p rj(frames, size);
 
 	tbb::parallel_reduce(
 			tbb::blocked_range<

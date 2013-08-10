@@ -31,6 +31,11 @@ public:
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud() const;
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud(
 			float min_height, float max_height) const;
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_original_pointcloud() const;
+	pcl::PointCloud<pcl::PointNormal>::Ptr get_original_pointcloud_with_normals() const;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_transformed_pointcloud(const Sophus::SE3f & transform) const;
+
 	Sophus::SE3f & get_position();
 	Sophus::SE3f & get_initial_position();
 

@@ -33,7 +33,7 @@ void reduce_jacobian_icp::operator()(
 		pcl::Correspondences cor;
 		ce.setInputCloud(cloud_j);
 		ce.setInputTarget(cloud_i);
-		ce.determineCorrespondences(cor, 0.5);
+		ce.determineCorrespondences(cor, 0.1);
 
 		cr.getRemainingCorrespondences(cor, cor);
 

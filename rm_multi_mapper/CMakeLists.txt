@@ -33,7 +33,7 @@ find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
 rosbuild_add_library(${PROJECT_NAME} src/robot_mapper.cpp src/icp_map.cpp src/keyframe.cpp
- src/reduce_jacobian_icp.cpp src/reduce_jacobian_rgb.cpp)
+ src/reduce_jacobian_icp.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_icp_p2p.cpp)
 target_link_libraries(${PROJECT_NAME} tbb)
 
 rosbuild_add_executable(multi_mapper src/main.cpp)

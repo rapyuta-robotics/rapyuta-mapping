@@ -22,6 +22,7 @@
 
 #include <octomap_server.h>
 #include <reduce_jacobian_icp.h>
+#include <reduce_jacobian_icp_p2p.h>
 #include <reduce_jacobian_rgb.h>
 
 class icp_map {
@@ -34,6 +35,7 @@ public:
 	keyframe_reference add_frame(const cv::Mat rgb, const cv::Mat depth,
 			const Sophus::SE3f & transform);
 	void optimize();
+	void optimize_p2p();
 	void optimize_rgb(int level);
 	void optimize_rgb_with_intrinsics(int level);
 	void set_octomap(RmOctomapServer::Ptr & server);
