@@ -32,8 +32,12 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
-rosbuild_add_executable(multi_mapper src/main.cpp src/robot_mapper.cpp src/icp_map.cpp)
-target_link_libraries(multi_mapper cholmod vtkCommon vtkFiltering tbb)
+rosbuild_add_library(${PROJECT_NAME} src/robot_mapper.cpp src/icp_map.cpp src/keyframe.cpp
+ src/reduce_jacobian_icp.cpp src/reduce_jacobian_rgb.cpp)
+target_link_libraries(${PROJECT_NAME} tbb)
+
+rosbuild_add_executable(multi_mapper src/main.cpp)
+target_link_libraries(multi_mapper ${VTK_LIBRARIES} ${PROJECT_NAME})
 
 #rosbuild_add_executable(ransac_test src/test.cpp src/robot_mapper.cpp src/keypoint_map.cpp)
 #target_link_libraries(ransac_test cholmod vtkCommon vtkFiltering rm_localization_util)
@@ -47,6 +51,6 @@ target_link_libraries(ba_demo cholmod)
 rosbuild_add_executable(test_lkt src/test_lkt.cpp)
 
 rosbuild_add_executable(test_icp src/test_icp.cpp src/icp_map.cpp)
-target_link_libraries(test_icp ${VTK_LIBRARIES} tbb)
+target_link_libraries(test_icp ${VTK_LIBRARIES} ${PROJECT_NAME})
 
 rosbuild_add_executable(test_rgbd src/test_rgbd.cpp)
