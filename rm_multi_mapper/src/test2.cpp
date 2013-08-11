@@ -5,45 +5,21 @@
  *      Author: vsu
  */
 
-#include <robot_mapper.h>
+#include <octomap/OcTree.h>
 
 int main(int argc, char **argv) {
 
-	ros::init(argc, argv, "test_map");
-	ros::NodeHandle nh;
+	octomap::OcTree tree(0.05);
 
-	boost::shared_ptr<keypoint_map> map;
-
-	Eigen::Vector4f intrinsics;
-	intrinsics << 525.0, 525.0, 319.5, 239.5;
-
-	Eigen::Affine3f transform;
-	transform.setIdentity();
-
-	for(int j=0; j<3; j++) {
-
-	for (int i = 0; i < 36; i++) {
-
-		cv::Mat rgb = cv::imread("rgb1/" + boost::lexical_cast<std::string>(i) + ".png",
-					CV_LOAD_IMAGE_UNCHANGED);
-		cv::Mat depth = cv::imread("depth1/" + boost::lexical_cast<std::string>(i) + ".png",
-					CV_LOAD_IMAGE_UNCHANGED);
-
-		if (map.get()) {
-				keypoint_map map1(rgb, depth, transform, intrinsics);
-				map->merge_keypoint_map(map1, 50, 300);
-
-			} else {
-				map.reset(new keypoint_map(rgb, depth, transform, intrinsics));
+	for(float x=-0.3; x<=0.3; x += 0.01) {
+		for(float y=-0.3; y<=0.3; y += 0.01) {
+			if(x*x + y*y <= 0.3 * 0.3) {
+				tree.updateNode(x, y, 0.01, false);
 			}
+		}
 	}
 
-	map->remove_bad_points(1);
-	map->optimize();
-
-	}
-
-	map->save("test2_final_map");
+	tree.writeBinary("free_space.bt");
 
 	return 0;
 }
