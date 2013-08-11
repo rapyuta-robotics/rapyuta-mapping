@@ -163,9 +163,10 @@ void icp_map::optimize_rgb(int level) {
 
 				if (angle < M_PI / 6) {
 					overlaping_keyframes.push_back(std::make_pair(i, j));
-					//std::cerr << i << " and " << j
-					//		<< " are connected with angle distance " << angle
-					//		<< std::endl;
+					if (i == 0 || j == 0)
+						std::cerr << i << " and " << j
+								<< " are connected with angle distance "
+								<< angle << std::endl;
 				}
 			}
 		}
@@ -236,11 +237,12 @@ void icp_map::optimize_rgb_with_intrinsics(int level) {
 
 				float angle = 2 * std::acos(std::abs(diff_quat.w()));
 
-				if (angle < M_PI / 6) {
+				if (angle < M_PI / 4) {
 					overlaping_keyframes.push_back(std::make_pair(i, j));
-					//std::cerr << i << " and " << j
-					//		<< " are connected with angle distance " << angle
-					//		<< std::endl;
+					if (i == 4)
+						std::cerr << i << " and " << j
+								<< " are connected with angle distance "
+								<< angle << std::endl;
 				}
 			}
 		}
@@ -311,6 +313,149 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr icp_map::get_map_pointcloud() {
 	}
 
 	return res;
+
+}
+
+void icp_map::optimize_rgb_3d(int level) {
+
+	int size = frames.size();
+	int intrinsics_size = intrinsics_vector.size();
+
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+
+	for (int i = 0; i < size; i++) {
+
+		for (int j = 0; j < size; j++) {
+
+			if (i != j) {
+
+				float centroid_distance = (frames[i]->get_centroid()
+						- frames[j]->get_centroid()).squaredNorm();
+
+				Eigen::Quaternionf diff_quat =
+						frames[i]->get_position().unit_quaternion()
+								* frames[j]->get_position().unit_quaternion().inverse();
+
+				float angle = 2 * std::acos(std::abs(diff_quat.w()));
+
+				if (angle < M_PI / 6) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					if (i == 0 || j == 0)
+						std::cerr << i << " and " << j
+								<< " are connected with angle distance "
+								<< angle << std::endl;
+				}
+			}
+		}
+	}
+
+	reduce_jacobian_rgb_3d rj(frames, intrinsics_vector, size, intrinsics_size,
+			level);
+
+
+	 tbb::parallel_reduce(
+	 tbb::blocked_range<
+	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
+	 rj);
+
+	Eigen::VectorXf update =
+			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(
+					rj.Jte.segment(6, (size - 1) * 6));
+
+	std::cerr << "Max update " << update.maxCoeff() << " " << update.minCoeff()
+			<< std::endl;
+
+	position_modification_mutex.lock();
+	for (int i = 0; i < size - 1; i++) {
+
+		frames[i + 1]->get_position() = Sophus::SE3f::exp(
+				update.segment<6>(i * 6)) * frames[i + 1]->get_position();
+
+	}
+
+	position_modification_mutex.unlock();
+
+
+
+}
+
+void icp_map::optimize_rgb_3d_with_intrinsics(int level) {
+
+	int size = frames.size();
+	int intrinsics_size = intrinsics_vector.size();
+
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+
+	for (int i = 0; i < size; i++) {
+
+		for (int j = 0; j < size; j++) {
+
+			if (i != j) {
+
+				float centroid_distance = (frames[i]->get_centroid()
+						- frames[j]->get_centroid()).squaredNorm();
+
+				Eigen::Quaternionf diff_quat =
+						frames[i]->get_position().unit_quaternion()
+								* frames[j]->get_position().unit_quaternion().inverse();
+
+				float angle = 2 * std::acos(std::abs(diff_quat.w()));
+
+				if (angle < M_PI / 6) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					if (i == 0 || j == 0)
+						std::cerr << i << " and " << j
+								<< " are connected with angle distance "
+								<< angle << std::endl;
+				}
+			}
+		}
+	}
+
+	reduce_jacobian_rgb_3d rj(frames, intrinsics_vector, size, intrinsics_size,
+			level);
+
+	/*
+	 tbb::parallel_reduce(
+	 tbb::blocked_range<
+	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
+	 rj);
+	 */
+
+	rj(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()));
+
+	Eigen::VectorXf update =
+			-rj.JtJ.block(6, 6, (size - 1) * 6 + intrinsics_size*3, (size - 1) * 6 + intrinsics_size*3).ldlt().solve(
+					rj.Jte.segment(6, (size - 1) * 6 + intrinsics_size*3));
+
+	std::cerr << "Max update " << update.maxCoeff() << " " << update.minCoeff()
+			<< std::endl;
+
+	position_modification_mutex.lock();
+	for (int i = 0; i < size - 1; i++) {
+
+		frames[i + 1]->get_position() = Sophus::SE3f::exp(
+				update.segment<6>(i * 6)) * frames[i + 1]->get_position();
+
+	}
+
+	for (int i = 0; i < intrinsics_size; i++) {
+		intrinsics_vector[i] =
+				update.segment<3>((size - 1) * 6 + i * 3).array().exp()
+						* intrinsics_vector[i].array();
+	}
+
+	position_modification_mutex.unlock();
+
+	for (int i = 0; i < intrinsics_size; i++) {
+		std::cerr << "Intrinsics" << std::endl << intrinsics_vector[i]
+				<< std::endl;
+	}
 
 }
 
@@ -495,13 +640,19 @@ void icp_map::save(const std::string & dir_name) {
 
 	}
 
-	std::ofstream f((dir_name + "/positions.txt").c_str());
+	std::ofstream f((dir_name + "/positions.txt").c_str(), std::ios_base::binary);
 	for (size_t i = 0; i < frames.size(); i++) {
 		Eigen::Quaternionf q = frames[i]->get_position().unit_quaternion();
 		Eigen::Vector3f t = frames[i]->get_position().translation();
-		f << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << " "
-				<< t.x() << " " << t.y() << " " << t.z() << std::endl;
+
+		f.write((char *) q.coeffs().data(), sizeof(float)*4);
+		f.write((char *) t.data(), sizeof(float)*3);
+
+		//f << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << " "
+		//		<< t.x() << " " << t.y() << " " << t.z() << std::endl;
 	}
+
+	f.close();
 
 }
 
@@ -509,11 +660,18 @@ void icp_map::load(const std::string & dir_name) {
 
 	std::vector<Sophus::SE3f> positions;
 
-	std::ifstream f((dir_name + "/positions.txt").c_str());
+	std::ifstream f((dir_name + "/positions.txt").c_str(), std::ios_base::binary);
 	while (f) {
 		Eigen::Quaternionf q;
 		Eigen::Vector3f t;
-		f >> q.x() >> q.y() >> q.z() >> q.w() >> t.x() >> t.y() >> t.z();
+
+
+		f.read((char *) q.coeffs().data(),sizeof(float)*4);
+		f.read((char *) t.data(),sizeof(float)*3);
+
+		//std::cerr << "sizeof(q.coeffs().data()) " << sizeof(q.coeffs().data()) << " sizeof(t.data()) " << sizeof(t.data()) << std::endl;
+
+		//f >> q.x() >> q.y() >> q.z() >> q.w() >> t.x() >> t.y() >> t.z();
 		positions.push_back(Sophus::SE3f(q, t));
 	}
 

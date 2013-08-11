@@ -24,6 +24,7 @@
 #include <reduce_jacobian_icp.h>
 #include <reduce_jacobian_icp_p2p.h>
 #include <reduce_jacobian_rgb.h>
+#include <reduce_jacobian_rgb_3d.h>
 
 class icp_map {
 public:
@@ -38,6 +39,8 @@ public:
 	void optimize_p2p();
 	void optimize_rgb(int level);
 	void optimize_rgb_with_intrinsics(int level);
+	void optimize_rgb_3d(int level);
+	void optimize_rgb_3d_with_intrinsics(int level);
 	void set_octomap(RmOctomapServer::Ptr & server);
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();
 	cv::Mat get_panorama_image();

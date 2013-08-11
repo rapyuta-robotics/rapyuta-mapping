@@ -167,8 +167,6 @@ void robot_mapper::capture_sphere() {
 
 	for (int i = 0; i < 18; i++) {
 
-		servo_pub.publish(start_angle);
-
 		move_base_msgs::MoveBaseGoal goal;
 		goal.target_pose.header.frame_id = "camera_rgb_frame";
 		goal.target_pose.header.stamp = ros::Time::now();
@@ -212,9 +210,8 @@ void robot_mapper::capture_sphere() {
 	map.save("icp_map1");
 
 	for (int level = 2; level >= 0; level--) {
-		for (int i = 0; i < (level + 1) * 10; i++) {
-
-			map.optimize_rgb(level);
+		for (int i = 0; i < (level + 1) * (level + 1) * 10; i++) {
+			map.optimize_rgb_with_intrinsics(level);
 
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
 					map.get_map_pointcloud();

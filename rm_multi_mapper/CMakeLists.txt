@@ -7,7 +7,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-#set(ROS_BUILD_TYPE RelWithDebInfo)
+set(ROS_BUILD_TYPE RelWithDebInfo)
 
 rosbuild_init()
 
@@ -33,7 +33,7 @@ find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
 rosbuild_add_library(${PROJECT_NAME} src/robot_mapper.cpp src/icp_map.cpp src/keyframe.cpp
- src/reduce_jacobian_icp.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_icp_p2p.cpp)
+ src/reduce_jacobian_icp.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_icp_p2p.cpp src/reduce_jacobian_rgb_3d.cpp)
 target_link_libraries(${PROJECT_NAME} tbb)
 
 rosbuild_add_executable(multi_mapper src/main.cpp)
@@ -42,8 +42,7 @@ target_link_libraries(multi_mapper ${VTK_LIBRARIES} ${PROJECT_NAME})
 #rosbuild_add_executable(ransac_test src/test.cpp src/robot_mapper.cpp src/keypoint_map.cpp)
 #target_link_libraries(ransac_test cholmod vtkCommon vtkFiltering rm_localization_util)
 
-#rosbuild_add_executable(test2 src/test2.cpp src/robot_mapper.cpp src/keypoint_map.cpp)
-#target_link_libraries(test2 cholmod vtkCommon vtkFiltering rm_localization_util)
+rosbuild_add_executable(test2 src/test2.cpp)
 
 rosbuild_add_executable(ba_demo src/ba_demo.cpp)
 target_link_libraries(ba_demo cholmod)

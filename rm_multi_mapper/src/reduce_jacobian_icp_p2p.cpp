@@ -15,6 +15,7 @@ reduce_jacobian_icp_p2p::reduce_jacobian_icp_p2p(reduce_jacobian_icp_p2p& rb,
 		size(rb.size), frames(rb.frames) {
 	JtJ.setZero(size * 6, size * 6);
 	Jte.setZero(size * 6);
+
 }
 
 void reduce_jacobian_icp_p2p::operator()(
@@ -25,14 +26,11 @@ void reduce_jacobian_icp_p2p::operator()(
 		int i = it->first;
 		int j = it->second;
 
-		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_i_with_normals;
-		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_i, cloud_j;
+		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_i, cloud_j;
 
-		cloud_i_with_normals =
-				frames[i]->get_original_pointcloud_with_normals();
-		cloud_i = frames[i]->get_original_pointcloud();
-		cloud_j = frames[j]->get_transformed_pointcloud(
-				frames[i]->get_position().inverse());
+		cloud_i = frames[i]->get_original_pointcloud_with_normals();
+		cloud_j = frames[j]->get_transformed_pointcloud_with_normals(
+				frames[i]->get_position().inverse() * frames[j]->get_position());
 
 		Eigen::Matrix4f Miw = frames[i]->get_position().inverse().matrix();
 		Eigen::Matrix4f Mwj = frames[j]->get_position().matrix();
@@ -44,11 +42,19 @@ void reduce_jacobian_icp_p2p::operator()(
 
 		croto.getRemainingCorrespondences(cor, cor);
 
+		crsn.setThreshold(0.9);
+		crsn.initializeDataContainer<pcl::PointNormal,pcl::PointNormal>();
+		crsn.setInputCloud<pcl::PointNormal>(cloud_j);
+		crsn.setInputTarget<pcl::PointNormal>(cloud_i);
+		crsn.setInputNormals<pcl::PointNormal,pcl::PointNormal>(cloud_j);
+		crsn.setTargetNormals<pcl::PointNormal,pcl::PointNormal>(cloud_i);
+		crsn.getRemainingCorrespondences(cor, cor);
+
 		for (size_t k = 0; k < cor.size(); k++) {
 			if (cor[k].index_match >= 0) {
-				pcl::PointNormal & pi = cloud_i_with_normals->at(
+				pcl::PointNormal & pi = cloud_i->at(
 						cor[k].index_match);
-				pcl::PointXYZ & pj = cloud_j->at(cor[k].index_query);
+				pcl::PointNormal & pj = cloud_j->at(cor[k].index_query);
 
 				if (std::isfinite(pi.x) && std::isfinite(pi.y)
 						&& std::isfinite(pi.z) && std::isfinite(pi.normal_x)

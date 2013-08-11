@@ -35,12 +35,13 @@ public:
 	pcl::PointCloud<pcl::PointXYZ>::Ptr get_original_pointcloud() const;
 	pcl::PointCloud<pcl::PointNormal>::Ptr get_original_pointcloud_with_normals() const;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr get_transformed_pointcloud(const Sophus::SE3f & transform) const;
+	pcl::PointCloud<pcl::PointNormal>::Ptr get_transformed_pointcloud_with_normals(const Sophus::SE3f & transform) const;
 
 	Sophus::SE3f & get_position();
 	Sophus::SE3f & get_initial_position();
 
-	cv::Mat get_subsampled_intencity(int level);
-	Eigen::Vector3f get_subsampled_intrinsics(int level);
+	cv::Mat get_subsampled_intencity(int level) const;
+	Eigen::Vector3f get_subsampled_intrinsics(int level) const;
 	int get_intrinsics_idx();
 
 	cv::Mat rgb;

@@ -23,7 +23,7 @@ struct reduce_jacobian_icp_p2p {
 
 	tbb::concurrent_vector<keyframe::Ptr> & frames;
 
-	pcl::registration::CorrespondenceEstimation<pcl::PointXYZ, pcl::PointXYZ> ce;
+	pcl::registration::CorrespondenceEstimation<pcl::PointNormal, pcl::PointNormal> ce;
 	pcl::registration::CorrespondenceRejectorOneToOne croto;
 	pcl::registration::CorrespondenceRejectorSurfaceNormal crsn;
 

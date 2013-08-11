@@ -104,82 +104,6 @@ void reduce_jacobian_rgb::compute_frame_jacobian(const Eigen::Vector3f & i,
 					* (Rwj(0, 0) * i(1) + Rwj(0, 1) * i(2) - Rwj(0, 2) * i(0)))
 			/ i(0);
 
-	Jj.coeffRef(0, 0) = (Rwj(1, 0) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
-			- Rwj(2, 0) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))) / i(0);
-	Jj.coeffRef(0, 1) = (-Rwj(0, 0) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
-			+ Rwj(2, 0) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1))) / i(0);
-	Jj.coeffRef(0, 2) = (Rwj(0, 0) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
-			- Rwj(1, 0) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1))) / i(0);
-	Jj.coeffRef(1, 0) = (Rwj(1, 1) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
-			- Rwj(2, 1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))) / i(0);
-	Jj.coeffRef(1, 1) = (-Rwj(0, 1) * (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
-			+ Rwj(2, 1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1))) / i(0);
-	Jj.coeffRef(1, 2) = (Rwj(0, 1) * (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
-			- Rwj(1, 1) * (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1))) / i(0);
-	Jj.coeffRef(2, 0) = (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
-			* (Rwj(2, 0) * i(1) / i(0) + Rwj(2, 1) * i(2) / i(0) - Rwj(2, 2))
-			- (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
-					* (Rwj(1, 0) * i(1) / i(0) + Rwj(1, 1) * i(2) / i(0)
-							- Rwj(1, 2));
-	Jj.coeffRef(2, 1) = -((Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1))
-			* (Rwj(2, 0) * i(1) + Rwj(2, 1) * i(2) - Rwj(2, 2) * i(0))
-			- (Rwi(2, 0) * i(0) + Rwi(2, 2) * i(1))
-					* (Rwj(0, 0) * i(1) + Rwj(0, 1) * i(2) - Rwj(0, 2) * i(0)))
-			/ i(0);
-	Jj.coeffRef(2, 2) = (Rwi(0, 0) * i(0) + Rwi(0, 2) * i(1))
-			* (Rwj(1, 0) * i(1) / i(0) + Rwj(1, 1) * i(2) / i(0) - Rwj(1, 2))
-			- (Rwi(1, 0) * i(0) + Rwi(1, 2) * i(1))
-					* (Rwj(0, 0) * i(1) / i(0) + Rwj(0, 1) * i(2) / i(0)
-							- Rwj(0, 2));
-	Jj.coeffRef(3, 0) = (Rwj(1, 0) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
-			- Rwj(2, 0) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))) / i(0);
-	Jj.coeffRef(3, 1) = (-Rwj(0, 0) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
-			+ Rwj(2, 0) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2))) / i(0);
-	Jj.coeffRef(3, 2) = (Rwj(0, 0) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
-			- Rwj(1, 0) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2))) / i(0);
-	Jj.coeffRef(4, 0) = (Rwj(1, 1) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
-			- Rwj(2, 1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))) / i(0);
-	Jj.coeffRef(4, 1) = (-Rwj(0, 1) * (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
-			+ Rwj(2, 1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2))) / i(0);
-	Jj.coeffRef(4, 2) = (Rwj(0, 1) * (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
-			- Rwj(1, 1) * (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2))) / i(0);
-	Jj.coeffRef(5, 0) = (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
-			* (Rwj(2, 0) * i(1) / i(0) + Rwj(2, 1) * i(2) / i(0) - Rwj(2, 2))
-			- (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
-					* (Rwj(1, 0) * i(1) / i(0) + Rwj(1, 1) * i(2) / i(0)
-							- Rwj(1, 2));
-	Jj.coeffRef(5, 1) = -((Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2))
-			* (Rwj(2, 0) * i(1) + Rwj(2, 1) * i(2) - Rwj(2, 2) * i(0))
-			- (Rwi(2, 1) * i(0) + Rwi(2, 2) * i(2))
-					* (Rwj(0, 0) * i(1) + Rwj(0, 1) * i(2) - Rwj(0, 2) * i(0)))
-			/ i(0);
-	Jj.coeffRef(5, 2) = (Rwi(0, 1) * i(0) + Rwi(0, 2) * i(2))
-			* (Rwj(1, 0) * i(1) / i(0) + Rwj(1, 1) * i(2) / i(0) - Rwj(1, 2))
-			- (Rwi(1, 1) * i(0) + Rwi(1, 2) * i(2))
-					* (Rwj(0, 0) * i(1) / i(0) + Rwj(0, 1) * i(2) / i(0)
-							- Rwj(0, 2));
-	Jj.coeffRef(6, 0) = (-Rwi(1, 2) * Rwj(2, 0) + Rwi(2, 2) * Rwj(1, 0)) / i(0);
-	Jj.coeffRef(6, 1) = (Rwi(0, 2) * Rwj(2, 0) - Rwi(2, 2) * Rwj(0, 0)) / i(0);
-	Jj.coeffRef(6, 2) = (-Rwi(0, 2) * Rwj(1, 0) + Rwi(1, 2) * Rwj(0, 0)) / i(0);
-	Jj.coeffRef(7, 0) = (-Rwi(1, 2) * Rwj(2, 1) + Rwi(2, 2) * Rwj(1, 1)) / i(0);
-	Jj.coeffRef(7, 1) = (Rwi(0, 2) * Rwj(2, 1) - Rwi(2, 2) * Rwj(0, 1)) / i(0);
-	Jj.coeffRef(7, 2) = (-Rwi(0, 2) * Rwj(1, 1) + Rwi(1, 2) * Rwj(0, 1)) / i(0);
-	Jj.coeffRef(8, 0) = (Rwi(1, 2)
-			* (Rwj(2, 0) * i(1) + Rwj(2, 1) * i(2) - Rwj(2, 2) * i(0))
-			- Rwi(2, 2)
-					* (Rwj(1, 0) * i(1) + Rwj(1, 1) * i(2) - Rwj(1, 2) * i(0)))
-			/ i(0);
-	Jj.coeffRef(8, 1) = (-Rwi(0, 2)
-			* (Rwj(2, 0) * i(1) + Rwj(2, 1) * i(2) - Rwj(2, 2) * i(0))
-			+ Rwi(2, 2)
-					* (Rwj(0, 0) * i(1) + Rwj(0, 1) * i(2) - Rwj(0, 2) * i(0)))
-			/ i(0);
-	Jj.coeffRef(8, 2) = (Rwi(0, 2)
-			* (Rwj(1, 0) * i(1) + Rwj(1, 1) * i(2) - Rwj(1, 2) * i(0))
-			- Rwi(1, 2)
-					* (Rwj(0, 0) * i(1) + Rwj(0, 1) * i(2) - Rwj(0, 2) * i(0)))
-			/ i(0);
-
 	Jk.coeffRef(0, 0) = i(1)
 			* (-Rwi(0, 2) * Rwj(0, 0) - Rwi(1, 2) * Rwj(1, 0)
 					- Rwi(2, 2) * Rwj(2, 0)) / i(0);
@@ -278,6 +202,8 @@ void reduce_jacobian_rgb::compute_frame_jacobian(const Eigen::Vector3f & i,
 	Jk.coeffRef(8, 2) = i(2)
 			* (-Rwi(0, 2) * Rwj(0, 1) - Rwi(1, 2) * Rwj(1, 1)
 					- Rwi(2, 2) * Rwj(2, 1)) / i(0);
+
+	Jj = -Ji;
 
 }
 
