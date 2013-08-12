@@ -25,9 +25,9 @@ struct reduce_jacobian_rgb_3d {
 	tbb::concurrent_vector<keyframe::Ptr> & frames;
 	std::vector<Eigen::Vector3f> & intrinsics_vector;
 
-
-	reduce_jacobian_rgb_3d(tbb::concurrent_vector<keyframe::Ptr> & frames, std::vector<Eigen::Vector3f> & intrinsics_vector,
-			int size, int intrinsics_size, int subsample_level);
+	reduce_jacobian_rgb_3d(tbb::concurrent_vector<keyframe::Ptr> & frames,
+			std::vector<Eigen::Vector3f> & intrinsics_vector, int size,
+			int intrinsics_size, int subsample_level);
 
 	reduce_jacobian_rgb_3d(reduce_jacobian_rgb_3d & rb, tbb::split);
 
@@ -36,8 +36,9 @@ struct reduce_jacobian_rgb_3d {
 			Eigen::Matrix<float, 12, 6> & Ji, Eigen::Matrix<float, 12, 6> & Jj,
 			Eigen::Matrix<float, 12, 3> & Jk);
 
-	void warpImage(int i, int j, cv::Mat & intensity_i,
-			cv::Mat & intensity_j, cv::Mat & intensity_j_warped, cv::Mat & idx_j_warped);
+	void warpImage(int i, int j, cv::Mat & intensity_i, cv::Mat & intensity_j,
+			cv::Mat & intensity_j_warped, cv::Mat & intensity_j_warped_x,
+			cv::Mat & intensity_j_warped_y, cv::Mat & depth_j);
 
 	void operator()(
 			const tbb::blocked_range<
@@ -46,6 +47,5 @@ struct reduce_jacobian_rgb_3d {
 	void join(reduce_jacobian_rgb_3d& rb);
 
 };
-
 
 #endif /* REDUCE_JACOBIAN_RGB_3D_H_ */

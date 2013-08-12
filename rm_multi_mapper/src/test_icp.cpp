@@ -11,77 +11,35 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-#include <pcl/point_cloud.h>
+#include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/visualization/pcl_visualizer.h>
 #include <cmath>
 
 #include <icp_map.h>
 
-int main() {
+int main(int argc, char **argv) {
+
+	ros::init(argc, argv, "test_icp");
+	ros::NodeHandle nh;
+
+	ros::Publisher pub = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
+			"/cloudbot0/keypoints", 1);
 
 	icp_map map;
-	map.load("icp_map1_optimized");
+	map.load("icp_map1");
 
 	std::cerr << map.frames.size() << std::endl;
-	//map.frames.resize(map.frames.size() - 21);
-
-	//map.frames.resize(map.frames.size() - 4);
-
-	//cv::imshow("img", map.get_panorama_image() * 255);
-	//cv::waitKey();
-	pcl::visualization::PCLVisualizer vis;
-
-	{
-		vis.removeAllPointClouds();
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
-		pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(
-				cloud);
-		vis.addPointCloud<pcl::PointXYZRGB>(cloud, rgb);
-		vis.spin();
-	}
-
-	/*
 	for (int level = 2; level >= 0; level--) {
 		for (int i = 0; i < (level + 1) * (level + 1) * 10; i++) {
 			map.optimize_rgb_with_intrinsics(level);
-
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
+					map.get_map_pointcloud();
+			cloud->header.frame_id = "/cloudbot0/map";
+			cloud->header.stamp = ros::Time::now();
+			cloud->header.seq = 0;
+			pub.publish(cloud);
 		}
 	}
-
-	//for (int i = 0; i < 10; i++) {
-	//	map.optimize_rgb_with_intrinsics(0);
-	//}
-
-	{
-		vis.removeAllPointClouds();
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
-		pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(
-				cloud);
-		vis.addPointCloud<pcl::PointXYZRGB>(cloud, rgb);
-		vis.spin();
-	}
-
-	map.save("icp_map1_optimized");
-*/
-	cv::imshow("img", map.get_panorama_image() * 255);
-	cv::waitKey();
-
-	for (int i = 0; i < 10; i++) {
-		map.optimize();
-
-		vis.removeAllPointClouds();
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud1 =
-				map.get_map_pointcloud();
-		pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb1(
-				cloud1);
-		vis.addPointCloud<pcl::PointXYZRGB>(cloud1, rgb1);
-
-		vis.spinOnce();
-
-	}
-
-	vis.spin();
 
 	return 0;
 

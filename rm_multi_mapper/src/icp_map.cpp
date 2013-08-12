@@ -353,11 +353,17 @@ void icp_map::optimize_rgb_3d(int level) {
 			level);
 
 
+	/*
 	 tbb::parallel_reduce(
 	 tbb::blocked_range<
 	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
 	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
 	 rj);
+	*/
+
+	rj(tbb::blocked_range<
+	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
 
 	Eigen::VectorXf update =
 			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(
@@ -644,39 +650,60 @@ void icp_map::save(const std::string & dir_name) {
 	for (size_t i = 0; i < frames.size(); i++) {
 		Eigen::Quaternionf q = frames[i]->get_position().unit_quaternion();
 		Eigen::Vector3f t = frames[i]->get_position().translation();
+		int intrinsics_idx = frames[i]->get_intrinsics_idx();
 
 		f.write((char *) q.coeffs().data(), sizeof(float)*4);
 		f.write((char *) t.data(), sizeof(float)*3);
+		f.write((char *) &intrinsics_idx, sizeof(int));
 
 		//f << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << " "
 		//		<< t.x() << " " << t.y() << " " << t.z() << std::endl;
 	}
-
 	f.close();
+
+
+	std::ofstream f1((dir_name + "/intrinsics.txt").c_str(), std::ios_base::binary);
+	for (size_t i = 0; i < intrinsics_vector.size(); i++) {
+		Eigen::Vector3f intrinsics = intrinsics_vector[i];
+		f1.write((char *) intrinsics.data(), sizeof(float)*3);
+	}
+	f1.close();
 
 }
 
 void icp_map::load(const std::string & dir_name) {
 
-	std::vector<Sophus::SE3f> positions;
+	std::vector<std::pair<Sophus::SE3f, int> > positions;
 
 	std::ifstream f((dir_name + "/positions.txt").c_str(), std::ios_base::binary);
 	while (f) {
 		Eigen::Quaternionf q;
 		Eigen::Vector3f t;
-
+		int intrinsics_idx;
 
 		f.read((char *) q.coeffs().data(),sizeof(float)*4);
 		f.read((char *) t.data(),sizeof(float)*3);
+		f.read((char *) &intrinsics_idx, sizeof(int));
 
 		//std::cerr << "sizeof(q.coeffs().data()) " << sizeof(q.coeffs().data()) << " sizeof(t.data()) " << sizeof(t.data()) << std::endl;
 
 		//f >> q.x() >> q.y() >> q.z() >> q.w() >> t.x() >> t.y() >> t.z();
-		positions.push_back(Sophus::SE3f(q, t));
+		positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics_idx));
 	}
 
 	positions.pop_back();
 	std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
+
+
+	std::ifstream f1((dir_name + "/intrinsics.txt").c_str(), std::ios_base::binary);
+	intrinsics_vector.clear();
+	while (f1) {
+		Eigen::Vector3f intrinsics;
+		f1.read((char *) intrinsics.data(),sizeof(float)*3);
+		intrinsics_vector.push_back(intrinsics);
+	}
+	intrinsics_vector.pop_back();
+	std::cerr << "Loaded " << intrinsics_vector.size() << " intrinsics" << std::endl;
 
 	for (size_t i = 0; i < positions.size(); i++) {
 		cv::Mat rgb = cv::imread(
@@ -687,7 +714,7 @@ void icp_map::load(const std::string & dir_name) {
 						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
 
 		keyframe::Ptr k(
-				new keyframe(rgb, depth, positions[i], intrinsics_vector, 0));
+				new keyframe(rgb, depth, positions[i].first, intrinsics_vector, positions[i].second));
 		frames.push_back(k);
 	}
 

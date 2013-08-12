@@ -276,7 +276,8 @@ void reduce_jacobian_rgb_3d::compute_frame_jacobian(const Eigen::Vector3f & i,
 
 void reduce_jacobian_rgb_3d::warpImage(int i, int j, cv::Mat & intensity_i,
 		cv::Mat & intensity_j, cv::Mat & intensity_j_warped,
-		cv::Mat & idx_j_warped) {
+		cv::Mat & intensity_j_warped_x, cv::Mat & intensity_j_warped_y,
+		cv::Mat & depth_j) {
 
 	int subsample_scale = 1 << subsample_level;
 
@@ -286,49 +287,62 @@ void reduce_jacobian_rgb_3d::warpImage(int i, int j, cv::Mat & intensity_i,
 			subsample_level);
 	intensity_i = frames[i]->get_subsampled_intencity(subsample_level);
 	intensity_j = frames[j]->get_subsampled_intencity(subsample_level);
-	cv::Mat & depth_j = frames[j]->depth;
+	cv::Mat & depth_i = frames[i]->depth;
 
-	Sophus::SE3f Mij = frames[i]->get_position().inverse()
-			* frames[j]->get_position();
+	Sophus::SE3f Mji = frames[j]->get_position().inverse()
+			* frames[i]->get_position();
 
-	cv::Mat depth_j_warped = cv::Mat(intensity_j.size(), depth_j.type());
-	intensity_j_warped = cv::Mat(intensity_j.size(), intensity_j.type());
-	idx_j_warped = cv::Mat(intensity_j.size(), CV_16SC2);
-	depth_j_warped.setTo(0);
-	intensity_j_warped.setTo(0);
-	idx_j_warped.setTo(cv::Vec2s(-1, -1));
+	depth_j = cv::Mat(intensity_j.size(), CV_32F);
+	depth_j.setTo(std::numeric_limits<float>::quiet_NaN());
 
-	for (int v = 0; v < intensity_j.rows; v++) {
-		for (int u = 0; u < intensity_j.cols; u++) {
-			int depth_u = (u + 0.5) * subsample_scale;
-			int depth_v = (v + 0.5) * subsample_scale;
+	cv::Mat idx_j = cv::Mat(intensity_j.size(), CV_16SC2);
+	idx_j.setTo(cv::Vec2s(-1, -1));
 
-			if (depth_j.at<unsigned short>(depth_v, depth_u) != 0) {
-				pcl::PointXYZ p;
-				p.z = depth_j.at<unsigned short>(depth_v, depth_u) / 1000.0f;
-				p.x = (u - intrinsics_j[1]) * p.z / intrinsics_j[0];
-				p.y = (v - intrinsics_j[2]) * p.z / intrinsics_j[0];
+	intensity_j_warped_x = cv::Mat(intensity_i.size(), CV_32F);
+	intensity_j_warped_y = cv::Mat(intensity_i.size(), CV_32F);
+	intensity_j_warped_x.setTo(-1);
+	intensity_j_warped_y.setTo(-1);
 
-				p.getVector3fMap() = Mij * p.getVector3fMap();
-				int u_i = p.x * intrinsics_i[0] / p.z + intrinsics_i[1];
-				int v_i = p.y * intrinsics_i[0] / p.z + intrinsics_i[2];
+	for (int vi = 0; vi < intensity_i.rows; vi++) {
+		for (int ui = 0; ui < intensity_i.cols; ui++) {
+			int depth_ui = (ui + 0.5) * subsample_scale;
+			int depth_vi = (vi + 0.5) * subsample_scale;
 
-				if (u_i >= 0 && u_i < intensity_j_warped.cols && v_i >= 0
-						&& v_i < intensity_j_warped.rows) {
-					unsigned short d = p.z * 1000.0f;
+			if (depth_i.at<unsigned short>(depth_vi, depth_ui) != 0) {
+				pcl::PointXYZ pi, pj;
+				pi.z = depth_i.at<unsigned short>(depth_vi, depth_ui) / 1000.0f;
+				pi.x = (ui - intrinsics_i[1]) * pi.z / intrinsics_i[0];
+				pi.y = (vi - intrinsics_i[2]) * pi.z / intrinsics_i[0];
 
-					if (depth_j_warped.at<unsigned short>(v_i, u_i) == 0
-							|| depth_j_warped.at<unsigned short>(v_i, u_i)
-									> d) {
-						//std::cerr << "Writing to depth_j_warped (" << v_i << "," << u_i << ")" << std::endl;
-						depth_j_warped.at<unsigned short>(v_i, u_i) = d;
+				pj.getVector3fMap() = Mji * pi.getVector3fMap();
+				float uj_f = pj.x * intrinsics_j[0] / pj.z + intrinsics_j[1];
+				float vj_f = pj.y * intrinsics_j[0] / pj.z + intrinsics_j[2];
 
-						//std::cerr << "Writing to intensity_j_warped (" << v_i << "," << u_i << ") from intensity_j (" << v << "," << u << ")" << std::endl;
-						intensity_j_warped.at<float>(v_i, u_i) = intensity_j.at<
-								float>(v, u);
+				int uj = uj_f;
+				int vj = vj_f;
 
-						//std::cerr << "Writing to idx_j_warped (" << v_i << "," << u_i << ") value (" << v << "," << u << ")" << std::endl;
-						idx_j_warped.at<cv::Vec2s>(v_i, u_i) = cv::Vec2s(v, u);
+				if (uj >= 0 && uj < intensity_j.cols && vj >= 0
+						&& vj < intensity_j.rows) {
+
+					float current_depth_j = depth_j.at<float>(vj, uj);
+					if (std::isnan(current_depth_j) || current_depth_j > pj.z) {
+						//std::cerr << "Writing point at (" << vj << "," << uj << ")" << std::endl;
+						cv::Vec2s idx_i = idx_j.at<cv::Vec2s>(vj, uj);
+						if (idx_i[0] >= 0 && idx_i[1] >= 0) {
+							//std::cerr << "Removing point at (" << vj << "," << uj << ")" << std::endl;
+							intensity_j_warped_x.at<float>(idx_i[0], idx_i[1]) =
+									-1;
+							intensity_j_warped_y.at<float>(idx_i[0], idx_i[1]) =
+									-1;
+							depth_j.at<float>(idx_i[0], idx_i[1]) =
+									std::numeric_limits<float>::quiet_NaN();
+						}
+
+						depth_j.at<float>(vj, uj) = pj.z;
+						intensity_j_warped_x.at<float>(vi, ui) = uj_f;
+						intensity_j_warped_y.at<float>(vi, ui) = vj_f;
+						idx_j.at<cv::Vec2s>(vj, uj) = cv::Vec2s(vi, ui);
+
 					}
 				}
 
@@ -336,6 +350,12 @@ void reduce_jacobian_rgb_3d::warpImage(int i, int j, cv::Mat & intensity_i,
 		}
 	}
 
+	//cv::FileStorage fs("test.yml", cv::FileStorage::WRITE);
+	//fs << "intensity_j_warped_x" << intensity_j_warped_x << "intensity_j_warped_y" << intensity_j_warped_y;
+	//fs.release();
+
+	cv::remap(intensity_j, intensity_j_warped, intensity_j_warped_x,
+			intensity_j_warped_y, CV_INTER_LINEAR, cv::BORDER_TRANSPARENT, 0);
 
 }
 
@@ -347,21 +367,27 @@ void reduce_jacobian_rgb_3d::operator()(
 		int i = it->first;
 		int j = it->second;
 
-		cv::Mat intensity_i, intensity_j, intensity_j_warped, idx_j_warped,
-				intensity_i_dx, intensity_i_dy;
+		cv::Mat intensity_i, intensity_j, intensity_j_warped,
+				intensity_j_warped_x, intensity_j_warped_y, intensity_i_dx,
+				intensity_i_dy, depth_j;
 
 		warpImage(i, j, intensity_i, intensity_j, intensity_j_warped,
-				idx_j_warped);
+				intensity_j_warped_x, intensity_j_warped_y, depth_j);
 
-		//std::cerr << "intensity_i " << intensity_i.size() << " " << intensity_i.type() << std::endl;
-		//std::cerr << "intensity_j " << intensity_j.size() << " " << intensity_j.type() << std::endl;
-		//std::cerr << "intensity_j_warped " << intensity_j_warped.size() << " " << intensity_j_warped.type() << std::endl;
+		/*
+		std::cerr << "intensity_i " << intensity_i.size() << " "
+				<< intensity_i.type() << std::endl;
+		std::cerr << "intensity_j " << intensity_j.size() << " "
+				<< intensity_j.type() << std::endl;
+		std::cerr << "intensity_j_warped " << intensity_j_warped.size() << " "
+				<< intensity_j_warped.type() << std::endl;
 
-		//cv::imshow("intensity_i", intensity_i);
-		//cv::imshow("intensity_j", intensity_j);
-		//cv::imshow("intensity_j_warped", intensity_j_warped);
-		//cv::waitKey();
-
+		cv::imshow("intensity_i", intensity_i);
+		cv::imshow("intensity_j", intensity_j);
+		cv::imshow("intensity_j_warped", intensity_j_warped);
+		cv::imshow("depth_j", depth_j);
+		cv::waitKey();
+		*/
 
 		intensity_i_dx = cv::Mat(intensity_i.size(), intensity_i.type());
 		intensity_i_dy = cv::Mat(intensity_i.size(), intensity_i.type());
@@ -389,71 +415,71 @@ void reduce_jacobian_rgb_3d::operator()(
 			for (int vi = 0; vi < intensity_i.rows; vi++) {
 				for (int ui = 0; ui < intensity_i.cols; ui++) {
 
-					cv::Vec2s uvj = idx_j_warped.at<cv::Vec2s>(vi, ui);
-					if (uvj[0] >= 0 && uvj[1] >= 0) {
+					float uj = intensity_j_warped_x.at<float>(vi, ui);
+					float vj = intensity_j_warped_y.at<float>(vi, ui);
+					if (vj >= 0 && uj >= 0) {
+						float dj = depth_j.at<float>((int) vj, (int) uj);
+						if (std::isfinite(dj)) {
 
-						float e = error.at<float>(vi, ui);
+							float e = error.at<float>(vi, ui);
 
-						float dx_i = intensity_i_dx.at<float>(vi, ui);
-						float dy_i = intensity_i_dy.at<float>(vi, ui);
-						float vj = uvj[0];
-						float uj = uvj[1];
+							float dx_i = intensity_i_dx.at<float>(vi, ui);
+							float dy_i = intensity_i_dy.at<float>(vi, ui);
 
-						int subsample_scale = 1 << subsample_level;
-						int depth_u = (uj + 0.5) * subsample_scale;
-						int depth_v = (vj + 0.5) * subsample_scale;
-						float dj = frames[j]->depth.at<unsigned short>(depth_v, depth_u) / 1000.0f;
+							Eigen::Matrix<float, 1, 12> Jp;
+							Jp << dj * dx_i * uj, dj * dx_i * vj, dj * dx_i, dx_i, dj
+									* dy_i * uj, dj * dy_i * vj, dj * dy_i, dy_i, dj
+									* uj * (-dx_i * ui - dy_i * vi), dj * vj
+									* (-dx_i * ui - dy_i * vi), dj
+									* (-dx_i * ui - dy_i * vi), -dx_i * ui
+									- dy_i * vi;
 
-						Eigen::Matrix<float, 1, 12> Jp;
-						Jp << dj * dx_i * uj, dj * dx_i * vj, dj * dx_i, dx_i, dj
-								* dy_i * uj, dj * dy_i * vj, dj * dy_i, dy_i, dj
-								* uj * (-dx_i * ui - dy_i * vi), dj * vj
-								* (-dx_i * ui - dy_i * vi), dj
-								* (-dx_i * ui - dy_i * vi), -dx_i * ui
-								- dy_i * vi;
+							Eigen::Matrix<float, 1, 6> Ji, Jj;
+							Eigen::Matrix<float, 1, 3> Jk;
+							Ji = Jp * Jwi;
+							Jj = Jp * Jwj;
+							Jk = Jp * Jwk;
 
-						Eigen::Matrix<float, 1, 6> Ji, Jj;
-						Eigen::Matrix<float, 1, 3> Jk;
-						Ji = Jp * Jwi;
-						Jj = Jp * Jwj;
-						Jk = Jp * Jwk;
+							int i_idx = i * 6;
+							int j_idx = j * 6;
+							int k_idx = size * 6 + ki * 3;
 
-						int i_idx = i * 6;
-						int j_idx = j * 6;
-						int k_idx = size * 6 + ki*3;
+							//
+							JtJ.block<6, 6>(i_idx, i_idx) += Ji.transpose()
+									* Ji;
+							JtJ.block<6, 6>(j_idx, j_idx) += Jj.transpose()
+									* Jj;
+							JtJ.block<3, 3>(k_idx, k_idx) += Jk.transpose()
+									* Jk;
+							// i and j
+							JtJ.block<6, 6>(i_idx, j_idx) += Ji.transpose()
+									* Jj;
+							JtJ.block<6, 6>(j_idx, i_idx) += Jj.transpose()
+									* Ji;
 
-						//
-						JtJ.block<6, 6>(i_idx, i_idx) += Ji.transpose() * Ji;
-						JtJ.block<6, 6>(j_idx, j_idx) += Jj.transpose() * Jj;
-						JtJ.block<3, 3>(k_idx, k_idx) +=
-								Jk.transpose() * Jk;
-						// i and j
-						JtJ.block<6, 6>(i_idx, j_idx) += Ji.transpose() * Jj;
-						JtJ.block<6, 6>(j_idx, i_idx) += Jj.transpose() * Ji;
+							// i and k
+							JtJ.block<6, 3>(i_idx, k_idx) += Ji.transpose()
+									* Jk;
+							JtJ.block<3, 6>(k_idx, i_idx) += Jk.transpose()
+									* Ji;
 
-						// i and k
-						JtJ.block<6, 3>(i_idx, k_idx) += Ji.transpose()
-								* Jk;
-						JtJ.block<3, 6>(k_idx, i_idx) += Jk.transpose()
-								* Ji;
+							// j and k
+							JtJ.block<3, 6>(k_idx, j_idx) += Jk.transpose()
+									* Jj;
+							JtJ.block<6, 3>(j_idx, k_idx) += Jj.transpose()
+									* Jk;
 
-						// j and k
-						JtJ.block<3, 6>(k_idx, j_idx) += Jk.transpose()
-								* Jj;
-						JtJ.block<6, 3>(j_idx, k_idx) += Jj.transpose()
-								* Jk;
+							// errors
+							Jte.segment<6>(i_idx) += Ji.transpose() * e;
+							Jte.segment<6>(j_idx) += Jj.transpose() * e;
+							Jte.segment<3>(k_idx) += Jk.transpose() * e;
 
-						// errors
-						Jte.segment<6>(i_idx) += Ji.transpose() * e;
-						Jte.segment<6>(j_idx) += Jj.transpose() * e;
-						Jte.segment<3>(k_idx) += Jk.transpose() * e;
-
+						}
 					}
 
 				}
 			}
 		}
-
 
 	}
 }
