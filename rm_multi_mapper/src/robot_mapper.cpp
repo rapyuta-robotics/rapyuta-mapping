@@ -36,6 +36,9 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 	set_intial_pose = nh.serviceClient<rm_localization::SetInitialPose>(
 			prefix + "/set_initial_pose");
 
+	set_calibration = nh.serviceClient<sensor_msgs::SetCameraInfo>(
+				prefix + "/rgb/set_camera_info");
+
 	visualization_offset = Eigen::Vector3f(0, robot_num * 20, 0);
 
 	/*
@@ -269,15 +272,26 @@ void robot_mapper::capture_sphere() {
 	p.pose.pose.orientation.w = orient.w();
 
 	p.pose.covariance = { {
-			0.1, 0.0, 0.0, 0.0, 0.0, 0.0,
-			0.0, 0.1, 0.0, 0.0, 0.0, 0.0,
+			0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+			0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
 			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-			0.0, 0.0,0.0, 0.0, 0.0, 0.06853891945200942}};
+			0.0, 0.0,0.0, 0.0, 0.0, 0.01}};
 
 	sleep(3);
 	pub_position_update.publish(p);
+
+	sensor_msgs::SetCameraInfo camera_info;
+	camera_info.request.camera_info.K = { { map.intrinsics_vector[0][0], 0, map.intrinsics_vector[0][1],
+			0, map.intrinsics_vector[0][0], map.intrinsics_vector[0][2],
+			0, 0, 0} };
+
+	camera_info.request.camera_info.P = {{ map.intrinsics_vector[0][0], 0, map.intrinsics_vector[0][1], 0,
+			0, map.intrinsics_vector[0][0], map.intrinsics_vector[0][2], 0,
+			0, 0, 0, 0}};
+
+	set_calibration.call(camera_info);
 
 }
 
@@ -345,11 +359,11 @@ void robot_mapper::move_to_random_point() {
 
 	//while (true) {
 	move_base_msgs::MoveBaseGoal goal;
-	goal.target_pose.header.frame_id = "base_link";
+	goal.target_pose.header.frame_id = prefix + "/map";
 	goal.target_pose.header.stamp = ros::Time::now();
 
-	goal.target_pose.pose.position.x = 0; //(((float) rand()) / RAND_MAX - 0.5);
-	goal.target_pose.pose.position.y = 1; //(((float) rand()) / RAND_MAX - 0.5);
+	goal.target_pose.pose.position.x = 1; //(((float) rand()) / RAND_MAX - 0.5);
+	goal.target_pose.pose.position.y = 0; //(((float) rand()) / RAND_MAX - 0.5);
 	goal.target_pose.pose.position.z = 0;
 
 	tf::Quaternion q;

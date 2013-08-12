@@ -9,6 +9,7 @@
 #define ICP_MAP_H_
 
 #include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
 #include <pcl_ros/point_cloud.h>
@@ -43,7 +44,11 @@ public:
 	void optimize_rgb_3d_with_intrinsics(int level);
 	void set_octomap(RmOctomapServer::Ptr & server);
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();
-	cv::Mat get_panorama_image();
+	void get_panorama_image(cv::Mat & res, cv::Mat & res_depth);
+	void get_panorama_features(cv::Mat & gray, cv::Mat & depth, std::vector<cv::KeyPoint> & filtered_keypoints,
+			pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors);
+
+	bool merge(icp_map & other);
 
 	void align_z_axis();
 

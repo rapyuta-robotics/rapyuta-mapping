@@ -28,6 +28,7 @@
 
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/SetCameraInfo.h>
 
 #include <tf/transform_broadcaster.h>
 #include <pcl_ros/publisher.h>
@@ -71,6 +72,7 @@ public:
 	ros::ServiceClient clear_costmaps_client;
 	ros::ServiceClient set_map_client;
 	ros::ServiceClient set_intial_pose;
+	ros::ServiceClient set_calibration;
 	ros::Publisher servo_pub;
 	ros::Publisher pub_keypoints;
 	ros::Publisher pub_cloud;

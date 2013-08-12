@@ -60,7 +60,22 @@ int main(int argc, char **argv) {
 
 	boost::thread t(publishTf);
 
-	//while (true) {
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(
+				boost::bind(&robot_mapper::capture_sphere,
+						robot_mappers[i].get()));
+	}
+
+	tg.join_all();
+
+
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(
+				boost::bind(&robot_mapper::move_to_random_point,
+						robot_mappers[i].get()));
+	}
+	tg.join_all();
+
 	for (int i = 0; i < num_robots; i++) {
 		tg.create_thread(
 				boost::bind(&robot_mapper::capture_sphere,
@@ -69,7 +84,6 @@ int main(int argc, char **argv) {
 	tg.join_all();
 
 
-	//}
 
 	return 0;
 }
