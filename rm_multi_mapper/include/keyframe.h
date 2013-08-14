@@ -22,7 +22,7 @@ public:
 	typedef boost::shared_ptr<keyframe> Ptr;
 
 	keyframe(const cv::Mat & rgb, const cv::Mat & depth,
-			const Sophus::SE3f & position, std::vector<Eigen::Vector3f> & intrinsics_vector, int intrinsics_idx);
+			const Sophus::SE3f & position, std::vector<Eigen::Vector3f> & intrinsics_vector, int intrinsics_idx, int max_level = 3);
 
 	Eigen::Vector3f get_centroid() const;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud() const;
@@ -40,15 +40,23 @@ public:
 	Sophus::SE3f & get_position();
 	Sophus::SE3f & get_initial_position();
 
+	void build_pyr();
 	cv::Mat get_subsampled_intencity(int level) const;
+	cv::Mat get_subsampled_intencity_dx(int level) const;
+	cv::Mat get_subsampled_intencity_dy(int level) const;
 	Eigen::Vector3f get_subsampled_intrinsics(int level) const;
 	int get_intrinsics_idx();
 
 	cv::Mat rgb;
 	cv::Mat depth;
-	cv::Mat intencity;
+
+	cv::Mat intencity_pyr;
+	cv::Mat intencity_pyr_dx;
+	cv::Mat intencity_pyr_dy;
 
 protected:
+	int max_level;
+
 	Sophus::SE3f position;
 	Sophus::SE3f initial_position;
 	Eigen::Vector3f centroid;

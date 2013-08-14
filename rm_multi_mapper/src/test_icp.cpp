@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
 			"/cloudbot0/keypoints", 1);
 
 	icp_map map;
-	map.load("icp_map_good3");
+	map.load("icp_map_good1");
 
 	std::cerr << map.frames.size() << std::endl;
 	for (int level = 2; level >= 0; level--) {
 		for (int i = 0; i < (level + 1) * (level + 1) * 12; i++) {
-			map.optimize_rgb_3d(level);
+			map.optimize_rgb_with_intrinsics(level);
 			//map.optimize_rgb_3d_with_intrinsics(level);
 			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
 					map.get_map_pointcloud();
@@ -52,7 +52,12 @@ int main(int argc, char **argv) {
 		pub.publish(cloud);
 	}
 
-	map.save("icp_map_good3_optimized");
+	cv::Mat img, depth;
+	map.get_panorama_image(img, depth);
+	cv::imshow("img", img);
+	cv::waitKey();
+
+	map.save("icp_map_merged_optimized");
 
 	return 0;
 

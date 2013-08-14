@@ -1,4 +1,3 @@
-
 #include <reduce_jacobian_rgb.h>
 #include <opencv2/imgproc/imgproc.hpp>
 
@@ -247,8 +246,10 @@ void reduce_jacobian_rgb::operator()(
 		//cv::imshow("intensity_j_warped", intensity_j_warped);
 		//cv::waitKey();
 
-		cv::Sobel(intensity_i, intensity_i_dx, CV_32F, 1, 0);
-		cv::Sobel(intensity_i, intensity_i_dy, CV_32F, 0, 1);
+		intensity_i_dx = frames[i]->get_subsampled_intencity_dx(
+				subsample_level);
+		intensity_i_dy = frames[i]->get_subsampled_intencity_dy(
+				subsample_level);
 
 		cv::Mat error = intensity_i - intensity_j_warped;
 

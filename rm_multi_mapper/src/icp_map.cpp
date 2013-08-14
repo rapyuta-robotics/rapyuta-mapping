@@ -475,7 +475,7 @@ void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth) {
 			img_projected(res.size(), res.type()), mask(res.size(), res.type()),
 			depth_projected(res.size(), res.type());
 
-	cv::Mat image_weight(frames[0]->intencity.size(), res.type()),
+	cv::Mat image_weight(frames[0]->rgb.size(), res.type()),
 			intencity_weighted(image_weight.size(), image_weight.type());
 	cv::Mat depth_weight(image_weight.size(), image_weight.type()),
 			depth_weighted(image_weight.size(), image_weight.type());
@@ -541,7 +541,7 @@ void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth) {
 
 		img_projected = 0.0f;
 		mask = 0.0f;
-		cv::multiply(frames[i]->intencity, image_weight, intencity_weighted);
+		cv::multiply(frames[i]->get_subsampled_intencity(0), image_weight, intencity_weighted);
 		cv::multiply(frames[i]->depth, depth_weight, depth_weighted, 1 / 1000.0,
 				CV_32F);
 		cv::remap(intencity_weighted, img_projected, map_x, map_y,
@@ -684,7 +684,7 @@ bool icp_map::merge(icp_map & other) {
 
 		for(int i=0; i<other.frames.size(); i++) {
 			other.frames[i]->get_position() = t * other.frames[i]->get_position();
-			frames.push_back(frames[i]);
+			frames.push_back(other.frames[i]);
 		}
 
 
@@ -801,6 +801,7 @@ void icp_map::save(const std::string & dir_name) {
 	boost::filesystem::create_directory(dir_name + "/intencity");
 	boost::filesystem::create_directory(dir_name + "/intencity_sub_1");
 	boost::filesystem::create_directory(dir_name + "/intencity_sub_2");
+	boost::filesystem::create_directory(dir_name + "/intencity_pyr");
 
 	for (size_t i = 0; i < frames.size(); i++) {
 		cv::imwrite(
@@ -812,7 +813,7 @@ void icp_map::save(const std::string & dir_name) {
 
 		cv::imwrite(
 				dir_name + "/intencity/" + boost::lexical_cast<std::string>(i)
-						+ ".png", frames[i]->intencity * 255);
+						+ ".png", frames[i]->get_subsampled_intencity(0) * 255);
 
 		cv::imwrite(
 				dir_name + "/intencity_sub_1/"
@@ -823,6 +824,11 @@ void icp_map::save(const std::string & dir_name) {
 				dir_name + "/intencity_sub_2/"
 						+ boost::lexical_cast<std::string>(i) + ".png",
 				frames[i]->get_subsampled_intencity(2) * 255);
+
+		cv::imwrite(
+						dir_name + "/intencity_pyr/"
+								+ boost::lexical_cast<std::string>(i) + ".png",
+						frames[i]->intencity_pyr * 255);
 
 	}
 
