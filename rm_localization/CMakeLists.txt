@@ -28,5 +28,12 @@ rosbuild_gensrv()
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
 
-rosbuild_add_executable(localization src/main.cpp src/util.cpp)
+find_package(VTK REQUIRED)
+include_directories(${VTK_INCLUDE_DIRS})
+
+rosbuild_add_executable(localization src/main.cpp src/util.cpp src/frame.cpp src/keyframe.cpp)
+target_link_libraries(localization tbb ${VTK_LIBRARIES})
+
+
+
 rosbuild_add_library(rm_localization_util src/util.cpp)

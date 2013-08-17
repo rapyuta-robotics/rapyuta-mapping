@@ -15,15 +15,15 @@
  fd = new cv::SurfFeatureDetector;
 
  fd->setInt("hessianThreshold", 400);
- fd->setInt("extended", 1);
+ fd->setInt("extended",1);
  fd->setInt("upright", 1);
- //fd->setInt("nOctaves", 1);
- //fd->setInt("nOctaveLayers", 1);
+ fd->setInt("nOctaves", 8);
+ fd->setInt("nOctaveLayers", 2);
 
  de->setInt("extended", 1);
  de->setInt("upright", 1);
- //de->setInt("nOctaves", 1);
- //de->setInt("nOctaveLayers", 1);
+ de->setInt("nOctaves", 8);
+ de->setInt("nOctaveLayers", 2);
 
  }
 

@@ -21,7 +21,11 @@
 #include <tf_conversions/tf_eigen.h>
 #include <eigen_conversions/eigen_msg.h>
 
+#include <pcl/visualization/pcl_visualizer.h>
+
 #include <util.h>
+#include <frame.h>
+#include <keyframe.h>
 
 class CaptureServer {
 protected:
@@ -64,10 +68,14 @@ protected:
 
 	Eigen::Vector3f offset;
 
+	keyframe::Ptr k;
+	Sophus::SE3f Mwc;
+
 public:
 
 	CaptureServer() :
-			nh_private("~") {
+			nh_private("~"), Mwc(Eigen::Quaternionf::Identity(),
+					Eigen::Vector3f::Zero()) {
 
 		ROS_INFO("Creating localization");
 
@@ -98,131 +106,55 @@ public:
 		set_initial_pose = nh_.advertiseService("set_initial_pose",
 				&CaptureServer::SetInitialPose, this);
 
-		boost::thread t(boost::bind(&CaptureServer::publishTf, this));
-
 	}
 
 	~CaptureServer(void) {
 	}
 
 	bool SetInitialPose(rm_localization::SetInitialPose::Request &req,
-				rm_localization::SetInitialPose::Response &res) {
+			rm_localization::SetInitialPose::Response &res) {
 
-		tf::transformMsgToTF(req.pose, map_to_odom);
-
-		return true;
 	}
 
 	bool SetMapCallback(rm_localization::SetMap::Request &req,
 			rm_localization::SetMap::Response &res) {
 
-
-		m.lock();
-		std::vector<cv::Mat> map_desc_vec(1);
-		cv_bridge::CvImagePtr descriptors = cv_bridge::toCvCopy(
-				req.descriptors);
-		map_descriptors = descriptors->image;
-		pcl::fromROSMsg(req.keypoints3d, map_keypoints3d);
-
-		map_desc_vec[0] = map_descriptors;
-		dm->clear();
-		dm->add(map_desc_vec);
-		dm->train();
-
-		Eigen::Vector3d vec;
-		tf::pointMsgToEigen(req.offset, vec);
-		offset = vec.cast<float>();
-
-		m.unlock();
-
-		ROS_INFO("Recieved map with %d points and %d descriptors",
-				map_keypoints3d.size(), map_descriptors.rows);
-
-		return true;
 	}
 
 	void RGBDCallback(const sensor_msgs::Image::ConstPtr& yuv2_msg,
 			const sensor_msgs::Image::ConstPtr& depth_msg,
 			const sensor_msgs::CameraInfo::ConstPtr& info_msg) {
 
-		//ROS_INFO("Recieved frame");
-
-		if (map_keypoints3d.size() < 10) {
-			return;
-		}
-
-		cv_bridge::CvImageConstPtr rgb = cv_bridge::toCvCopy(yuv2_msg,
-				sensor_msgs::image_encodings::MONO8);
+		cv_bridge::CvImageConstPtr yuv2 = cv_bridge::toCvShare(yuv2_msg);
 		cv_bridge::CvImageConstPtr depth = cv_bridge::toCvShare(depth_msg);
 
-		intrinsics << 525.0, 525.0, 319.5, 239.5;
+		if (k.get()) {
 
-		std::vector<cv::KeyPoint> keypoints;
+			frame f(yuv2->image, depth->image, Mwc);
+			k->estimate_position(f);
+			Mwc = f.get_pos();
 
-		pcl::PointCloud<pcl::PointXYZ> keypoints3d;
-		cv::Mat descriptors;
-		compute_features(rgb->image, depth->image, intrinsics, fd, de,
-				keypoints, keypoints3d, descriptors);
+			tf::Transform cam_to_world;
 
-		std::vector<cv::DMatch> matches;
-		m.lock();
-		dm->match(descriptors, matches);
-		m.unlock();
+			Eigen::Affine3d t(Mwc.cast<double>().matrix());
+			tf::transformEigenToTF(t, cam_to_world);
 
-		Eigen::Affine3f transform;
-		std::vector<bool> inliers;
-
-		bool res = estimate_transform_ransac(keypoints3d, map_keypoints3d,
-				matches, 300, 0.03 * 0.03, 20, transform, inliers);
-
-		if (res) {
-
-			ROS_INFO("Transformation computation successfull");
-
-			tf::StampedTransform map_to_cam;
-			try {
-				listener.lookupTransform(map_frame, yuv2_msg->header.frame_id,
-						yuv2_msg->header.stamp, map_to_cam);
-			} catch (tf::TransformException ex) {
-				ROS_ERROR("%s", ex.what());
-			}
-
-
-			tf::Transform map_to_cam_new;
-			tf::transformEigenToTF(transform.cast<double>(), map_to_cam_new);
-
-			map_to_odom = map_to_cam_new * map_to_cam.inverse() * map_to_odom;
-
-
-
-			// leave xy translation and z rotation only;
-			tf::Quaternion orientation = map_to_odom.getRotation();
-			double roll, pitch, yaw;
-			tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-			orientation.setEuler(0, 0, yaw);
-			tf::Vector3 translation = map_to_odom.getOrigin();
-			translation.setZ(0);
-
-
-
-			map_to_odom.setRotation(orientation);
-			map_to_odom.setOrigin(translation);
+			br.sendTransform(
+					tf::StampedTransform(cam_to_world, ros::Time::now(),
+							"/world",
+							"/camera_rgb_optical_frame"));
 
 		} else {
-			ROS_INFO("Transformation computation unsuccessfull");
+			Eigen::Vector3f intrinsics(525.0, 319.5, 239.5);
+			intrinsics /= 2;
+
+			k.reset(new keyframe(yuv2->image, depth->image, Mwc, intrinsics));
+
 		}
 
-	}
-
-	void publishTf() {
-
-		while (true) {
-			br.sendTransform(
-					tf::StampedTransform(map_to_odom, ros::Time::now(), map_frame,
-							odom_frame));
-			//ROS_INFO("Published map odom transform");
-			usleep(33000);
-		}
+		//vis.removeAllPointClouds();
+		//vis.addPointCloud<pcl::PointXYZ>(f.get_pointcloud(1));
+		//vis.spin();
 
 	}
 
