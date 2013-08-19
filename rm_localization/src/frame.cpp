@@ -7,6 +7,8 @@ frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 
 	assert(yuv.cols == depth.cols && yuv.rows == depth.rows);
 
+	this->position = position;
+
 	cols = yuv.cols;
 	rows = yuv.rows;
 	this->max_level = max_level;
@@ -17,8 +19,13 @@ frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 	cv::Mat intecity_0 = get_i(0);
 	cv::Mat depth_0 = get_d(0);
 
-	convert cvt(yuv, depth, intecity_0, depth_0);
-	tbb::parallel_for(tbb::blocked_range<int>(0, cols * rows), cvt);
+	if (yuv.channels() == 2) {
+		convert cvt(yuv, depth, intecity_0, depth_0);
+		tbb::parallel_for(tbb::blocked_range<int>(0, cols * rows), cvt);
+	} else if (yuv.channels() == 1) {
+		convert_gray cvt(yuv, depth, intecity_0, depth_0);
+		tbb::parallel_for(tbb::blocked_range<int>(0, cols * rows), cvt);
+	}
 
 	for (int level = 1; level < max_level; level++) {
 		cv::Mat prev_intencity = get_i(level - 1);
@@ -64,19 +71,20 @@ cv::Mat frame::get_subsampled(cv::Mat & image_pyr, int level) const {
 	return res;
 }
 
-void frame::warp(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
-		const Eigen::Vector3f & intrinsics, const Sophus::SE3f & position, int level,
-		cv::Mat & intencity_warped, cv::Mat & depth_warped) {
+void frame::warp(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
+		const Eigen::Vector3f & intrinsics, const Sophus::SE3f & position,
+		int level, cv::Mat & intencity_warped, cv::Mat & depth_warped) {
 
 	cv::Mat intencity = get_i(level);
 	cv::Mat depth = get_d(level);
 
 	assert(cloud->height == intencity.rows && cloud->width == intencity.cols);
 
-	Sophus::SE3f transform = this->position * position.inverse();
+	Eigen::Affine3f transform((this->position.inverse() * position).matrix());
+	//std::cerr << "Transform" << std::endl << this->position.matrix() << std::endl;
 
-	parallel_warp w(intencity, depth, transform, cloud, intrinsics, intencity_warped,
-			depth_warped);
+	parallel_warp w(intencity, depth, transform, cloud, intrinsics,
+			intencity_warped, depth_warped);
 
 	tbb::parallel_for(
 			tbb::blocked_range<int>(0, intencity.cols * intencity.rows), w);

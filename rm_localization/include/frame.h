@@ -33,6 +33,31 @@ struct convert {
 
 };
 
+struct convert_gray {
+	const cv::Mat & gray;
+	const cv::Mat & depth;
+	cv::Mat & intencity;
+	cv::Mat & depth_f;
+
+	convert_gray(const cv::Mat & gray, const cv::Mat & depth,
+			cv::Mat & intencity, cv::Mat & depth_f) :
+			gray(gray), depth(depth), intencity(intencity), depth_f(depth_f) {
+	}
+
+	void operator()(const tbb::blocked_range<int>& range) const {
+		for (int i = range.begin(); i != range.end(); i++) {
+			int u = i % gray.cols;
+			int v = i / gray.cols;
+
+			unsigned char val = gray.at <unsigned char> (v, u);
+			intencity.at<float>(v, u) = val / 255.0f;
+			depth_f.at<float>(v, u) = depth.at<unsigned short>(v, u) / 1000.0f;
+		}
+
+	}
+
+};
+
 struct subsample {
 	const cv::Mat & prev_intencity;
 	const cv::Mat & prev_depth;
@@ -75,15 +100,15 @@ struct subsample {
 struct parallel_warp {
 	const cv::Mat & intencity;
 	const cv::Mat & depth;
-	const Sophus::SE3f & transform;
-	const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud;
+	const Eigen::Affine3f & transform;
+	const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud;
 	const Eigen::Vector3f & intrinsics;
 	cv::Mat & intencity_warped;
 	cv::Mat & depth_warped;
 
 	parallel_warp(const cv::Mat & intencity, const cv::Mat & depth,
-			const Sophus::SE3f & transform,
-			const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+			const Eigen::Affine3f & transform,
+			const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
 			const Eigen::Vector3f & intrinsics, cv::Mat & intencity_warped,
 			cv::Mat & depth_warped) :
 			intencity(intencity), depth(depth), transform(transform), cloud(
@@ -96,7 +121,7 @@ struct parallel_warp {
 			int u = i % intencity_warped.cols;
 			int v = i / intencity_warped.cols;
 
-			pcl::PointXYZ p = cloud->at(u, v);
+			pcl::PointXYZRGB p = cloud->at(u, v);
 			if (std::isfinite(p.x) && std::isfinite(p.y)
 					&& std::isfinite(p.z)) {
 				p.getVector3fMap() = transform * p.getVector3fMap();
@@ -183,7 +208,7 @@ public:
 	frame(const cv::Mat & yuv, const cv::Mat & depth,
 			const Sophus::SE3f & position, int max_level = 3);
 
-	void warp(const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud,
+	void warp(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
 			const Eigen::Vector3f & intrinsics, const Sophus::SE3f & position,
 			int level, cv::Mat & intencity_warped, cv::Mat & depth_warped);
 

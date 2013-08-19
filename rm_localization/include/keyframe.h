@@ -11,30 +11,60 @@
 #include <pcl/point_types.h>
 
 struct convert_depth_to_pointcloud {
+	const cv::Mat & intencity;
 	const cv::Mat & depth;
 	const Eigen::Vector3f & intrinsics;
-	pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud;
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud;
+	cv::Mat & intencity_dx;
+	cv::Mat & intencity_dy;
 
-	convert_depth_to_pointcloud(const cv::Mat & depth,
-			const Eigen::Vector3f & intrinsics,
-			pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud) :
-			depth(depth), intrinsics(intrinsics), cloud(cloud) {
+	convert_depth_to_pointcloud(const cv::Mat & intencity,
+			const cv::Mat & depth, const Eigen::Vector3f & intrinsics,
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
+			cv::Mat & intencity_dx, cv::Mat & intencity_dy) :
+			intencity(intencity), depth(depth), intrinsics(intrinsics), cloud(
+					cloud), intencity_dx(intencity_dx), intencity_dy(
+					intencity_dy) {
 	}
 
 	void operator()(const tbb::blocked_range<int>& range) const {
-		pcl::PointXYZ bad_point;
+		pcl::PointXYZRGB bad_point;
 		bad_point.x = bad_point.y = bad_point.z =
 				std::numeric_limits<float>::quiet_NaN();
 		for (int i = range.begin(); i != range.end(); i++) {
 			int u = i % depth.cols;
 			int v = i / depth.cols;
 
-			pcl::PointXYZ p;
+			float dx, dy;
+			if (u == 0) {
+				dx = intencity.at<float>(v, u + 1) - intencity.at<float>(v, u);
+			} else if (u == intencity.cols - 1) {
+				dx = intencity.at<float>(v, u) - intencity.at<float>(v, u - 1);
+			} else {
+				dx = (intencity.at<float>(v, u + 1)
+						- intencity.at<float>(v, u - 1)) / 2;
+			}
+
+			if (v == 0) {
+				dy = intencity.at<float>(v + 1, u) - intencity.at<float>(v, u);
+			} else if (v == intencity.rows - 1) {
+				dy = intencity.at<float>(v, u) - intencity.at<float>(v - 1, u);
+			} else {
+				dy = (intencity.at<float>(v + 1, u)
+						- intencity.at<float>(v - 1, u)) / 2;
+			}
+
+			intencity_dx.at<float>(v, u) = dx;
+			intencity_dy.at<float>(v, u) = dy;
+
+			pcl::PointXYZRGB p;
 			p.z = depth.at<float>(v, u);
 
-			if (p.z > 0) {
+			if (p.z > 0 && (std::abs(dx) > 0.05 || std::abs(dy) > 0.05)) {
 				p.x = (u - intrinsics[1]) * p.z / intrinsics[0];
 				p.y = (v - intrinsics[2]) * p.z / intrinsics[0];
+
+				p.r = p.g = p.b = intencity.at<float>(v, u) * 255;
 
 				cloud->at(u, v) = p;
 			} else {
@@ -57,12 +87,12 @@ struct reduce_jacobian {
 	const cv::Mat & intencity_warped;
 	const cv::Mat & depth_warped;
 	const Eigen::Vector3f & intrinsics;
-	const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud;
+	const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud;
 
 	reduce_jacobian(const cv::Mat & intencity, const cv::Mat & intencity_dx,
 			const cv::Mat & intencity_dy, const cv::Mat & intencity_warped,
 			const cv::Mat & depth_warped, const Eigen::Vector3f & intrinsics,
-			const pcl::PointCloud<pcl::PointXYZ>::Ptr & cloud) :
+			const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud) :
 			intencity(intencity), intencity_dx(intencity_dx), intencity_dy(
 					intencity_dy), intencity_warped(intencity_warped), depth_warped(
 					depth_warped), intrinsics(intrinsics), cloud(cloud) {
@@ -80,21 +110,25 @@ struct reduce_jacobian {
 		Jte.setZero();
 	}
 
-	inline void compute_jacobian(const pcl::PointXYZ & p,
-			Eigen::Matrix<float, 2, 6> & J) {
+	inline void compute_jacobian(const pcl::PointXYZRGB & p,
+			Eigen::Matrix<float, 2, 6> & j) {
 
-		J(0,0) = 1/p.z;
-		J(0,1) = 0;
-		J(0,2) = -p.x/p.z*p.z;
-		J(0,3) = -p.x*p.y/p.z*p.z;
-		J(0,4) = (p.x*p.x + p.z*p.z)/p.z*p.z;
-		J(0,5) = -p.y/p.z;
-		J(1,0) = 0;
-		J(1,1) = 1/p.z;
-		J(1,2) = -p.y/p.z*p.z;
-		J(1,3) = -(p.y*p.z + p.z*p.z)/p.z*p.z;
-		J(1,4) = p.x*p.y/p.z*p.z;
-		J(1,5) = p.x/p.z;
+		float z = 1.0f / p.z;
+		float z_sqr = 1.0f / (p.z * p.z);
+
+		j(0, 0) = z;
+		j(0, 1) = 0.0f;
+		j(0, 2) = -p.x * z_sqr;
+		j(0, 3) = j(0, 2) * p.y; //j(0, 3) = -p(0) * p(1) * z_sqr;
+		j(0, 4) = 1.0f - j(0, 2) * p.x; //j(0, 4) =  (1.0 + p(0) * p(0) * z_sqr);
+		j(0, 5) = -p.y * z;
+
+		j(1, 0) = 0.0f;
+		j(1, 1) = z;
+		j(1, 2) = -p.y * z_sqr;
+		j(1, 3) = -1.0f + j(1, 2) * p.y; //j(1, 3) = -(1.0 + p(1) * p(1) * z_sqr);
+		j(1, 4) = -j(0, 3); //j(1, 4) =  p(0) * p(1) * z_sqr;
+		j(1, 5) = p.x * z;
 
 	}
 
@@ -103,11 +137,12 @@ struct reduce_jacobian {
 			int u = i % depth_warped.cols;
 			int v = i / depth_warped.cols;
 
-			pcl::PointXYZ p = cloud->at(u, v);
+			pcl::PointXYZRGB p = cloud->at(u, v);
 			if (std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z)
 					&& depth_warped.at<float>(v, u) != 0) {
 
-				float error = intencity.at<float>(v, u) - intencity_warped.at<float>(v, u);
+				float error = intencity.at<float>(v, u)
+						- intencity_warped.at<float>(v, u);
 
 				Eigen::Matrix<float, 1, 2> Ji;
 				Eigen::Matrix<float, 2, 6> Jw;
@@ -117,10 +152,10 @@ struct reduce_jacobian {
 
 				compute_jacobian(p, Jw);
 
-				J = Ji*Jw;
+				J = Ji * Jw;
 
-				JtJ += J.transpose()*J;
-				Jte += J.transpose()*error;
+				JtJ += J.transpose() * J;
+				Jte += J.transpose() * error;
 
 			}
 
@@ -159,7 +194,7 @@ public:
 		return intrinsics / (1 << level);
 	}
 
-	inline pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud(int level) {
+	inline pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_pointcloud(int level) {
 		return clouds[level];
 	}
 
@@ -168,7 +203,7 @@ protected:
 	cv::Mat intencity_pyr_dy;
 	Eigen::Vector3f intrinsics;
 
-	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> clouds;
+	std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> clouds;
 
 };
 

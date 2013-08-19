@@ -71,6 +71,8 @@ protected:
 	keyframe::Ptr k;
 	Sophus::SE3f Mwc;
 
+	ros::Publisher keypoint_pub;
+
 public:
 
 	CaptureServer() :
@@ -106,6 +108,9 @@ public:
 		set_initial_pose = nh_.advertiseService("set_initial_pose",
 				&CaptureServer::SetInitialPose, this);
 
+		keypoint_pub = nh_.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
+				"keypoints", 1);
+
 	}
 
 	~CaptureServer(void) {
@@ -134,6 +139,15 @@ public:
 			k->estimate_position(f);
 			Mwc = f.get_pos();
 
+			/*
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = k->get_pointcloud(
+					2);
+			cloud->header.stamp = ros::Time::now();
+			cloud->header.frame_id = "world";
+
+			keypoint_pub.publish(cloud);
+			*/
+
 			tf::Transform cam_to_world;
 
 			Eigen::Affine3d t(Mwc.cast<double>().matrix());
@@ -141,15 +155,13 @@ public:
 
 			br.sendTransform(
 					tf::StampedTransform(cam_to_world, ros::Time::now(),
-							"/world",
-							"/camera_rgb_optical_frame"));
+							"/world", "/camera_rgb_optical_frame"));
 
 		} else {
 			Eigen::Vector3f intrinsics(525.0, 319.5, 239.5);
 			intrinsics /= 2;
 
 			k.reset(new keyframe(yuv2->image, depth->image, Mwc, intrinsics));
-
 		}
 
 		//vis.removeAllPointClouds();
