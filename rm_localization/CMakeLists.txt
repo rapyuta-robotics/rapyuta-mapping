@@ -28,7 +28,7 @@ rosbuild_gensrv()
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -msse2 -ftree-vectorizer-verbose=5")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -msse3 -ftree-vectorizer-verbose=5")
 
 find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})

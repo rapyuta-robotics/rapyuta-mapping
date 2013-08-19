@@ -35,36 +35,36 @@ struct convert_depth_to_pointcloud {
 			int u = i % depth.cols;
 			int v = i / depth.cols;
 
-			float dx, dy;
+			int16_t dx, dy;
 			if (u == 0) {
-				dx = intencity.at<float>(v, u + 1) - intencity.at<float>(v, u);
+				dx = (int16_t) intencity.at<uint8_t>(v, u + 1) - intencity.at<uint8_t>(v, u);
 			} else if (u == intencity.cols - 1) {
-				dx = intencity.at<float>(v, u) - intencity.at<float>(v, u - 1);
+				dx = (int16_t) intencity.at<uint8_t>(v, u) - intencity.at<uint8_t>(v, u - 1);
 			} else {
-				dx = (intencity.at<float>(v, u + 1)
-						- intencity.at<float>(v, u - 1)) / 2;
+				dx = ((int16_t) intencity.at<uint8_t>(v, u + 1)
+						- intencity.at<uint8_t>(v, u - 1)) / 2;
 			}
 
 			if (v == 0) {
-				dy = intencity.at<float>(v + 1, u) - intencity.at<float>(v, u);
+				dy = (int16_t) intencity.at<uint8_t>(v + 1, u) - intencity.at<uint8_t>(v, u);
 			} else if (v == intencity.rows - 1) {
-				dy = intencity.at<float>(v, u) - intencity.at<float>(v - 1, u);
+				dy = (int16_t) intencity.at<uint8_t>(v, u) - intencity.at<uint8_t>(v - 1, u);
 			} else {
-				dy = (intencity.at<float>(v + 1, u)
-						- intencity.at<float>(v - 1, u)) / 2;
+				dy = ((int16_t) intencity.at<uint8_t>(v + 1, u)
+						- intencity.at<uint8_t>(v - 1, u)) / 2;
 			}
 
-			intencity_dx.at<float>(v, u) = dx;
-			intencity_dy.at<float>(v, u) = dy;
+			intencity_dx.at<int16_t>(v, u) = dx;
+			intencity_dy.at<int16_t>(v, u) = dy;
 
 			pcl::PointXYZRGB p;
-			p.z = depth.at<float>(v, u);
+			p.z = depth.at<uint16_t>(v, u)/1000.0;
 
-			if (p.z > 0 && (std::abs(dx) > 0.05 || std::abs(dy) > 0.05)) {
+			if (p.z > 0 && (std::abs(dx) > 12 || std::abs(dy) > 12)) {
 				p.x = (u - intrinsics[1]) * p.z / intrinsics[0];
 				p.y = (v - intrinsics[2]) * p.z / intrinsics[0];
 
-				p.r = p.g = p.b = intencity.at<float>(v, u) * 255;
+				p.r = p.g = p.b = intencity.at<uint8_t>(v, u);
 
 				cloud->at(u, v) = p;
 			} else {
@@ -139,16 +139,16 @@ struct reduce_jacobian {
 
 			pcl::PointXYZRGB p = cloud->at(u, v);
 			if (std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z)
-					&& depth_warped.at<float>(v, u) != 0) {
+					&& depth_warped.at<uint16_t>(v, u) != 0) {
 
-				float error = intencity.at<float>(v, u)
-						- intencity_warped.at<float>(v, u);
+				float error = intencity.at<uint8_t>(v, u)
+						- intencity_warped.at<uint8_t>(v, u);
 
 				Eigen::Matrix<float, 1, 2> Ji;
 				Eigen::Matrix<float, 2, 6> Jw;
 				Eigen::Matrix<float, 1, 6> J;
-				Ji[0] = intencity_dx.at<float>(v, u) * intrinsics[0];
-				Ji[1] = intencity_dy.at<float>(v, u) * intrinsics[0];
+				Ji[0] = intencity_dx.at<int16_t>(v, u) * intrinsics[0];
+				Ji[1] = intencity_dy.at<int16_t>(v, u) * intrinsics[0];
 
 				compute_jacobian(p, Jw);
 

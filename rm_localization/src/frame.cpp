@@ -13,8 +13,8 @@ frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 	rows = yuv.rows;
 	this->max_level = max_level;
 
-	intencity_pyr = cv::Mat::zeros(rows, cols + cols / 2, CV_32F);
-	depth_pyr = cv::Mat::zeros(rows, cols + cols / 2, CV_32F);
+	intencity_pyr = cv::Mat::zeros(rows, cols + cols / 2, CV_8U);
+	depth_pyr = cv::Mat::zeros(rows, cols + cols / 2, CV_16U);
 
 	cv::Mat intecity_0 = get_i(0);
 	cv::Mat depth_0 = get_d(0);

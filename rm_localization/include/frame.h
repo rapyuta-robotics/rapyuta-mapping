@@ -25,8 +25,8 @@ struct convert {
 			int v = i / yuv.cols;
 
 			cv::Vec2b val = yuv.at<cv::Vec2b>(v, u);
-			intencity.at<float>(v, u) = val[1] / 255.0f;
-			depth_f.at<float>(v, u) = depth.at<unsigned short>(v, u) / 1000.0f;
+			intencity.at<uint8_t>(v, u) = val[1];
+			depth_f.at<uint16_t>(v, u) = depth.at<uint16_t>(v, u);
 		}
 
 	}
@@ -49,9 +49,8 @@ struct convert_gray {
 			int u = i % gray.cols;
 			int v = i / gray.cols;
 
-			unsigned char val = gray.at <unsigned char> (v, u);
-			intencity.at<float>(v, u) = val / 255.0f;
-			depth_f.at<float>(v, u) = depth.at<unsigned short>(v, u) / 1000.0f;
+			intencity.at<uint8_t>(v, u) = gray.at <uint8_t> (v, u);
+			depth_f.at<uint16_t>(v, u) = depth.at<uint16_t>(v, u);
 		}
 
 	}
@@ -75,21 +74,21 @@ struct subsample {
 			int u = i % current_intencity.cols;
 			int v = i / current_intencity.cols;
 
-			float val = prev_intencity.at<float>(2 * v, 2 * u);
-			val += prev_intencity.at<float>(2 * v + 1, 2 * u);
-			val += prev_intencity.at<float>(2 * v, 2 * u + 1);
-			val += prev_intencity.at<float>(2 * v + 1, 2 * u + 1);
+			int val = prev_intencity.at<uint8_t>(2 * v, 2 * u);
+			val += prev_intencity.at<uint8_t>(2 * v + 1, 2 * u);
+			val += prev_intencity.at<uint8_t>(2 * v, 2 * u + 1);
+			val += prev_intencity.at<uint8_t>(2 * v + 1, 2 * u + 1);
 
-			current_intencity.at<float>(v, u) = val / 4.0f;
+			current_intencity.at<uint8_t>(v, u) = val / 4;
 
-			float values[4];
-			values[0] = prev_depth.at<float>(2 * v, 2 * u);
-			values[1] = prev_depth.at<float>(2 * v + 1, 2 * u);
-			values[2] = prev_depth.at<float>(2 * v, 2 * u + 1);
-			values[3] = prev_depth.at<float>(2 * v + 1, 2 * u + 1);
+			uint16_t values[4];
+			values[0] = prev_depth.at<uint16_t>(2 * v, 2 * u);
+			values[1] = prev_depth.at<uint16_t>(2 * v + 1, 2 * u);
+			values[2] = prev_depth.at<uint16_t>(2 * v, 2 * u + 1);
+			values[3] = prev_depth.at<uint16_t>(2 * v + 1, 2 * u + 1);
 			std::sort(values, values + 4);
 
-			current_depth.at<float>(v, u) = values[2];
+			current_depth.at<uint16_t>(v, u) = values[2];
 
 		}
 
@@ -134,21 +133,21 @@ struct parallel_warp {
 
 					float val = interpolate(uw, vw, p.z);
 					if (val > 0) {
-						intencity_warped.at<float>(v, u) = val;
-						depth_warped.at<float>(v, u) = p.z;
+						intencity_warped.at<uint8_t>(v, u) = val;
+						depth_warped.at<uint16_t>(v, u) = p.z;
 					} else {
-						intencity_warped.at<float>(v, u) = 0;
-						depth_warped.at<float>(v, u) = 0;
+						intencity_warped.at<uint8_t>(v, u) = 0;
+						depth_warped.at<uint16_t>(v, u) = 0;
 					}
 
 				} else {
-					intencity_warped.at<float>(v, u) = 0;
-					depth_warped.at<float>(v, u) = 0;
+					intencity_warped.at<uint8_t>(v, u) = 0;
+					depth_warped.at<uint16_t>(v, u) = 0;
 				}
 
 			} else {
-				intencity_warped.at<float>(v, u) = 0;
-				depth_warped.at<float>(v, u) = 0;
+				intencity_warped.at<uint8_t>(v, u) = 0;
+				depth_warped.at<uint16_t>(v, u) = 0;
 
 			}
 
@@ -170,26 +169,26 @@ struct parallel_warp {
 		float val = 0;
 		float sum = 0;
 
-		if (depth.at<float>(v, u) != 0 && depth.at<float>(v, u) > z_eps) {
-			val += u0 * v0 * intencity.at<float>(v, u);
+		if (depth.at<uint16_t>(v, u) != 0 && depth.at<uint16_t>(v, u) > z_eps) {
+			val += u0 * v0 * intencity.at<uint8_t>(v, u);
 			sum += u0 * v0;
 		}
 
-		if (depth.at<float>(v + 1, u) != 0
-				&& depth.at<float>(v + 1, u) > z_eps) {
-			val += u0 * v1 * intencity.at<float>(v + 1, u);
+		if (depth.at<uint16_t>(v + 1, u) != 0
+				&& depth.at<uint16_t>(v + 1, u) > z_eps) {
+			val += u0 * v1 * intencity.at<uint8_t>(v + 1, u);
 			sum += u0 * v1;
 		}
 
-		if (depth.at<float>(v, u + 1) != 0
-				&& depth.at<float>(v, u + 1) > z_eps) {
-			val += u1 * v0 * intencity.at<float>(v, u + 1);
+		if (depth.at<uint16_t>(v, u + 1) != 0
+				&& depth.at<uint16_t>(v, u + 1) > z_eps) {
+			val += u1 * v0 * intencity.at<uint8_t>(v, u + 1);
 			sum += u1 * v0;
 		}
 
-		if (depth.at<float>(v + 1, u + 1) != 0
-				&& depth.at<float>(v + 1, u + 1) > z_eps) {
-			val += u1 * v1 * intencity.at<float>(v + 1, u + 1);
+		if (depth.at<uint16_t>(v + 1, u + 1) != 0
+				&& depth.at<uint16_t>(v + 1, u + 1) > z_eps) {
+			val += u1 * v1 * intencity.at<uint8_t>(v + 1, u + 1);
 			sum += u1 * v1;
 		}
 
