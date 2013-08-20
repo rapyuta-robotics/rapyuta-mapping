@@ -78,8 +78,8 @@ struct convert_depth_to_pointcloud {
 
 struct reduce_jacobian {
 
-	Eigen::MatrixXf JtJ;
-	Eigen::VectorXf Jte;
+	Sophus::Matrix6f JtJ;
+	Sophus::Vector6f Jte;
 
 	const uint8_t * intencity;
 	const int16_t * intencity_dx;
@@ -99,8 +99,8 @@ struct reduce_jacobian {
 					intencity_dy), intencity_warped(intencity_warped), depth_warped(
 					depth_warped), intrinsics(intrinsics), cloud(cloud), cols(cols), rows(rows) {
 
-		JtJ.setZero(6,6);
-		Jte.setZero(6);
+		JtJ.setZero();
+		Jte.setZero();
 
 	}
 
@@ -108,12 +108,12 @@ struct reduce_jacobian {
 			intencity(rb.intencity), intencity_dx(rb.intencity_dx), intencity_dy(
 					rb.intencity_dy), intencity_warped(rb.intencity_warped), depth_warped(
 					rb.depth_warped), intrinsics(rb.intrinsics), cloud(rb.cloud), cols(rb.cols), rows(rb.rows) {
-		JtJ.setZero(6,6);
-		Jte.setZero(6);
+		JtJ.setZero();
+		Jte.setZero();
 	}
 
 	inline void compute_jacobian(const pcl::PointXYZRGB & p,
-			Eigen::MatrixXf & j) {
+			Eigen::Matrix<float, 2, 6> & j) {
 
 		float z = 1.0f / p.z;
 		float z_sqr = 1.0f / (p.z * p.z);
@@ -146,18 +146,18 @@ struct reduce_jacobian {
 				float error = intencity[i]
 						- intencity_warped[i];
 
-				Eigen::VectorXf Ji(2);
-				Eigen::MatrixXf Jw(2,6);
-				Eigen::VectorXf J(6);
+				Eigen::Matrix<float, 1, 2> Ji;
+				Eigen::Matrix<float, 2, 6> Jw;
+				Eigen::Matrix<float, 1, 6> J;
 				Ji[0] = intencity_dx[i] * intrinsics[0];
 				Ji[1] = intencity_dy[i] * intrinsics[0];
 
 				compute_jacobian(p, Jw);
 
-				J = Ji.transpose() * Jw;
+				J = Ji * Jw;
 
-				JtJ += J * J.transpose();
-				Jte += J * error;
+				JtJ += J.transpose() * J;
+				Jte += J.transpose() * error;
 
 			}
 
