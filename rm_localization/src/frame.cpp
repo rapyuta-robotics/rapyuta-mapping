@@ -1,6 +1,6 @@
 #include <frame.h>
 #include <cassert>
-#include <opencv2/highgui/highgui.hpp>
+//#include <opencv2/highgui/highgui.hpp>
 
 frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 		const Sophus::SE3f & position, int max_level) {
@@ -41,14 +41,14 @@ frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 	}
 
 	/*
-	cv::imshow("get_i(0)", get_i(0));
-	cv::imshow("get_d(0)", get_d(0));
-	cv::imshow("get_i(1)", get_i(1));
-	cv::imshow("get_d(1)", get_d(1));
-	cv::imshow("get_i(2)", get_i(2));
-	cv::imshow("get_d(2)", get_d(2));
-	cv::waitKey();
-	*/
+	 cv::imshow("get_i(0)", get_i(0));
+	 cv::imshow("get_d(0)", get_d(0));
+	 cv::imshow("get_i(1)", get_i(1));
+	 cv::imshow("get_d(1)", get_d(1));
+	 cv::imshow("get_i(2)", get_i(2));
+	 cv::imshow("get_d(2)", get_d(2));
+	 cv::waitKey();
+	 */
 
 }
 
@@ -61,10 +61,22 @@ void frame::warp(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
 	int c = cols >> level;
 	int r = rows >> level;
 
-	parallel_warp w(intencity_pyr[level], depth_pyr[level], transform, cloud, intrinsics, c, r,
-			(uint8_t *) intencity_warped.data, (uint16_t *) depth_warped.data);
+	parallel_warp w(intencity_pyr[level], depth_pyr[level], transform, cloud,
+			intrinsics, c, r, (uint8_t *) intencity_warped.data,
+			(uint16_t *) depth_warped.data);
 
-	tbb::parallel_for(
-			tbb::blocked_range<int>(0, c*r), w);
+	tbb::parallel_for(tbb::blocked_range<int>(0, c * r), w);
+
+}
+
+frame::~frame() {
+
+	for (int level = 0; level < max_level; level++) {
+		delete[] intencity_pyr[level];
+		delete[] depth_pyr[level];
+	}
+
+	delete[] intencity_pyr;
+	delete[] depth_pyr;
 
 }

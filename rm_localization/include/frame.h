@@ -186,6 +186,8 @@ public:
 	frame(const cv::Mat & yuv, const cv::Mat & depth,
 			const Sophus::SE3f & position, int max_level = 3);
 
+	~frame();
+
 	void warp(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
 			const Eigen::Vector3f & intrinsics, const Sophus::SE3f & position,
 			int level, cv::Mat & intencity_warped, cv::Mat & depth_warped);

@@ -1,6 +1,6 @@
 #include <keyframe.h>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
+//#include <opencv2/highgui/highgui.hpp>
 
 keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 		const Sophus::SE3f & position, const Eigen::Vector3f & intrinsics,
@@ -18,16 +18,18 @@ keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 	}
 
 	for (int level = 0; level < max_level; level++) {
-		cv::Mat i = get_i(level);
-		cv::Mat d = get_d(level);
-		cv::Mat i_dx = get_i_dx(level);
-		cv::Mat i_dy = get_i_dy(level);
+
+		int c = cols >> level;
+		int r = rows >> level;
+
 		Eigen::Vector3f intrinsics = get_intrinsics(level);
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
-				new pcl::PointCloud<pcl::PointXYZRGB>(d.cols, d.rows));
+				new pcl::PointCloud<pcl::PointXYZRGB>(c, r));
 
-		convert_depth_to_pointcloud sub(i, d, intrinsics, cloud, i_dx, i_dy);
-		tbb::parallel_for(tbb::blocked_range<int>(0, d.cols * d.rows), sub);
+		convert_depth_to_pointcloud sub(intencity_pyr[level], depth_pyr[level],
+				intrinsics, c, r, cloud, intencity_pyr_dx[level],
+				intencity_pyr_dy[level]);
+		tbb::parallel_for(tbb::blocked_range<int>(0, c * r), sub);
 
 		clouds.push_back(cloud);
 	}
@@ -39,6 +41,18 @@ keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 	 cv::imshow("intencity_pyr_dy", intencity_pyr_dy);
 	 cv::waitKey();
 	 */
+
+}
+
+keyframe::~keyframe() {
+
+	for (int level = 0; level < max_level; level++) {
+		delete[] intencity_pyr_dx[level];
+		delete[] intencity_pyr_dy[level];
+	}
+
+	delete[] intencity_pyr_dx;
+	delete[] intencity_pyr_dy;
 
 }
 
@@ -61,11 +75,16 @@ void keyframe::estimate_position(frame & f) {
 					intencity.type()), depth_warped(depth.rows, depth.cols,
 					depth.type());
 
+			int c = cols >> level;
+			int r = rows >> level;
+
 			f.warp(clouds[level], intrinsics, position, level, intencity_warped,
 					depth_warped);
 
-			reduce_jacobian rj(intencity, intencity_dx, intencity_dy,
-					intencity_warped, depth_warped, intrinsics, clouds[level]);
+			reduce_jacobian rj(intencity_pyr[level], intencity_pyr_dx[level],
+					intencity_pyr_dy[level], (uint8_t *) intencity_warped.data,
+					(uint16_t *) depth_warped.data, intrinsics, clouds[level],
+					c, r);
 
 			tbb::parallel_reduce(
 					tbb::blocked_range<int>(0, intencity.cols * intencity.rows),
@@ -82,13 +101,14 @@ void keyframe::estimate_position(frame & f) {
 			//std::cerr << "Transform " << std::endl << f.position.matrix()
 			//		<< std::endl;
 
+			/*
 			if (level == 0) {
 				cv::imshow("intencity_warped", intencity_warped);
 				cv::imshow("depth_warped", depth_warped);
 				cv::imshow("intensity", intencity);
 				cv::imshow("depth", depth);
 				cv::waitKey(3);
-			}
+			}*/
 
 		}
 	}
