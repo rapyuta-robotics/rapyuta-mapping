@@ -52,11 +52,11 @@ frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 
 }
 
-void frame::warp(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
+void frame::warp(const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
 		const Eigen::Vector3f & intrinsics, const Sophus::SE3f & position,
 		int level, cv::Mat & intencity_warped, cv::Mat & depth_warped) {
 
-	Eigen::Affine3f transform((this->position.inverse() * position).matrix());
+	Eigen::Matrix<float, 4, 4, Eigen::ColMajor> transform((this->position.inverse() * position).matrix());
 
 	int c = cols >> level;
 	int r = rows >> level;

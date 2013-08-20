@@ -1,6 +1,6 @@
 #include <keyframe.h>
 #include <opencv2/imgproc/imgproc.hpp>
-//#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 		const Sophus::SE3f & position, const Eigen::Vector3f & intrinsics,
@@ -17,21 +17,20 @@ keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 		intencity_pyr_dy[level] = new int16_t[cols * rows / (1 << 2 * level)];
 	}
 
+	clouds.resize(max_level);
 	for (int level = 0; level < max_level; level++) {
 
 		int c = cols >> level;
 		int r = rows >> level;
 
 		Eigen::Vector3f intrinsics = get_intrinsics(level);
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
-				new pcl::PointCloud<pcl::PointXYZRGB>(c, r));
+		clouds[level].setZero(4, c*r);
 
 		convert_depth_to_pointcloud sub(intencity_pyr[level], depth_pyr[level],
-				intrinsics, c, r, cloud, intencity_pyr_dx[level],
+				intrinsics, c, r, clouds[level], intencity_pyr_dx[level],
 				intencity_pyr_dy[level]);
 		tbb::parallel_for(tbb::blocked_range<int>(0, c * r), sub);
 
-		clouds.push_back(cloud);
 	}
 
 	/*
@@ -101,14 +100,14 @@ void keyframe::estimate_position(frame & f) {
 			//std::cerr << "Transform " << std::endl << f.position.matrix()
 			//		<< std::endl;
 
-			/*
+
 			if (level == 0) {
 				cv::imshow("intencity_warped", intencity_warped);
-				cv::imshow("depth_warped", depth_warped);
+				//cv::imshow("depth_warped", depth_warped);
 				cv::imshow("intensity", intencity);
-				cv::imshow("depth", depth);
+				//cv::imshow("depth", depth);
 				cv::waitKey(3);
-			}*/
+			}
 
 		}
 	}

@@ -5,8 +5,6 @@
 #include <opencv2/core/core.hpp>
 #include <sophus/se3.hpp>
 #include <tbb/parallel_for.h>
-#include <pcl_ros/point_cloud.h>
-#include <pcl/point_types.h>
 
 struct convert {
 	const uint8_t * yuv;
@@ -76,8 +74,8 @@ struct subsample {
 struct parallel_warp {
 	const uint8_t * intencity;
 	const uint16_t * depth;
-	const Eigen::Affine3f & transform;
-	const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud;
+	const Eigen::Matrix<float, 4, 4, Eigen::ColMajor> & transform;
+	const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud;
 	const Eigen::Vector3f & intrinsics;
 	int cols;
 	int rows;
@@ -85,8 +83,8 @@ struct parallel_warp {
 	uint16_t * depth_warped;
 
 	parallel_warp(const uint8_t * intencity, const uint16_t * depth,
-			const Eigen::Affine3f & transform,
-			const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
+			const Eigen::Matrix<float, 4, 4, Eigen::ColMajor> & transform,
+			const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
 			const Eigen::Vector3f & intrinsics, int cols, int rows,
 			uint8_t * intencity_warped, uint16_t * depth_warped) :
 			intencity(intencity), depth(depth), transform(transform), cloud(
@@ -96,23 +94,20 @@ struct parallel_warp {
 
 	void operator()(const tbb::blocked_range<int>& range) const {
 		for (int i = range.begin(); i != range.end(); i++) {
-			int u = i % cols;
-			int v = i / cols;
 
-			pcl::PointXYZRGB p = cloud->at(u, v);
-			if (std::isfinite(p.x) && std::isfinite(p.y)
-					&& std::isfinite(p.z)) {
-				p.getVector3fMap() = transform * p.getVector3fMap();
+			Eigen::Vector4f p = cloud.col(i);
+			if (p(3) > 0) {
+				p = transform * p;
 
-				float uw = p.x * intrinsics[0] / p.z + intrinsics[1];
-				float vw = p.y * intrinsics[0] / p.z + intrinsics[2];
+				float uw = p(0) * intrinsics[0] / p(2) + intrinsics[1];
+				float vw = p(1) * intrinsics[0] / p(2) + intrinsics[2];
 
 				if (uw >= 0 && uw < cols && vw >= 0 && vw < rows) {
 
-					float val = interpolate(uw, vw, p.z);
+					float val = interpolate(uw, vw, p(2));
 					if (val > 0) {
 						intencity_warped[i] = val;
-						depth_warped[i] = p.z * 1000;
+						depth_warped[i] = p(2) * 1000;
 					} else {
 						intencity_warped[i] = 0;
 						depth_warped[i] = 0;
@@ -188,7 +183,7 @@ public:
 
 	~frame();
 
-	void warp(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
+	void warp(const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
 			const Eigen::Vector3f & intrinsics, const Sophus::SE3f & position,
 			int level, cv::Mat & intencity_warped, cv::Mat & depth_warped);
 
