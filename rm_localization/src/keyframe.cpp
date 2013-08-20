@@ -9,8 +9,13 @@ keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 
 	this->intrinsics = intrinsics;
 
-	intencity_pyr_dx = cv::Mat(intencity_pyr.size(), CV_16S);
-	intencity_pyr_dy = cv::Mat(intencity_pyr.size(), CV_16S);
+	intencity_pyr_dx = new int16_t *[max_level];
+	intencity_pyr_dy = new int16_t *[max_level];
+
+	for (int level = 0; level < max_level; level++) {
+		intencity_pyr_dx[level] = new int16_t[cols * rows / (1 << 2 * level)];
+		intencity_pyr_dy[level] = new int16_t[cols * rows / (1 << 2 * level)];
+	}
 
 	for (int level = 0; level < max_level; level++) {
 		cv::Mat i = get_i(level);
@@ -28,18 +33,18 @@ keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 	}
 
 	/*
-	cv::imshow("intencity_pyr", intencity_pyr);
-	cv::imshow("depth_pyr", depth_pyr);
-	cv::imshow("intencity_pyr_dx", intencity_pyr_dx);
-	cv::imshow("intencity_pyr_dy", intencity_pyr_dy);
-	cv::waitKey();
-	*/
+	 cv::imshow("intencity_pyr", intencity_pyr);
+	 cv::imshow("depth_pyr", depth_pyr);
+	 cv::imshow("intencity_pyr_dx", intencity_pyr_dx);
+	 cv::imshow("intencity_pyr_dy", intencity_pyr_dy);
+	 cv::waitKey();
+	 */
 
 }
 
 void keyframe::estimate_position(frame & f) {
 
-	int level_iterations[] = { 0, 0, 3 };
+	int level_iterations[] = { 1, 2, 3 };
 
 	for (int level = 2; level >= 0; level--) {
 		for (int iteration = 0; iteration < level_iterations[level];
@@ -77,14 +82,13 @@ void keyframe::estimate_position(frame & f) {
 			//std::cerr << "Transform " << std::endl << f.position.matrix()
 			//		<< std::endl;
 
-			/*
-			 if (level == 0) {
-			 cv::imshow("intencity_warped", intencity_warped);
-			 cv::imshow("depth_warped", depth_warped);
-			 cv::imshow("intensity", intencity);
-			 cv::imshow("depth", depth);
-			 cv::waitKey(3);
-			 }*/
+			if (level == 0) {
+				cv::imshow("intencity_warped", intencity_warped);
+				cv::imshow("depth_warped", depth_warped);
+				cv::imshow("intensity", intencity);
+				cv::imshow("depth", depth);
+				cv::waitKey(3);
+			}
 
 		}
 	}

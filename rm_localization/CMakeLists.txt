@@ -30,7 +30,7 @@ rosbuild_gensrv()
 
 
 if(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
-	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -msse3 -ftree-vectorizer-verbose=5")
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -msse3 -ftree-vectorizer-verbose=0")
 else(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
 	include_directories(/opt/tbb41_20130116oss/include/)
 	SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -march=armv7-a -mcpu=cortex-a9 -mfpu=neon -funsafe-math-optimizations -mvectorize-with-neon-quad -ftree-vectorize -ftree-vectorizer-verbose=5" )

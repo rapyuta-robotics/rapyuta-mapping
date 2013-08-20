@@ -60,7 +60,7 @@ struct convert_depth_to_pointcloud {
 			pcl::PointXYZRGB p;
 			p.z = depth.at<uint16_t>(v, u)/1000.0;
 
-			if (p.z > 0 && (std::abs(dx) > 12 || std::abs(dy) > 12)) {
+			if (p.z > 0 /* && (std::abs(dx) > 12 || std::abs(dy) > 12) */) {
 				p.x = (u - intrinsics[1]) * p.z / intrinsics[0];
 				p.y = (v - intrinsics[2]) * p.z / intrinsics[0];
 
@@ -183,11 +183,11 @@ public:
 	void estimate_position(frame & f);
 
 	inline cv::Mat get_i_dx(int level) {
-		return get_subsampled(intencity_pyr_dx, level);
+		return cv::Mat(rows/(1 << level), cols/(1 << level), CV_16S, intencity_pyr_dx[level]);
 	}
 
 	inline cv::Mat get_i_dy(int level) {
-		return get_subsampled(intencity_pyr_dy, level);
+		return cv::Mat(rows/(1 << level), cols/(1 << level), CV_16S, intencity_pyr_dy[level]);
 	}
 
 	inline Eigen::Vector3f get_intrinsics(int level) {
@@ -199,8 +199,8 @@ public:
 	}
 
 protected:
-	cv::Mat intencity_pyr_dx;
-	cv::Mat intencity_pyr_dy;
+	int16_t ** intencity_pyr_dx;
+	int16_t ** intencity_pyr_dy;
 	Eigen::Vector3f intrinsics;
 
 	std::vector<pcl::PointCloud<pcl::PointXYZRGB>::Ptr> clouds;

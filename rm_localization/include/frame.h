@@ -9,48 +9,16 @@
 #include <pcl/point_types.h>
 
 struct convert {
-	const cv::Mat & yuv;
-	const cv::Mat & depth;
-	cv::Mat & intencity;
-	cv::Mat & depth_f;
+	const uint8_t * yuv;
+	uint8_t * intencity;
 
-	convert(const cv::Mat & yuv, const cv::Mat & depth, cv::Mat & intencity,
-			cv::Mat & depth_f) :
-			yuv(yuv), depth(depth), intencity(intencity), depth_f(depth_f) {
+	convert(const uint8_t * yuv, uint8_t * intencity) :
+			yuv(yuv), intencity(intencity) {
 	}
 
 	void operator()(const tbb::blocked_range<int>& range) const {
 		for (int i = range.begin(); i != range.end(); i++) {
-			int u = i % yuv.cols;
-			int v = i / yuv.cols;
-
-			cv::Vec2b val = yuv.at<cv::Vec2b>(v, u);
-			intencity.at<uint8_t>(v, u) = val[1];
-			depth_f.at<uint16_t>(v, u) = depth.at<uint16_t>(v, u);
-		}
-
-	}
-
-};
-
-struct convert_gray {
-	const cv::Mat & gray;
-	const cv::Mat & depth;
-	cv::Mat & intencity;
-	cv::Mat & depth_f;
-
-	convert_gray(const cv::Mat & gray, const cv::Mat & depth,
-			cv::Mat & intencity, cv::Mat & depth_f) :
-			gray(gray), depth(depth), intencity(intencity), depth_f(depth_f) {
-	}
-
-	void operator()(const tbb::blocked_range<int>& range) const {
-		for (int i = range.begin(); i != range.end(); i++) {
-			int u = i % gray.cols;
-			int v = i / gray.cols;
-
-			intencity.at<uint8_t>(v, u) = gray.at <uint8_t> (v, u);
-			depth_f.at<uint16_t>(v, u) = depth.at<uint16_t>(v, u);
+			intencity[i] = yuv[2 * i + 1];
 		}
 
 	}
@@ -58,37 +26,46 @@ struct convert_gray {
 };
 
 struct subsample {
-	const cv::Mat & prev_intencity;
-	const cv::Mat & prev_depth;
-	cv::Mat & current_intencity;
-	cv::Mat & current_depth;
+	const uint8_t * prev_intencity;
+	const uint16_t * prev_depth;
+	int cols;
+	int rows;
+	uint8_t * current_intencity;
+	uint16_t * current_depth;
 
-	subsample(const cv::Mat & prev_intencity, const cv::Mat & prev_depth,
-			cv::Mat & current_intencity, cv::Mat & current_depth) :
-			prev_intencity(prev_intencity), prev_depth(prev_depth), current_intencity(
-					current_intencity), current_depth(current_depth) {
+	subsample(const uint8_t * prev_intencity, const uint16_t * prev_depth,
+			int cols, int rows, uint8_t * current_intencity,
+			uint16_t * current_depth) :
+			prev_intencity(prev_intencity), prev_depth(prev_depth), cols(cols), rows(
+					rows), current_intencity(current_intencity), current_depth(
+					current_depth) {
 	}
 
 	void operator()(const tbb::blocked_range<int>& range) const {
 		for (int i = range.begin(); i != range.end(); i++) {
-			int u = i % current_intencity.cols;
-			int v = i / current_intencity.cols;
+			int u = i % cols;
+			int v = i / cols;
 
-			int val = prev_intencity.at<uint8_t>(2 * v, 2 * u);
-			val += prev_intencity.at<uint8_t>(2 * v + 1, 2 * u);
-			val += prev_intencity.at<uint8_t>(2 * v, 2 * u + 1);
-			val += prev_intencity.at<uint8_t>(2 * v + 1, 2 * u + 1);
+			int p1 = 4 * v * cols + 2 * u;
+			int p2 = p1 + 2 * cols;
+			int p3 = p1 + 1;
+			int p4 = p2 + 1;
 
-			current_intencity.at<uint8_t>(v, u) = val / 4;
+			int val = prev_intencity[p1];
+			val += prev_intencity[p2];
+			val += prev_intencity[p3];
+			val += prev_intencity[p4];
+
+			current_intencity[i] = val / 4;
 
 			uint16_t values[4];
-			values[0] = prev_depth.at<uint16_t>(2 * v, 2 * u);
-			values[1] = prev_depth.at<uint16_t>(2 * v + 1, 2 * u);
-			values[2] = prev_depth.at<uint16_t>(2 * v, 2 * u + 1);
-			values[3] = prev_depth.at<uint16_t>(2 * v + 1, 2 * u + 1);
+			values[0] = prev_depth[p1];
+			values[1] = prev_depth[p2];
+			values[2] = prev_depth[p3];
+			values[3] = prev_depth[p4];
 			std::sort(values, values + 4);
 
-			current_depth.at<uint16_t>(v, u) = values[2];
+			current_depth[i] = values[2];
 
 		}
 
@@ -97,28 +74,30 @@ struct subsample {
 };
 
 struct parallel_warp {
-	const cv::Mat & intencity;
-	const cv::Mat & depth;
+	const uint8_t * intencity;
+	const uint16_t * depth;
 	const Eigen::Affine3f & transform;
 	const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud;
 	const Eigen::Vector3f & intrinsics;
-	cv::Mat & intencity_warped;
-	cv::Mat & depth_warped;
+	int cols;
+	int rows;
+	uint8_t * intencity_warped;
+	uint16_t * depth_warped;
 
-	parallel_warp(const cv::Mat & intencity, const cv::Mat & depth,
+	parallel_warp(const uint8_t * intencity, const uint16_t * depth,
 			const Eigen::Affine3f & transform,
 			const pcl::PointCloud<pcl::PointXYZRGB>::Ptr & cloud,
-			const Eigen::Vector3f & intrinsics, cv::Mat & intencity_warped,
-			cv::Mat & depth_warped) :
+			const Eigen::Vector3f & intrinsics, int cols, int rows,
+			uint8_t * intencity_warped, uint16_t * depth_warped) :
 			intencity(intencity), depth(depth), transform(transform), cloud(
-					cloud), intrinsics(intrinsics), intencity_warped(
+					cloud), intrinsics(intrinsics), cols(cols), rows(rows), intencity_warped(
 					intencity_warped), depth_warped(depth_warped) {
 	}
 
 	void operator()(const tbb::blocked_range<int>& range) const {
 		for (int i = range.begin(); i != range.end(); i++) {
-			int u = i % intencity_warped.cols;
-			int v = i / intencity_warped.cols;
+			int u = i % cols;
+			int v = i / cols;
 
 			pcl::PointXYZRGB p = cloud->at(u, v);
 			if (std::isfinite(p.x) && std::isfinite(p.y)
@@ -128,26 +107,25 @@ struct parallel_warp {
 				float uw = p.x * intrinsics[0] / p.z + intrinsics[1];
 				float vw = p.y * intrinsics[0] / p.z + intrinsics[2];
 
-				if (uw >= 0 && uw < intencity_warped.cols && vw >= 0
-						&& vw < intencity_warped.rows) {
+				if (uw >= 0 && uw < cols && vw >= 0 && vw < rows) {
 
 					float val = interpolate(uw, vw, p.z);
 					if (val > 0) {
-						intencity_warped.at<uint8_t>(v, u) = val;
-						depth_warped.at<uint16_t>(v, u) = p.z;
+						intencity_warped[i] = val;
+						depth_warped[i] = p.z * 1000;
 					} else {
-						intencity_warped.at<uint8_t>(v, u) = 0;
-						depth_warped.at<uint16_t>(v, u) = 0;
+						intencity_warped[i] = 0;
+						depth_warped[i] = 0;
 					}
 
 				} else {
-					intencity_warped.at<uint8_t>(v, u) = 0;
-					depth_warped.at<uint16_t>(v, u) = 0;
+					intencity_warped[i] = 0;
+					depth_warped[i] = 0;
 				}
 
 			} else {
-				intencity_warped.at<uint8_t>(v, u) = 0;
-				depth_warped.at<uint16_t>(v, u) = 0;
+				intencity_warped[i] = 0;
+				depth_warped[i] = 0;
 
 			}
 
@@ -164,31 +142,32 @@ struct parallel_warp {
 		float v0 = vw - v;
 		float u1 = 1 - u0;
 		float v1 = 1 - v0;
-		float z_eps = z - 0.05;
+		uint16_t z_eps = z*1000 - 100;
 
 		float val = 0;
 		float sum = 0;
 
-		if (depth.at<uint16_t>(v, u) != 0 && depth.at<uint16_t>(v, u) > z_eps) {
-			val += u0 * v0 * intencity.at<uint8_t>(v, u);
+		size_t p00 = v * cols + u;
+		if (depth[p00] != 0 && depth[p00] > z_eps) {
+			val += u0 * v0 * intencity[p00];
 			sum += u0 * v0;
 		}
 
-		if (depth.at<uint16_t>(v + 1, u) != 0
-				&& depth.at<uint16_t>(v + 1, u) > z_eps) {
-			val += u0 * v1 * intencity.at<uint8_t>(v + 1, u);
+		size_t p01 = p00 + cols;
+		if (depth[p01] != 0 && depth[p01] > z_eps) {
+			val += u0 * v1 * intencity[p01];
 			sum += u0 * v1;
 		}
 
-		if (depth.at<uint16_t>(v, u + 1) != 0
-				&& depth.at<uint16_t>(v, u + 1) > z_eps) {
-			val += u1 * v0 * intencity.at<uint8_t>(v, u + 1);
+		size_t p10 = p00 + 1;
+		if (depth[p10] != 0 && depth[p10] > z_eps) {
+			val += u1 * v0 * intencity[p10];
 			sum += u1 * v0;
 		}
 
-		if (depth.at<uint16_t>(v + 1, u + 1) != 0
-				&& depth.at<uint16_t>(v + 1, u + 1) > z_eps) {
-			val += u1 * v1 * intencity.at<uint8_t>(v + 1, u + 1);
+		size_t p11 = p01 + 1;
+		if (depth[p11] != 0 && depth[p11] > z_eps) {
+			val += u1 * v1 * intencity[p11];
 			sum += u1 * v1;
 		}
 
@@ -212,11 +191,13 @@ public:
 			int level, cv::Mat & intencity_warped, cv::Mat & depth_warped);
 
 	inline cv::Mat get_i(int level) {
-		return get_subsampled(intencity_pyr, level);
+		return cv::Mat(rows / (1 << level), cols / (1 << level), CV_8U,
+				intencity_pyr[level]);
 	}
 
 	inline cv::Mat get_d(int level) {
-		return get_subsampled(depth_pyr, level);
+		return cv::Mat(rows / (1 << level), cols / (1 << level), CV_16U,
+				depth_pyr[level]);
 	}
 
 	inline Sophus::SE3f get_pos() {
@@ -225,10 +206,8 @@ public:
 
 protected:
 
-	cv::Mat get_subsampled(cv::Mat & image_pyr, int level) const;
-
-	cv::Mat intencity_pyr;
-	cv::Mat depth_pyr;
+	uint8_t ** intencity_pyr;
+	uint16_t ** depth_pyr;
 	Sophus::SE3f position;
 
 	int max_level;
