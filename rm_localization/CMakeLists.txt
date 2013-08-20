@@ -28,7 +28,14 @@ rosbuild_gensrv()
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -msse3 -ftree-vectorizer-verbose=5")
+
+if(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -msse3 -ftree-vectorizer-verbose=5")
+else(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
+	include_directories(/opt/tbb41_20130116oss/include/)
+	SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -march=armv7-a -mcpu=cortex-a9 -mfpu=neon -funsafe-math-optimizations -mvectorize-with-neon-quad -ftree-vectorize -ftree-vectorizer-verbose=5" )
+endif(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
+
 
 find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})

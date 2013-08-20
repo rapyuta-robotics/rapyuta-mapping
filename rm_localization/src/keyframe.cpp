@@ -39,7 +39,7 @@ keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 
 void keyframe::estimate_position(frame & f) {
 
-	int level_iterations[] = { 1, 2, 3 };
+	int level_iterations[] = { 0, 0, 3 };
 
 	for (int level = 2; level >= 0; level--) {
 		for (int iteration = 0; iteration < level_iterations[level];
