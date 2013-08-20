@@ -26,7 +26,6 @@
 #include <util.h>
 #include <frame.h>
 #include <keyframe.h>
-#include <image.h>
 
 class CaptureServer {
 protected:
@@ -73,7 +72,6 @@ protected:
 	Sophus::SE3f Mwc;
 
 	ros::Publisher keypoint_pub;
-	image<uint8_t, 320, 240, 3> im;
 
 public:
 
