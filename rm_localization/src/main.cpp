@@ -129,17 +129,22 @@ public:
 	}
 
 	int get_closest_keyframe() {
-		int res = 0;
-		Sophus::SE3f t = keyframes[0]->get_pos().inverse() * Mwc;
-		float dist = t.translation().norm()  +  (1 - t.unit_quaternion().w()) * 30;
 
-		for (size_t i = 1; i < keyframes.size(); i++) {
-			Sophus::SE3f t = keyframes[i]->get_pos().inverse() * Mwc;
-			float current_dist =  t.translation().norm()  +  (1 - t.unit_quaternion().w()) * 30;
+		int res = - 1;
+		float dist = 10000.0;
 
-			if (current_dist < dist) {
-				res = i;
-				dist = current_dist;
+		for (size_t i = 0; i < keyframes.size(); i++) {
+			Sophus::SE3f t = keyframes[i]->get_pos();
+
+			if ((Mwc.translation() - t.translation()).norm() < 0.3) {
+
+				float current_dist = t.unit_quaternion().angularDistance(
+						Mwc.unit_quaternion());
+
+				if (current_dist < dist) {
+					res = i;
+					dist = current_dist;
+				}
 			}
 
 		}
@@ -156,12 +161,13 @@ public:
 
 		if (keyframes.size() != 0) {
 
-			int closest_keyframe_idx = keyframes.size()-1;
+			int closest_keyframe_idx = get_closest_keyframe();
 
 			keyframe::Ptr closest_keyframe = keyframes[closest_keyframe_idx];
 
 			Sophus::SE3f tt = closest_keyframe->get_pos().inverse() * Mwc;
-			std::cerr << "Closest keyframe " << closest_keyframe_idx << std::endl;
+			std::cerr << "Closest keyframe " << closest_keyframe_idx
+					<< std::endl;
 
 			if (tt.translation().norm() > 0.3
 					|| tt.unit_quaternion().w() < 0.9900000) {
