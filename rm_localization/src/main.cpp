@@ -52,7 +52,7 @@ protected:
 
 	int queue_size_;
 
-	Eigen::Vector4f intrinsics;
+	Eigen::Vector3f intrinsics;
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
 	cv::Ptr<cv::DescriptorMatcher> dm;
@@ -68,7 +68,7 @@ protected:
 
 	Eigen::Vector3f offset;
 
-	keyframe::Ptr k;
+	std::vector<keyframe::Ptr> keyframes;
 	Sophus::SE3f Mwc;
 
 	ros::Publisher keypoint_pub;
@@ -80,6 +80,8 @@ public:
 					Eigen::Vector3f::Zero()) {
 
 		ROS_INFO("Creating localization");
+
+		intrinsics << 525.0 / 2, 319.5 / 2, 239.5 / 2;
 
 		tf_prefix_ = tf::getPrefixParam(nh_private);
 		odom_frame = tf::resolve(tf_prefix_, "odom_combined");
@@ -126,6 +128,25 @@ public:
 
 	}
 
+	int get_closest_keyframe() {
+		int res = 0;
+		Sophus::SE3f t = keyframes[0]->get_pos().inverse() * Mwc;
+		float dist = t.translation().norm()  +  (1 - t.unit_quaternion().w()) * 30;
+
+		for (size_t i = 1; i < keyframes.size(); i++) {
+			Sophus::SE3f t = keyframes[i]->get_pos().inverse() * Mwc;
+			float current_dist =  t.translation().norm()  +  (1 - t.unit_quaternion().w()) * 30;
+
+			if (current_dist < dist) {
+				res = i;
+				dist = current_dist;
+			}
+
+		}
+
+		return res;
+	}
+
 	void RGBDCallback(const sensor_msgs::Image::ConstPtr& yuv2_msg,
 			const sensor_msgs::Image::ConstPtr& depth_msg,
 			const sensor_msgs::CameraInfo::ConstPtr& info_msg) {
@@ -133,20 +154,31 @@ public:
 		cv_bridge::CvImageConstPtr yuv2 = cv_bridge::toCvShare(yuv2_msg);
 		cv_bridge::CvImageConstPtr depth = cv_bridge::toCvShare(depth_msg);
 
-		if (k.get()) {
+		if (keyframes.size() != 0) {
 
-			frame f(yuv2->image, depth->image, Mwc);
-			k->estimate_position(f);
-			Mwc = f.get_pos();
+			int closest_keyframe_idx = keyframes.size()-1;
 
-			/*
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = k->get_pointcloud(
-					2);
-			cloud->header.stamp = ros::Time::now();
-			cloud->header.frame_id = "world";
+			keyframe::Ptr closest_keyframe = keyframes[closest_keyframe_idx];
 
-			keypoint_pub.publish(cloud);
-			*/
+			Sophus::SE3f tt = closest_keyframe->get_pos().inverse() * Mwc;
+			std::cerr << "Closest keyframe " << closest_keyframe_idx << std::endl;
+
+			if (tt.translation().norm() > 0.3
+					|| tt.unit_quaternion().w() < 0.9900000) {
+				keyframe::Ptr k(
+						new keyframe(yuv2->image, depth->image, Mwc,
+								intrinsics));
+
+				closest_keyframe->estimate_position(*k);
+				Mwc = k->get_pos();
+				keyframes.push_back(k);
+				std::cerr << "Adding new keyframe" << std::endl;
+
+			} else {
+				frame f(yuv2->image, depth->image, Mwc);
+				closest_keyframe->estimate_position(f);
+				Mwc = f.get_pos();
+			}
 
 			tf::Transform cam_to_world;
 
@@ -158,10 +190,10 @@ public:
 							"/world", "/camera_rgb_optical_frame"));
 
 		} else {
-			Eigen::Vector3f intrinsics(525.0, 319.5, 239.5);
-			intrinsics /= 2;
 
-			k.reset(new keyframe(yuv2->image, depth->image, Mwc, intrinsics));
+			keyframe::Ptr k(
+					new keyframe(yuv2->image, depth->image, Mwc, intrinsics));
+			keyframes.push_back(k);
 		}
 
 		//vis.removeAllPointClouds();
