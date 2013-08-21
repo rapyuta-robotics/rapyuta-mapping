@@ -20,7 +20,6 @@ void publishTf() {
 			map_to_odom.setIdentity();
 			map_to_odom.setOrigin(tf::Vector3(offset[0], offset[1], offset[2]));
 
-
 			br.sendTransform(
 					tf::StampedTransform(map_to_odom, ros::Time::now(),
 							"/world",
@@ -29,9 +28,11 @@ void publishTf() {
 											i + robot_offset) + "/map"));
 
 			/*
-			robot_mappers[i]->update_map_to_odom();
+			//robot_mappers[i]->update_map_to_odom();
+			map_to_odom.setIdentity();
 			br.sendTransform(
-					tf::StampedTransform(robot_mappers[i]->map_to_odom, ros::Time::now(),
+					tf::StampedTransform(map_to_odom,
+							ros::Time::now(),
 							"/cloudbot"
 									+ boost::lexical_cast<std::string>(
 											i + robot_offset) + "/map",
@@ -60,30 +61,22 @@ int main(int argc, char **argv) {
 
 	boost::thread t(publishTf);
 
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::capture_sphere,
-						robot_mappers[i].get()));
+	while (true) {
+		for (int i = 0; i < num_robots; i++) {
+			tg.create_thread(
+					boost::bind(&robot_mapper::capture_sphere,
+							robot_mappers[i].get()));
+		}
+
+		tg.join_all();
+
+		for (int i = 0; i < num_robots; i++) {
+			tg.create_thread(
+					boost::bind(&robot_mapper::move_to_random_point,
+							robot_mappers[i].get()));
+		}
+		tg.join_all();
 	}
-
-	tg.join_all();
-
-
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::move_to_random_point,
-						robot_mappers[i].get()));
-	}
-	tg.join_all();
-
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::capture_sphere,
-						robot_mappers[i].get()));
-	}
-	tg.join_all();
-
-
 
 	return 0;
 }

@@ -38,15 +38,15 @@ public:
 			const Sophus::SE3f & transform);
 	void optimize();
 	void optimize_p2p();
-	void optimize_rgb(int level);
-	void optimize_rgb_with_intrinsics(int level);
-	void optimize_rgb_3d(int level);
-	void optimize_rgb_3d_with_intrinsics(int level);
+	float optimize_rgb(int level);
+	float optimize_rgb_with_intrinsics(int level);
+	float optimize_rgb_3d(int level);
+	float optimize_rgb_3d_with_intrinsics(int level);
 	void set_octomap(RmOctomapServer::Ptr & server);
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();
-	void get_panorama_image(cv::Mat & res, cv::Mat & res_depth);
-	void get_panorama_features(cv::Mat & gray, cv::Mat & depth, std::vector<cv::KeyPoint> & filtered_keypoints,
-			pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors);
+	void get_panorama_image(cv::Mat & res, cv::Mat & res_depth, cv::Mat & rgb);
+
+	void add_panorama_image();
 
 	bool merge(icp_map & other);
 
@@ -59,6 +59,11 @@ public:
 
 	tbb::concurrent_vector<keyframe::Ptr> frames;
 	std::vector<Eigen::Vector3f> intrinsics_vector;
+
+	std::vector<cv::Mat> intencity_panoramas;
+	std::vector<cv::Mat> depth_panoramas;
+	std::vector<Sophus::SE3f> position_panoramas;
+
 	boost::mutex position_modification_mutex;
 	boost::thread optimization_loop_thread;
 };

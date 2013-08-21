@@ -33,7 +33,8 @@ find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
 rosbuild_add_library(${PROJECT_NAME} src/robot_mapper.cpp src/icp_map.cpp src/keyframe.cpp
- src/reduce_jacobian_icp.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_icp_p2p.cpp src/reduce_jacobian_rgb_3d.cpp)
+ src/reduce_jacobian_icp.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_icp_p2p.cpp src/reduce_jacobian_rgb_3d.cpp
+ src/panorama_map.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization_util)
 
 rosbuild_add_executable(multi_mapper src/main.cpp)
@@ -44,8 +45,8 @@ target_link_libraries(multi_mapper ${VTK_LIBRARIES} ${PROJECT_NAME})
 
 rosbuild_add_executable(test2 src/test2.cpp)
 
-rosbuild_add_executable(ba_demo src/ba_demo.cpp)
-target_link_libraries(ba_demo cholmod)
+#rosbuild_add_executable(ba_demo src/ba_demo.cpp)
+#target_link_libraries(ba_demo cholmod)
 
 rosbuild_add_executable(test_lkt src/test_lkt.cpp)
 
@@ -59,3 +60,6 @@ rosbuild_add_executable(test_show src/test_show.cpp)
 target_link_libraries(test_show ${VTK_LIBRARIES} ${PROJECT_NAME})
 
 rosbuild_add_executable(test_rgbd src/test_rgbd.cpp)
+
+rosbuild_add_executable(test_panorama src/test_panorama.cpp)
+target_link_libraries(test_panorama ${PROJECT_NAME})

@@ -8,8 +8,201 @@
 #include <icp_map.h>
 #include <boost/filesystem.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/nonfree/nonfree.hpp>
 #include <fstream>
-#include <util.h>
+
+/*
+ void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
+ cv::Ptr<cv::DescriptorExtractor> & de,
+ cv::Ptr<cv::DescriptorMatcher> & dm) {
+ de = new cv::SiftDescriptorExtractor;
+ dm = new cv::FlannBasedMatcher;
+ fd = new cv::SiftFeatureDetector;
+
+
+ }
+ */
+
+void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
+		cv::Ptr<cv::DescriptorExtractor> & de,
+		cv::Ptr<cv::DescriptorMatcher> & dm) {
+	de = new cv::SurfDescriptorExtractor;
+	dm = new cv::FlannBasedMatcher;
+	fd = new cv::SurfFeatureDetector;
+
+	fd->setInt("hessianThreshold", 400);
+	fd->setInt("extended", 1);
+	fd->setInt("upright", 1);
+	fd->setInt("nOctaves", 8);
+	fd->setInt("nOctaveLayers", 2);
+
+	de->setInt("extended", 1);
+	de->setInt("upright", 1);
+	de->setInt("nOctaves", 8);
+	de->setInt("nOctaveLayers", 2);
+
+}
+
+bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
+		const pcl::PointCloud<pcl::PointXYZ> & dst,
+		const std::vector<cv::DMatch> matches, int num_iter,
+		float distance2_threshold, int min_num_inliers, Eigen::Affine3f & trans,
+		std::vector<bool> & inliers) {
+
+	int max_inliers = 0;
+
+	if (matches.size() < min_num_inliers)
+		return false;
+
+	for (int iter = 0; iter < num_iter; iter++) {
+
+		int rand_idx[3];
+		// Select 3 random points
+		for (int i = 0; i < 3; i++) {
+			rand_idx[i] = rand() % matches.size();
+		}
+
+		while (rand_idx[0] == rand_idx[1] || rand_idx[0] == rand_idx[2]
+				|| rand_idx[1] == rand_idx[2]) {
+			for (int i = 0; i < 3; i++) {
+				rand_idx[i] = rand() % matches.size();
+			}
+		}
+
+		//std::cerr << "Random idx " << rand_idx[0] << " " << rand_idx[1] << " "
+		//		<< rand_idx[2] << " " << matches.size() << std::endl;
+
+		Eigen::Matrix3f src_rand, dst_rand;
+
+		for (int i = 0; i < 3; i++) {
+			src_rand.col(i) =
+					src[matches[rand_idx[i]].queryIdx].getVector3fMap();
+			dst_rand.col(i) =
+					dst[matches[rand_idx[i]].trainIdx].getVector3fMap();
+
+		}
+
+		Eigen::Affine3f transformation;
+		transformation = Eigen::umeyama(src_rand, dst_rand, false);
+
+		//std::cerr << "src_rand " << std::endl << src_rand << std::endl;
+		//std::cerr << "dst_rand " << std::endl << dst_rand << std::endl;
+		//std::cerr << "src_rand_trans " << std::endl << transformation * src_rand
+		//		<< std::endl;
+		//std::cerr << "trans " << std::endl << transformation.matrix()
+		//		<< std::endl;
+
+		int current_num_inliers = 0;
+		std::vector<bool> current_inliers;
+		current_inliers.resize(matches.size());
+		for (size_t i = 0; i < matches.size(); i++) {
+
+			Eigen::Vector4f distance_vector = transformation
+					* src[matches[i].queryIdx].getVector4fMap()
+					- dst[matches[i].trainIdx].getVector4fMap();
+
+			current_inliers[i] = distance_vector.squaredNorm()
+					< distance2_threshold;
+			if (current_inliers[i])
+				current_num_inliers++;
+
+		}
+
+		if (current_num_inliers > max_inliers) {
+			max_inliers = current_num_inliers;
+			inliers = current_inliers;
+		}
+	}
+
+	if (max_inliers < min_num_inliers) {
+		return false;
+	}
+
+	Eigen::Matrix3Xf src_rand(3, max_inliers), dst_rand(3, max_inliers);
+
+	int col_idx = 0;
+	for (size_t i = 0; i < inliers.size(); i++) {
+		if (inliers[i]) {
+			src_rand.col(col_idx) = src[matches[i].queryIdx].getVector3fMap();
+			dst_rand.col(col_idx) = dst[matches[i].trainIdx].getVector3fMap();
+			col_idx++;
+		}
+
+	}
+
+	trans = Eigen::umeyama(src_rand, dst_rand, false);
+	trans.makeAffine();
+
+	std::cerr << max_inliers << std::endl;
+
+	return true;
+
+}
+
+void get_panorama_features(const cv::Mat & gray, const cv::Mat & depth,
+		std::vector<cv::KeyPoint> & filtered_keypoints,
+		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
+
+	cv::Ptr<cv::FeatureDetector> fd;
+	cv::Ptr<cv::DescriptorExtractor> de;
+	cv::Ptr<cv::DescriptorMatcher> dm;
+
+	init_feature_detector(fd, de, dm);
+
+	int threshold = 400;
+	//fd->setInt("hessianThreshold", threshold);
+
+	std::vector<cv::KeyPoint> keypoints;
+
+	cv::Mat mask(depth.size(), CV_8UC1);
+	depth.convertTo(mask, CV_8U);
+
+	fd->detect(gray, keypoints, mask);
+
+	/*
+	 for (int i = 0; i < 5; i++) {
+	 if (keypoints.size() < 900) {
+	 threshold = threshold / 2;
+	 //fd->setInt("hessianThreshold", threshold);
+	 keypoints.clear();
+	 fd->detect(gray, keypoints, mask);
+	 } else {
+	 break;
+	 }
+	 }*/
+
+	if (keypoints.size() > 1000)
+		keypoints.resize(1000);
+
+	filtered_keypoints.clear();
+	keypoints3d.clear();
+
+	float cx = depth.cols / 2.0;
+	float cy = depth.rows / 2.0;
+	float scale_x = 2 * M_PI / depth.cols;
+	float scale_y = 0.5 * M_PI / depth.rows;
+
+	for (size_t i = 0; i < keypoints.size(); i++) {
+		if (depth.at<float>(keypoints[i].pt) != 0) {
+			filtered_keypoints.push_back(keypoints[i]);
+			float phi = (keypoints[i].pt.x - cx) * scale_x;
+			float theta = (keypoints[i].pt.y - cy) * scale_y;
+
+			Eigen::Vector3f vec(cos(theta) * cos(phi), -cos(theta) * sin(phi),
+					-sin(theta));
+			vec *= depth.at<float>(keypoints[i].pt);
+			pcl::PointXYZ p;
+			p.getVector3fMap() = vec;
+
+			keypoints3d.push_back(p);
+
+		}
+	}
+
+	de->compute(gray, filtered_keypoints, descriptors);
+
+}
 
 icp_map::icp_map()
 // : optimization_loop_thread(boost::bind(&icp_map::optimization_loop, this)) {
@@ -140,8 +333,9 @@ void icp_map::optimize_p2p() {
 
 }
 
-void icp_map::optimize_rgb(int level) {
+float icp_map::optimize_rgb(int level) {
 
+	float iteration_max_update;
 	int size = frames.size();
 	int intrinsics_size = intrinsics_vector.size();
 
@@ -193,8 +387,10 @@ void icp_map::optimize_rgb(int level) {
 			-rj.JtJ.block(3, 3, (size - 1) * 3, (size - 1) * 3).ldlt().solve(
 					rj.Jte.segment(3, (size - 1) * 3));
 
-	std::cerr << "Max update " << update.maxCoeff() << " " << update.minCoeff()
-			<< std::endl;
+	iteration_max_update = std::max(abs(update.maxCoeff()),
+			abs(update.minCoeff()));
+
+	std::cerr << "Max update " << iteration_max_update << std::endl;
 
 	position_modification_mutex.lock();
 	for (int i = 0; i < size - 1; i++) {
@@ -214,10 +410,13 @@ void icp_map::optimize_rgb(int level) {
 				<< std::endl;
 	}
 
+	return iteration_max_update;
+
 }
 
-void icp_map::optimize_rgb_with_intrinsics(int level) {
+float icp_map::optimize_rgb_with_intrinsics(int level) {
 
+	float iteration_max_update;
 	int size = frames.size();
 	int intrinsics_size = intrinsics_vector.size();
 
@@ -271,8 +470,10 @@ void icp_map::optimize_rgb_with_intrinsics(int level) {
 			(size - 1) * 3 + intrinsics_size * 3).ldlt().solve(
 			rj.Jte.segment(3, (size - 1) * 3 + intrinsics_size * 3));
 
-	std::cerr << "Max update " << update.maxCoeff() << " " << update.minCoeff()
-			<< std::endl;
+	iteration_max_update = std::max(std::abs(update.maxCoeff()),
+			std::abs(update.minCoeff()));
+
+	std::cerr << "Max update " << iteration_max_update << std::endl;
 
 	position_modification_mutex.lock();
 	for (int i = 0; i < size - 1; i++) {
@@ -298,6 +499,8 @@ void icp_map::optimize_rgb_with_intrinsics(int level) {
 				<< std::endl;
 	}
 
+	return iteration_max_update;
+
 }
 
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr icp_map::get_map_pointcloud() {
@@ -317,8 +520,9 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr icp_map::get_map_pointcloud() {
 
 }
 
-void icp_map::optimize_rgb_3d(int level) {
+float icp_map::optimize_rgb_3d(int level) {
 
+	float iteration_max_update;
 	int size = frames.size();
 	int intrinsics_size = intrinsics_vector.size();
 
@@ -353,25 +557,20 @@ void icp_map::optimize_rgb_3d(int level) {
 	reduce_jacobian_rgb_3d rj(frames, intrinsics_vector, size, intrinsics_size,
 			level);
 
-	/*
-	 tbb::parallel_reduce(
-	 tbb::blocked_range<
-	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
-	 rj);
-	 */
-
-	rj(
+	tbb::parallel_reduce(
 			tbb::blocked_range<
 					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-					overlaping_keyframes.begin(), overlaping_keyframes.end()));
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rj);
 
 	Eigen::VectorXf update =
 			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(
 					rj.Jte.segment(6, (size - 1) * 6));
 
-	std::cerr << "Max update " << update.maxCoeff() << " " << update.minCoeff()
-			<< std::endl;
+	iteration_max_update = std::max(abs(update.maxCoeff()),
+			abs(update.minCoeff()));
+
+	std::cerr << "Max update " << iteration_max_update << std::endl;
 
 	position_modification_mutex.lock();
 	for (int i = 0; i < size - 1; i++) {
@@ -383,10 +582,13 @@ void icp_map::optimize_rgb_3d(int level) {
 
 	position_modification_mutex.unlock();
 
+	return iteration_max_update;
+
 }
 
-void icp_map::optimize_rgb_3d_with_intrinsics(int level) {
+float icp_map::optimize_rgb_3d_with_intrinsics(int level) {
 
+	float iteration_max_update;
 	int size = frames.size();
 	int intrinsics_size = intrinsics_vector.size();
 
@@ -421,32 +623,24 @@ void icp_map::optimize_rgb_3d_with_intrinsics(int level) {
 	reduce_jacobian_rgb_3d rj(frames, intrinsics_vector, size, intrinsics_size,
 			level);
 
-	/*
-	 tbb::parallel_reduce(
-	 tbb::blocked_range<
-	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
-	 rj);
-	 */
-
-	rj(
+	tbb::parallel_reduce(
 			tbb::blocked_range<
 					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-					overlaping_keyframes.begin(), overlaping_keyframes.end()));
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rj);
 
-	Eigen::VectorXf update = -rj.JtJ.block(6, 6,
-			(size - 1) * 6 + intrinsics_size * 3,
-			(size - 1) * 6 + intrinsics_size * 3).ldlt().solve(
-			rj.Jte.segment(6, (size - 1) * 6 + intrinsics_size * 3));
+	Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
 
-	std::cerr << "Max update " << update.maxCoeff() << " " << update.minCoeff()
-			<< std::endl;
+	iteration_max_update = std::max(abs(update.maxCoeff()),
+			abs(update.minCoeff()));
+
+	std::cerr << "Max update " << iteration_max_update << std::endl;
 
 	position_modification_mutex.lock();
-	for (int i = 0; i < size - 1; i++) {
+	for (int i = 0; i < size; i++) {
 
-		frames[i + 1]->get_position() = Sophus::SE3f::exp(
-				update.segment<6>(i * 6)) * frames[i + 1]->get_position();
+		frames[i]->get_position() = Sophus::SE3f::exp(
+				update.segment<6>(i * 6)) * frames[i]->get_position();
 
 	}
 
@@ -463,22 +657,29 @@ void icp_map::optimize_rgb_3d_with_intrinsics(int level) {
 				<< std::endl;
 	}
 
+	return iteration_max_update;
+
 }
 
-void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth) {
+void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth, cv::Mat & res_rgb) {
 	res = cv::Mat::zeros(400, 1600, CV_32F);
+	res_rgb = cv::Mat::zeros(400, 1600, frames[0]->rgb.type());
 	res_depth = cv::Mat::zeros(res.size(), res.type());
 	cv::Mat w = cv::Mat::zeros(res.size(), res.type());
 	cv::Mat w_depth = cv::Mat::zeros(res.size(), res.type());
 
 	cv::Mat map_x(res.size(), res.type()), map_y(res.size(), res.type()),
 			img_projected(res.size(), res.type()), mask(res.size(), res.type()),
-			depth_projected(res.size(), res.type());
+			depth_projected(res.size(), res.type()),
+			rgb_projected(res.size(), res_rgb.type());
 
-	cv::Mat image_weight(frames[0]->rgb.size(), res.type()),
-			intencity_weighted(image_weight.size(), image_weight.type());
+	cv::Mat image_weight(frames[0]->rgb.size(), res.type()), intencity_weighted(
+			image_weight.size(), image_weight.type());
 	cv::Mat depth_weight(image_weight.size(), image_weight.type()),
 			depth_weighted(image_weight.size(), image_weight.type());
+
+	cv::Mat rgb_weighted(
+				image_weight.size(), res_rgb.type());
 
 	float cx = image_weight.cols / 2.0;
 	float cy = image_weight.rows / 2.0;
@@ -541,16 +742,21 @@ void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth) {
 
 		img_projected = 0.0f;
 		mask = 0.0f;
-		cv::multiply(frames[i]->get_subsampled_intencity(0), image_weight, intencity_weighted);
+		cv::multiply(frames[i]->get_subsampled_intencity(0), image_weight,
+				intencity_weighted);
+
 		cv::multiply(frames[i]->depth, depth_weight, depth_weighted, 1 / 1000.0,
 				CV_32F);
 		cv::remap(intencity_weighted, img_projected, map_x, map_y,
 				CV_INTER_LINEAR, cv::BORDER_TRANSPARENT, 0);
+		cv::remap(frames[i]->rgb, rgb_projected, map_x, map_y, CV_INTER_LINEAR,
+						cv::BORDER_TRANSPARENT, 0);
 		cv::remap(image_weight, mask, map_x, map_y, CV_INTER_LINEAR,
 				cv::BORDER_TRANSPARENT, 0);
 		cv::remap(depth_weighted, depth_projected, map_x, map_y, CV_INTER_NN,
 				cv::BORDER_TRANSPARENT, 0);
 		res += img_projected;
+		res_rgb += rgb_projected;
 		w += mask;
 
 		res_depth += depth_projected;
@@ -566,73 +772,7 @@ void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth) {
 
 	res /= w;
 	res_depth /= w_depth;
-}
-
-void icp_map::get_panorama_features(cv::Mat & gray, cv::Mat & depth,
-		std::vector<cv::KeyPoint> & filtered_keypoints,
-		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
-
-	cv::Ptr<cv::FeatureDetector> fd;
-	cv::Ptr<cv::DescriptorExtractor> de;
-	cv::Ptr<cv::DescriptorMatcher> dm;
-
-	init_feature_detector(fd, de, dm);
-
-	cv::Mat gray_f;
-	get_panorama_image(gray_f, depth);
-	gray_f.convertTo(gray, CV_8U, 255);
-
-	int threshold = 400;
-	fd->setInt("hessianThreshold", threshold);
-
-	std::vector<cv::KeyPoint> keypoints;
-
-	cv::Mat mask(depth.size(), CV_8UC1);
-	depth.convertTo(mask, CV_8U);
-
-	fd->detect(gray, keypoints, mask);
-
-	for (int i = 0; i < 5; i++) {
-		if (keypoints.size() < 900) {
-			threshold = threshold / 2;
-			fd->setInt("hessianThreshold", threshold);
-			keypoints.clear();
-			fd->detect(gray, keypoints, mask);
-		} else {
-			break;
-		}
-	}
-
-	if (keypoints.size() > 1000)
-		keypoints.resize(1000);
-
-	filtered_keypoints.clear();
-	keypoints3d.clear();
-
-	float cx = depth.cols / 2.0;
-	float cy = depth.rows / 2.0;
-	float scale_x = 2 * M_PI / depth.cols;
-	float scale_y = 0.5 * M_PI / depth.rows;
-
-	for (size_t i = 0; i < keypoints.size(); i++) {
-		if (depth.at<float>(keypoints[i].pt) != 0) {
-			filtered_keypoints.push_back(keypoints[i]);
-			float phi = (keypoints[i].pt.x - cx) * scale_x;
-			float theta = (keypoints[i].pt.y - cy) * scale_y;
-
-			Eigen::Vector3f vec(cos(theta) * cos(phi), -cos(theta) * sin(phi),
-					-sin(theta));
-			vec *= depth.at<float>(keypoints[i].pt);
-			pcl::PointXYZ p;
-			p.getVector3fMap() = vec;
-
-			keypoints3d.push_back(p);
-
-		}
-	}
-
-	de->compute(gray, filtered_keypoints, descriptors);
-
+	//res_rgb /= w_depth;
 }
 
 bool icp_map::merge(icp_map & other) {
@@ -645,57 +785,79 @@ bool icp_map::merge(icp_map & other) {
 
 	bool result = false;
 
-	std::vector<cv::KeyPoint> keypoints_i, keypoints_j;
-	pcl::PointCloud<pcl::PointXYZ> keypoints3d_i, keypoints3d_j;
-	cv::Mat descriptors_i, descriptors_j;
+	for (int iter = 0; iter < 10; iter++) {
 
-	cv::Mat gray_i, depth_i, gray_j, depth_j;
+		int i = rand() % intencity_panoramas.size();
+		int j = rand() % other.intencity_panoramas.size();
 
-	get_panorama_features(gray_i, depth_i, keypoints_i, keypoints3d_i,
-			descriptors_i);
+		std::vector<cv::KeyPoint> keypoints_i, keypoints_j;
+		pcl::PointCloud<pcl::PointXYZ> keypoints3d_i, keypoints3d_j;
+		cv::Mat descriptors_i, descriptors_j;
 
-	other.get_panorama_features(gray_j, depth_j, keypoints_j, keypoints3d_j,
-			descriptors_j);
+		cv::Mat gray_i, depth_i, gray_j, depth_j;
+		gray_i = intencity_panoramas[i];
+		depth_i = depth_panoramas[i];
+		gray_j = other.intencity_panoramas[j];
+		depth_j = other.depth_panoramas[j];
 
-	std::vector<cv::DMatch> matches, matches_filtered;
-	dm->match(descriptors_j, descriptors_i, matches);
+		get_panorama_features(gray_i, depth_i, keypoints_i, keypoints3d_i,
+				descriptors_i);
 
-	Eigen::Affine3f transform;
-	std::vector<bool> inliers;
+		get_panorama_features(gray_j, depth_j, keypoints_j, keypoints3d_j,
+				descriptors_j);
 
-	bool res = estimate_transform_ransac(keypoints3d_j, keypoints3d_i, matches,
-			20000, 0.05 * 0.05, 20, transform, inliers);
+		std::vector<cv::DMatch> matches, matches_filtered;
+		dm->match(descriptors_j, descriptors_i, matches);
 
-	if (res) {
-		for (int i = 0; i < matches.size(); i++) {
-			if (inliers[i]) {
-				matches_filtered.push_back(matches[i]);
+		Eigen::Affine3f transform;
+		std::vector<bool> inliers;
+
+		bool res = estimate_transform_ransac(keypoints3d_j, keypoints3d_i,
+				matches, 2000, 0.05 * 0.05, 20, transform, inliers);
+
+		if (res) {
+			for (size_t k = 0; k < matches.size(); k++) {
+				if (inliers[k]) {
+					matches_filtered.push_back(matches[k]);
+				}
 			}
+
+			cv::Mat matches_img;
+			cv::drawMatches(gray_j, keypoints_j, gray_i, keypoints_i,
+					matches_filtered, matches_img, cv::Scalar(0, 255, 0));
+
+			cv::imshow("Matches", matches_img);
+			cv::waitKey(0);
+
+			Sophus::SE3f t(transform.rotation(), transform.translation());
+			Sophus::SE3f Mw1w2 = position_panoramas[i] * t
+					* other.position_panoramas[j].inverse();
+
+			for (size_t k = 0; k < other.frames.size(); k++) {
+				keyframe::Ptr & of = other.frames[k];
+				keyframe::Ptr f(new keyframe(of->rgb, of->depth, Mw1w2
+						* of->get_position(), intrinsics_vector, 0));
+				frames.push_back(f);
+			}
+
+			for (size_t k = 0; k < other.intencity_panoramas.size(); k++) {
+				intencity_panoramas.push_back(other.intencity_panoramas[k]);
+				depth_panoramas.push_back(other.depth_panoramas[k]);
+				position_panoramas.push_back(
+						Mw1w2 * other.position_panoramas[k]);
+			}
+
+			break;
+
+		} else {
+			std::cerr << "Could not merge maps" << std::endl;
+			cv::Mat matches_img;
+			cv::drawMatches(gray_j, keypoints_j, gray_i, keypoints_i, matches,
+					matches_img, cv::Scalar(0, 255, 0));
+
+			cv::imshow("Matches", matches_img);
+			cv::waitKey(0);
 		}
-
-		cv::Mat matches_img;
-		cv::drawMatches(gray_j, keypoints_j, gray_i, keypoints_i,
-				matches_filtered, matches_img, cv::Scalar(0, 255, 0));
-
-		cv::imshow("Matches", matches_img);
-		cv::waitKey(0);
-
-		Sophus::SE3f t(transform.rotation(), transform.translation());
-
-		for(int i=0; i<other.frames.size(); i++) {
-			other.frames[i]->get_position() = t * other.frames[i]->get_position();
-			frames.push_back(other.frames[i]);
-		}
-
-
-	} else {
-		std::cerr << "Could not merge maps" << std::endl;
-		cv::Mat matches_img;
-		cv::drawMatches(gray_j, keypoints_j, gray_i, keypoints_i, matches,
-				matches_img, cv::Scalar(0, 255, 0));
-
-		cv::imshow("Matches", matches_img);
-		cv::waitKey(0);
 	}
 
 	return result;
@@ -826,9 +988,9 @@ void icp_map::save(const std::string & dir_name) {
 				frames[i]->get_subsampled_intencity(2) * 255);
 
 		cv::imwrite(
-						dir_name + "/intencity_pyr/"
-								+ boost::lexical_cast<std::string>(i) + ".png",
-						frames[i]->intencity_pyr * 255);
+				dir_name + "/intencity_pyr/"
+						+ boost::lexical_cast<std::string>(i) + ".png",
+				frames[i]->intencity_pyr * 255);
 
 	}
 
@@ -907,6 +1069,17 @@ void icp_map::load(const std::string & dir_name) {
 						positions[i].second));
 		frames.push_back(k);
 	}
+
+}
+
+void icp_map::add_panorama_image() {
+	cv::Mat gray, gray_f, depth, rgb;
+	get_panorama_image(gray_f, depth, rgb);
+	gray_f.convertTo(gray, CV_8U, 255);
+
+	intencity_panoramas.push_back(gray);
+	depth_panoramas.push_back(depth);
+	position_panoramas.push_back(frames[0]->get_position());
 
 }
 

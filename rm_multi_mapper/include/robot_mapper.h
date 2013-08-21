@@ -38,6 +38,7 @@
 //#include <keypoint_map.h>
 #include <opencv2/highgui/highgui.hpp>
 #include <icp_map.h>
+#include <panorama_map.h>
 
 class robot_mapper {
 
@@ -51,7 +52,7 @@ public:
 	void save_image();
 	//void save_circle();
 
-	void capture();
+	void capture(boost::shared_ptr<icp_map> & map);
 	void capture_sphere();
 	void capture_circle();
 
@@ -79,7 +80,7 @@ public:
 	ros::Publisher pub_position_update;
 
 	//boost::shared_ptr<keypoint_map> map;
-	icp_map map;
+	boost::shared_ptr<panorama_map> map;
 
 	Eigen::Affine3f initial_transformation;
 
