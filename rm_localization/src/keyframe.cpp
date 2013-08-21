@@ -24,7 +24,7 @@ keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 		int r = rows >> level;
 
 		Eigen::Vector3f intrinsics = get_intrinsics(level);
-		clouds[level].setZero(4, c*r);
+		clouds[level].setZero(4, c * r);
 
 		convert_depth_to_pointcloud sub(intencity_pyr[level], depth_pyr[level],
 				intrinsics, c, r, clouds[level], intencity_pyr_dx[level],
@@ -100,7 +100,6 @@ void keyframe::estimate_position(frame & f) {
 			//std::cerr << "Transform " << std::endl << f.position.matrix()
 			//		<< std::endl;
 
-
 			if (level == 0) {
 				cv::imshow("intencity_warped", intencity_warped);
 				//cv::imshow("depth_warped", depth_warped);
@@ -112,4 +111,24 @@ void keyframe::estimate_position(frame & f) {
 		}
 	}
 
+}
+
+rm_localization::Keyframe::Ptr keyframe::to_msg(
+		const cv_bridge::CvImageConstPtr & yuv2) {
+	rm_localization::Keyframe::Ptr k(new rm_localization::Keyframe);
+
+	cv::Mat rgb;
+	cv::cvtColor(yuv2->image, rgb, CV_YUV2RGB_UYVY);
+
+	cv::imencode(".png", rgb, k->rgb_png_data);
+	cv::imencode(".png", get_d(0), k->depth_png_data);
+
+	k->header.frame_id = yuv2->header.frame_id;
+	k->header.stamp = yuv2->header.stamp;
+
+	memcpy(k->intrinsics.data(), intrinsics.data(), 3 * sizeof(float));
+	memcpy(k->unit_quaternion.data(), position.unit_quaternion().coeffs().data(), 4 * sizeof(float));
+	memcpy(k->position.data(), position.translation().data(), 3 * sizeof(float));
+
+	return k;
 }

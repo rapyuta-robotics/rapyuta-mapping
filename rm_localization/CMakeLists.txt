@@ -18,7 +18,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 #uncomment if you have defined messages
-#rosbuild_genmsg()
+rosbuild_genmsg()
 #uncomment if you have defined services
 rosbuild_gensrv()
 
@@ -40,11 +40,13 @@ endif(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
 find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
-rosbuild_add_executable(localization src/main.cpp src/util.cpp src/frame.cpp src/keyframe.cpp)
-target_link_libraries(localization tbb ${VTK_LIBRARIES})
+rosbuild_add_library(${PROJECT_NAME} src/frame.cpp src/keyframe.cpp)
+target_link_libraries(${PROJECT_NAME} tbb)
 
-rosbuild_add_executable(test_vo src/test_vo.cpp src/frame.cpp src/keyframe.cpp)
-target_link_libraries(test_vo tbb ${VTK_LIBRARIES})
+rosbuild_add_executable(localization src/main.cpp)
+target_link_libraries(localization ${PROJECT_NAME})
+
+rosbuild_add_executable(test_vo src/test_vo.cpp)
+target_link_libraries(test_vo ${PROJECT_NAME} ${VTK_LIBRARIES})
 
 
-rosbuild_add_library(rm_localization_util src/util.cpp)

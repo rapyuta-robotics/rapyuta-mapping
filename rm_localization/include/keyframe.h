@@ -8,6 +8,9 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
+#include <cv_bridge/cv_bridge.h>
+#include <rm_localization/Keyframe.h>
+
 struct convert_depth_to_pointcloud {
 	const uint8_t * intencity;
 	const uint16_t * depth;
@@ -196,6 +199,9 @@ public:
 	inline Eigen::Vector3f get_intrinsics(int level) {
 		return intrinsics / (1 << level);
 	}
+
+	rm_localization::Keyframe::Ptr to_msg(const cv_bridge::CvImageConstPtr & yuv2);
+
 
 protected:
 	int16_t ** intencity_pyr_dx;
