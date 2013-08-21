@@ -2,7 +2,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 reduce_jacobian_rgb_3d::reduce_jacobian_rgb_3d(
-		tbb::concurrent_vector<keyframe::Ptr> & frames,
+		tbb::concurrent_vector<color_keyframe::Ptr> & frames,
 		std::vector<Eigen::Vector3f> & intrinsics_vector, int size,
 		int intrinsics_size, int subsample_level) :
 		size(size), intrinsics_size(intrinsics_size), subsample_level(

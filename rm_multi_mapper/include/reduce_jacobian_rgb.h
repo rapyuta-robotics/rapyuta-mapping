@@ -8,7 +8,7 @@
 #ifndef REDUCE_JACOBIAN_RGB_H_
 #define REDUCE_JACOBIAN_RGB_H_
 
-#include <keyframe.h>
+#include <color_keyframe.h>
 #include <tbb/concurrent_vector.h>
 #include <tbb/parallel_reduce.h>
 
@@ -20,11 +20,11 @@ struct reduce_jacobian_rgb {
 	int intrinsics_size;
 	int subsample_level;
 
-	tbb::concurrent_vector<keyframe::Ptr> & frames;
+	tbb::concurrent_vector<color_keyframe::Ptr> & frames;
 	std::vector<Eigen::Vector3f> & intrinsics_vector;
 
 
-	reduce_jacobian_rgb(tbb::concurrent_vector<keyframe::Ptr> & frames, std::vector<Eigen::Vector3f> & intrinsics_vector,
+	reduce_jacobian_rgb(tbb::concurrent_vector<color_keyframe::Ptr> & frames, std::vector<Eigen::Vector3f> & intrinsics_vector,
 			int size, int intrinsics_size, int subsample_level);
 
 	reduce_jacobian_rgb(reduce_jacobian_rgb& rb, tbb::split);

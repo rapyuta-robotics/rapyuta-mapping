@@ -15,8 +15,7 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
 
-#include <sophus/se3.hpp>
-#include <sophus/so3.hpp>
+#include <color_keyframe.h>
 
 #include <tbb/concurrent_vector.h>
 #include <tbb/parallel_reduce.h>
@@ -30,7 +29,7 @@
 class icp_map {
 public:
 
-	typedef tbb::concurrent_vector<keyframe::Ptr>::iterator keyframe_reference;
+	typedef tbb::concurrent_vector<color_keyframe::Ptr>::iterator keyframe_reference;
 
 	icp_map();
 
@@ -57,7 +56,7 @@ public:
 	void save(const std::string & dir_name);
 	void load(const std::string & dir_name);
 
-	tbb::concurrent_vector<keyframe::Ptr> frames;
+	tbb::concurrent_vector<color_keyframe::Ptr> frames;
 	std::vector<Eigen::Vector3f> intrinsics_vector;
 
 	std::vector<cv::Mat> intencity_panoramas;

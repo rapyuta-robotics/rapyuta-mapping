@@ -215,7 +215,7 @@ icp_map::icp_map()
 
 icp_map::keyframe_reference icp_map::add_frame(const cv::Mat rgb,
 		const cv::Mat depth, const Sophus::SE3f & transform) {
-	keyframe::Ptr k(new keyframe(rgb, depth, transform, intrinsics_vector, 0));
+	color_keyframe::Ptr k(new color_keyframe(rgb, depth, transform, intrinsics_vector, 0));
 	return frames.push_back(k);
 }
 
@@ -834,9 +834,9 @@ bool icp_map::merge(icp_map & other) {
 					* other.position_panoramas[j].inverse();
 
 			for (size_t k = 0; k < other.frames.size(); k++) {
-				keyframe::Ptr & of = other.frames[k];
-				keyframe::Ptr f(
-						new keyframe(of->rgb, of->depth,
+				color_keyframe::Ptr & of = other.frames[k];
+				color_keyframe::Ptr f(
+						new color_keyframe(of->rgb, of->depth,
 								Mw1w2 * of->get_position(), intrinsics_vector,
 								0));
 				frames.push_back(f);
@@ -1066,8 +1066,8 @@ void icp_map::load(const std::string & dir_name) {
 				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
 						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
 
-		keyframe::Ptr k(
-				new keyframe(rgb, depth, positions[i].first, intrinsics_vector,
+		color_keyframe::Ptr k(
+				new color_keyframe(rgb, depth, positions[i].first, intrinsics_vector,
 						positions[i].second));
 		frames.push_back(k);
 	}

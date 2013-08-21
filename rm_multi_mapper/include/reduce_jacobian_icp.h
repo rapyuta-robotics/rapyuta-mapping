@@ -8,7 +8,7 @@
 #ifndef REDUCE_JACOBIAN_ICP_H_
 #define REDUCE_JACOBIAN_ICP_H_
 
-#include <keyframe.h>
+#include <color_keyframe.h>
 #include <tbb/concurrent_vector.h>
 #include <tbb/parallel_reduce.h>
 #include <pcl/registration/correspondence_estimation.h>
@@ -20,12 +20,12 @@ struct reduce_jacobian_icp {
 	Eigen::VectorXf Jte;
 	int size;
 
-	tbb::concurrent_vector<keyframe::Ptr> & frames;
+	tbb::concurrent_vector<color_keyframe::Ptr> & frames;
 
 	pcl::registration::CorrespondenceEstimation<pcl::PointXYZ, pcl::PointXYZ> ce;
 	pcl::registration::CorrespondenceRejectorOneToOne cr;
 
-	reduce_jacobian_icp(tbb::concurrent_vector<keyframe::Ptr> & frames,
+	reduce_jacobian_icp(tbb::concurrent_vector<color_keyframe::Ptr> & frames,
 			int size);
 
 	reduce_jacobian_icp(reduce_jacobian_icp& rb, tbb::split);

@@ -3,7 +3,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 reduce_jacobian_icp::reduce_jacobian_icp(
-		tbb::concurrent_vector<keyframe::Ptr> & frames, int size) :
+		tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size) :
 		size(size), frames(frames) {
 
 	JtJ.setZero(size * 6, size * 6);
