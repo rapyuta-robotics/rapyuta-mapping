@@ -387,8 +387,8 @@ float icp_map::optimize_rgb(int level) {
 			-rj.JtJ.block(3, 3, (size - 1) * 3, (size - 1) * 3).ldlt().solve(
 					rj.Jte.segment(3, (size - 1) * 3));
 
-	iteration_max_update = std::max(abs(update.maxCoeff()),
-			abs(update.minCoeff()));
+	iteration_max_update = std::max(std::abs(update.maxCoeff()),
+			std::abs(update.minCoeff()));
 
 	std::cerr << "Max update " << iteration_max_update << std::endl;
 
@@ -639,8 +639,8 @@ float icp_map::optimize_rgb_3d_with_intrinsics(int level) {
 	position_modification_mutex.lock();
 	for (int i = 0; i < size; i++) {
 
-		frames[i]->get_position() = Sophus::SE3f::exp(
-				update.segment<6>(i * 6)) * frames[i]->get_position();
+		frames[i]->get_position() = Sophus::SE3f::exp(update.segment<6>(i * 6))
+				* frames[i]->get_position();
 
 	}
 
@@ -661,7 +661,8 @@ float icp_map::optimize_rgb_3d_with_intrinsics(int level) {
 
 }
 
-void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth, cv::Mat & res_rgb) {
+void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth,
+		cv::Mat & res_rgb) {
 	res = cv::Mat::zeros(400, 1600, CV_32F);
 	res_rgb = cv::Mat::zeros(400, 1600, frames[0]->rgb.type());
 	res_depth = cv::Mat::zeros(res.size(), res.type());
@@ -670,16 +671,15 @@ void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth, cv::Mat & r
 
 	cv::Mat map_x(res.size(), res.type()), map_y(res.size(), res.type()),
 			img_projected(res.size(), res.type()), mask(res.size(), res.type()),
-			depth_projected(res.size(), res.type()),
-			rgb_projected(res.size(), res_rgb.type());
+			depth_projected(res.size(), res.type()), rgb_projected(res.size(),
+					res_rgb.type());
 
 	cv::Mat image_weight(frames[0]->rgb.size(), res.type()), intencity_weighted(
 			image_weight.size(), image_weight.type());
 	cv::Mat depth_weight(image_weight.size(), image_weight.type()),
 			depth_weighted(image_weight.size(), image_weight.type());
 
-	cv::Mat rgb_weighted(
-				image_weight.size(), res_rgb.type());
+	cv::Mat rgb_weighted(image_weight.size(), res_rgb.type());
 
 	float cx = image_weight.cols / 2.0;
 	float cy = image_weight.rows / 2.0;
@@ -750,7 +750,7 @@ void icp_map::get_panorama_image(cv::Mat & res, cv::Mat & res_depth, cv::Mat & r
 		cv::remap(intencity_weighted, img_projected, map_x, map_y,
 				CV_INTER_LINEAR, cv::BORDER_TRANSPARENT, 0);
 		cv::remap(frames[i]->rgb, rgb_projected, map_x, map_y, CV_INTER_LINEAR,
-						cv::BORDER_TRANSPARENT, 0);
+				cv::BORDER_TRANSPARENT, 0);
 		cv::remap(image_weight, mask, map_x, map_y, CV_INTER_LINEAR,
 				cv::BORDER_TRANSPARENT, 0);
 		cv::remap(depth_weighted, depth_projected, map_x, map_y, CV_INTER_NN,
@@ -835,8 +835,10 @@ bool icp_map::merge(icp_map & other) {
 
 			for (size_t k = 0; k < other.frames.size(); k++) {
 				keyframe::Ptr & of = other.frames[k];
-				keyframe::Ptr f(new keyframe(of->rgb, of->depth, Mw1w2
-						* of->get_position(), intrinsics_vector, 0));
+				keyframe::Ptr f(
+						new keyframe(of->rgb, of->depth,
+								Mw1w2 * of->get_position(), intrinsics_vector,
+								0));
 				frames.push_back(f);
 			}
 

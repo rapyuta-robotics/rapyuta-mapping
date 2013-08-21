@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 	std::cerr << map.frames.size() << std::endl;
 	for (int level = 2; level >= 0; level--) {
 		for (int i = 0; i < (level + 1) * (level + 1) * 12; i++) {
-			float max_update = map.optimize_rgb_with_intrinsics(level);
+			float max_update = map.optimize_rgb(level);
 
 			if (max_update < 1e-4)
 				break;
