@@ -136,7 +136,7 @@ public:
 		for (size_t i = 0; i < keyframes.size(); i++) {
 			Sophus::SE3f t = keyframes[i]->get_pos();
 
-			if ((Mwc.translation() - t.translation()).norm() < 0.3) {
+			if ((Mwc.translation() - t.translation()).norm() < 0.5) {
 
 				float current_dist = t.unit_quaternion().angularDistance(
 						Mwc.unit_quaternion());
@@ -165,12 +165,12 @@ public:
 
 			keyframe::Ptr closest_keyframe = keyframes[closest_keyframe_idx];
 
-			Sophus::SE3f tt = closest_keyframe->get_pos().inverse() * Mwc;
+			Sophus::SE3f tt = closest_keyframe->get_pos();
 			std::cerr << "Closest keyframe " << closest_keyframe_idx
 					<< std::endl;
 
-			if (tt.translation().norm() > 0.3
-					|| tt.unit_quaternion().w() < 0.9900000) {
+			if ((tt.translation() - Mwc.translation()).norm() > 0.3
+					|| tt.unit_quaternion().angularDistance(Mwc.unit_quaternion()) > M_PI/18) {
 				keyframe::Ptr k(
 						new keyframe(yuv2->image, depth->image, Mwc,
 								intrinsics));
