@@ -200,8 +200,12 @@ public:
 		return intrinsics / (1 << level);
 	}
 
-	rm_localization::Keyframe::Ptr to_msg(const cv_bridge::CvImageConstPtr & yuv2);
+	inline Eigen::Vector3f & get_intrinsics() {
+		return intrinsics;
+	}
 
+	rm_localization::Keyframe::Ptr to_msg(
+			const cv_bridge::CvImageConstPtr & yuv2);
 
 protected:
 	int16_t ** intencity_pyr_dx;

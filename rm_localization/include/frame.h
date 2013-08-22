@@ -197,7 +197,7 @@ public:
 				depth_pyr[level]);
 	}
 
-	inline Sophus::SE3f get_pos() {
+	inline Sophus::SE3f & get_pos() {
 		return position;
 	}
 

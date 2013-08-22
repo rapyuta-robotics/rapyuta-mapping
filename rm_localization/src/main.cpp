@@ -18,7 +18,6 @@
 #include <frame.h>
 #include <keyframe.h>
 
-
 class CaptureServer {
 protected:
 
@@ -43,14 +42,9 @@ protected:
 	tf::TransformBroadcaster br;
 	tf::TransformListener lr;
 
-	std::string tf_prefix_;
-	std::string odom_frame;
-	std::string map_frame;
-
 	std::vector<keyframe::Ptr> keyframes;
 	Sophus::SE3f camera_position;
 
-	nav_msgs::Odometry odom;
 	ros::Publisher odom_pub;
 	ros::Publisher keyframe_pub;
 
@@ -63,23 +57,14 @@ public:
 		ROS_INFO("Creating localization");
 
 		intrinsics << 525.0 / 2, 319.5 / 2, 239.5 / 2;
-		double var = 1e-3;
-		odom.pose.covariance = { {
-				var, 0, 0, 0, 0, 0,
-				0, var, 0, 0, 0, 0,
-				0, 0, var, 0, 0, 0,
-				0, 0, 0, var, 0, 0,
-				0, 0, 0, 0, var, 0,
-				0, 0, 0, 0, 0, var}};
 
-		tf_prefix_ = tf::getPrefixParam(nh_private);
-		odom_frame = tf::resolve(tf_prefix_, "odom_combined");
-		map_frame = tf::resolve(tf_prefix_, "map");
+		init_camera_position();
 
 		queue_size_ = 1;
 
 		odom_pub = nh_.advertise<nav_msgs::Odometry>("vo", queue_size_);
-		keyframe_pub = nh_.advertise<rm_localization::Keyframe>("keyframe", queue_size_);
+		keyframe_pub = nh_.advertise<rm_localization::Keyframe>("keyframe",
+				queue_size_);
 
 		rgb_sub.subscribe(nh_, "rgb/image_raw", queue_size_);
 		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
@@ -123,25 +108,51 @@ public:
 		return res;
 	}
 
-	void publish_vo(const std::string & frame, const ros::Time & time) {
-		odom.header.stamp = time;
-		odom.header.frame_id = frame;
-
-		tf::quaternionEigenToMsg(
-				camera_position.unit_quaternion().cast<double>(),
-				odom.pose.pose.orientation);
-		tf::pointEigenToMsg(camera_position.translation().cast<double>(),
-				odom.pose.pose.position);
-
-		odom_pub.publish(odom);
-	}
-
-	void update_camera_position(const std::string & frame,
-			const ros::Time & time) {
+	void publish_tf(const std::string & frame, const ros::Time & time) {
 
 		tf::StampedTransform transform;
 		try {
-			lr.lookupTransform(frame, odom_frame, time, transform);
+			lr.lookupTransform("base_footprint", "camera_rgb_optical_frame",
+					time, transform);
+
+			Eigen::Quaterniond q;
+			Eigen::Vector3d t;
+
+			tf::quaternionTFToEigen(transform.getRotation(), q);
+			tf::vectorTFToEigen(transform.getOrigin(), t);
+
+			Sophus::SE3f Mcb = Sophus::SE3f(q.cast<float>(), t.cast<float>());
+
+			Sophus::SE3f Mob = camera_position * Mcb;
+
+			geometry_msgs::TransformStamped tr;
+
+			tf::quaternionEigenToMsg(
+					camera_position.unit_quaternion().cast<double>(),
+					tr.transform.rotation);
+			tf::vectorEigenToMsg(camera_position.translation().cast<double>(),
+					tr.transform.translation);
+
+			tr.header.frame_id = "odom";
+			tr.header.stamp = time;
+			tr.child_frame_id = "base_footprint";
+
+			br.sendTransform(tr);
+
+		} catch (tf::TransformException & ex) {
+			ROS_ERROR("%s", ex.what());
+		}
+
+	}
+
+	void init_camera_position() {
+
+		tf::StampedTransform transform;
+		try {
+			ros::Time time = ros::Time::now();
+			//lr.waitForTransform("camera_rgb_optical_frame", "base_footprint", time, ros::Duration(5));
+			lr.lookupTransform("camera_rgb_optical_frame", "base_footprint",
+					time, transform);
 
 			Eigen::Quaterniond q;
 			Eigen::Vector3d t;
@@ -192,6 +203,7 @@ public:
 			}
 
 		} else {
+
 			keyframe::Ptr k(
 					new keyframe(yuv2->image, depth->image, camera_position,
 							intrinsics));
@@ -199,7 +211,7 @@ public:
 			keyframes.push_back(k);
 		}
 
-		publish_vo(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
+		publish_tf(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 	}
 
