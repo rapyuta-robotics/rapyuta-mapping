@@ -1,16 +1,3 @@
-diff --git a/Source/Drivers/PS1080/PS1080Console/PS1080Console.cpp b/Source/Drivers/PS1080/PS1080Console/PS1080Console.cpp
-index e9e23ab..5635284 100644
---- a/Source/Drivers/PS1080/PS1080Console/PS1080Console.cpp
-+++ b/Source/Drivers/PS1080/PS1080Console/PS1080Console.cpp
-@@ -953,7 +953,7 @@ bool Download(openni::Device& Device, vector<string>& Command)
- 		printf("Can't understand %s as id\n", Command[1].c_str());
- 		return true;
- 	}
--	XnParamFileData ParamFile = {nId, Command[2].c_str()};
-+	XnParamFileData ParamFile = {(uint32_t) nId, Command[2].c_str()};
- 
- 	openni::Status rc = Device.getProperty(XN_MODULE_PROPERTY_FILE, &ParamFile);
- 	if (rc != openni::STATUS_OK)
 diff --git a/ThirdParty/PSCommon/BuildSystem/Platform.Arm b/ThirdParty/PSCommon/BuildSystem/Platform.Arm
 index c4a112d..996f2f0 100644
 --- a/ThirdParty/PSCommon/BuildSystem/Platform.Arm
