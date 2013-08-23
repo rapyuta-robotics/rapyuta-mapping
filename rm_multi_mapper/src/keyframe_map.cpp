@@ -4,6 +4,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <fstream>
 #include <reduce_jacobian_rgb.h>
+#include <reduce_jacobian_rgb_3d.h>
 
 keyframe_map::keyframe_map() {
 }
@@ -37,19 +38,18 @@ float keyframe_map::optimize_panorama(int level) {
 
 	reduce_jacobian_rgb rj(frames, size, level);
 
-
-	 tbb::parallel_reduce(
-	 tbb::blocked_range<
-	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
-	 rj);
-
-/*
-	rj(
+	tbb::parallel_reduce(
 			tbb::blocked_range<
 					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-					overlaping_keyframes.begin(), overlaping_keyframes.end()));
-*/
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rj);
+
+	/*
+	 rj(
+	 tbb::blocked_range<
+	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
+	 */
 
 	Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
 	//Eigen::VectorXf update =
@@ -66,15 +66,74 @@ float keyframe_map::optimize_panorama(int level) {
 		frames[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
 				* frames[i]->get_pos().so3();
 
+		frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
+
 		frames[i]->get_intrinsics().array() =
 				update.segment<3>(size * 3).array().exp()
 						* frames[i]->get_intrinsics().array();
 
-		if(i==0) {
+		if (i == 0) {
 			Eigen::Vector3f intrinsics = frames[i]->get_intrinsics();
-			ROS_INFO("New intrinsics %f, %f, %f", intrinsics(0), intrinsics(1), intrinsics(2));
+			ROS_INFO("New intrinsics %f, %f, %f", intrinsics(0), intrinsics(1),
+					intrinsics(2));
 		}
 
+	}
+
+	return iteration_max_update;
+
+}
+
+float keyframe_map::optimize(int level) {
+
+	float iteration_max_update;
+	int size = frames.size();
+
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			if (i != j) {
+				float angle =
+						frames[i]->get_pos().unit_quaternion().angularDistance(
+								frames[j]->get_pos().unit_quaternion());
+
+				if (angle < M_PI / 6) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
+				}
+			}
+		}
+	}
+
+	reduce_jacobian_rgb_3d rj(frames, size, level);
+
+	/*
+	tbb::parallel_reduce(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rj);
+	*/
+
+	rj(
+		 tbb::blocked_range<
+		 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+		 overlaping_keyframes.begin(), overlaping_keyframes.end()));
+
+	Eigen::VectorXf update =
+					-rj.JtJ.block(6, 6, (size-1) * 6, (size-1) * 6).ldlt().solve(
+							rj.Jte.segment(6, (size-1) * 6));
+
+
+	iteration_max_update = std::max(std::abs(update.maxCoeff()),
+			std::abs(update.minCoeff()));
+
+	ROS_INFO("Max update %f", iteration_max_update);
+
+	for (int i = 0; i < size-1; i++) {
+		frames[i+1]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i * 6))
+				* frames[i+1]->get_pos();
 	}
 
 	return iteration_max_update;

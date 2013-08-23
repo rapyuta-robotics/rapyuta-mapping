@@ -55,8 +55,7 @@ protected:
 public:
 
 	CaptureServer() :
-			nh_private("~"), camera_position(Eigen::Quaternionf::Identity(),
-					Eigen::Vector3f::Zero()) {
+			nh_private("~") {
 
 		ROS_INFO("Creating localization");
 
@@ -86,6 +85,7 @@ public:
 	}
 
 	~CaptureServer(void) {
+		delete rgb_tf_sub;
 	}
 
 	int get_closest_keyframe() {

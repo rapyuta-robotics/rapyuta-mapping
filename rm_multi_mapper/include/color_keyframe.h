@@ -28,6 +28,10 @@ public:
 		return rgb;
 	}
 
+	inline Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & get_cloud(int level) {
+		return clouds[level];
+	}
+
 	static Ptr from_msg(const rm_localization::Keyframe::ConstPtr & k);
 
 protected:

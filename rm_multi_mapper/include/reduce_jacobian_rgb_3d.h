@@ -19,26 +19,17 @@ struct reduce_jacobian_rgb_3d {
 	Eigen::MatrixXf JtJ;
 	Eigen::VectorXf Jte;
 	int size;
-	int intrinsics_size;
 	int subsample_level;
 
 	tbb::concurrent_vector<color_keyframe::Ptr> & frames;
-	std::vector<Eigen::Vector3f> & intrinsics_vector;
 
-	reduce_jacobian_rgb_3d(tbb::concurrent_vector<color_keyframe::Ptr> & frames,
-			std::vector<Eigen::Vector3f> & intrinsics_vector, int size,
-			int intrinsics_size, int subsample_level);
+	reduce_jacobian_rgb_3d(tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size, int subsample_level);
 
 	reduce_jacobian_rgb_3d(reduce_jacobian_rgb_3d & rb, tbb::split);
 
 	void compute_frame_jacobian(const Eigen::Vector3f & i,
-			const Eigen::Matrix4f & Miw, const Eigen::Matrix4f & Mwj,
-			Eigen::Matrix<float, 12, 6> & Ji, Eigen::Matrix<float, 12, 6> & Jj,
-			Eigen::Matrix<float, 12, 3> & Jk);
-
-	void warpImage(int i, int j, cv::Mat & intensity_i, cv::Mat & intensity_j,
-			cv::Mat & intensity_j_warped, cv::Mat & intensity_j_warped_x,
-			cv::Mat & intensity_j_warped_y, cv::Mat & depth_j);
+			const Eigen::Vector4f & p, const Eigen::Matrix<float, 4, 4, Eigen::ColMajor> & Miw,
+			Eigen::Matrix<float, 2, 6> & J);
 
 	void operator()(
 			const tbb::blocked_range<

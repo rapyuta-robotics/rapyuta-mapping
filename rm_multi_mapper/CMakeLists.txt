@@ -33,7 +33,7 @@ find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
 
-rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp)
+rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_rgb_3d.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization)
 
 rosbuild_add_executable(test_keyframe_extraction src/test_keyframe_extraction.cpp)
@@ -58,8 +58,8 @@ target_link_libraries(test_keyframe_extraction ${PROJECT_NAME})
 
 #rosbuild_add_executable(test_lkt src/test_lkt.cpp)
 
-#rosbuild_add_executable(test_icp src/test_icp.cpp)
-#target_link_libraries(test_icp ${PROJECT_NAME})
+rosbuild_add_executable(test_icp src/test_icp.cpp)
+target_link_libraries(test_icp ${PROJECT_NAME})
 
 #rosbuild_add_executable(test_merge src/test_merge.cpp)
 #target_link_libraries(test_merge ${VTK_LIBRARIES} ${PROJECT_NAME})
