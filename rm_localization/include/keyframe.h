@@ -138,13 +138,11 @@ struct reduce_jacobian {
 
 	void operator()(const tbb::blocked_range<int>& range) {
 		for (int i = range.begin(); i != range.end(); i++) {
-			int u = i % cols;
-			int v = i / cols;
 
 			Eigen::Vector4f p = cloud.col(i);
 			if (p(3) && depth_warped[i] != 0) {
 
-				float error = intencity[i] - intencity_warped[i];
+				float error = (float) intencity[i] - (float) intencity_warped[i];
 
 				Eigen::Matrix<float, 1, 2> Ji;
 				Eigen::Matrix<float, 2, 6> Jw;

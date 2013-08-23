@@ -7,6 +7,8 @@
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
+#include <tf/message_filter.h>
+
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
 
@@ -33,6 +35,8 @@ protected:
 	message_filters::Subscriber<sensor_msgs::Image> depth_sub;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub;
 
+	tf::MessageFilter<sensor_msgs::Image> * rgb_tf_sub;
+
 	boost::shared_ptr<Synchronizer> sync;
 
 	int queue_size_;
@@ -58,9 +62,7 @@ public:
 
 		intrinsics << 525.0 / 2, 319.5 / 2, 239.5 / 2;
 
-		init_camera_position();
-
-		queue_size_ = 1;
+		queue_size_ = 5;
 
 		odom_pub = nh_.advertise<nav_msgs::Odometry>("vo", queue_size_);
 		keyframe_pub = nh_.advertise<rm_localization::Keyframe>("keyframe",
@@ -70,10 +72,13 @@ public:
 		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
 		info_sub.subscribe(nh_, "rgb/camera_info", queue_size_);
 
+		rgb_tf_sub = new tf::MessageFilter<sensor_msgs::Image>(rgb_sub, lr,
+				"base_footprint", queue_size_);
+
 		// Synchronize inputs.
 		sync.reset(
-				new Synchronizer(SyncPolicy(queue_size_), rgb_sub, depth_sub,
-						info_sub));
+				new Synchronizer(SyncPolicy(queue_size_), *rgb_tf_sub,
+						depth_sub, info_sub));
 
 		sync->registerCallback(
 				boost::bind(&CaptureServer::RGBDCallback, this, _1, _2, _3));
@@ -112,7 +117,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			lr.lookupTransform("base_footprint", "camera_rgb_optical_frame",
+			lr.lookupTransform(frame, "base_footprint",
 					time, transform);
 
 			Eigen::Quaterniond q;
@@ -127,10 +132,9 @@ public:
 
 			geometry_msgs::TransformStamped tr;
 
-			tf::quaternionEigenToMsg(
-					camera_position.unit_quaternion().cast<double>(),
+			tf::quaternionEigenToMsg(Mob.unit_quaternion().cast<double>(),
 					tr.transform.rotation);
-			tf::vectorEigenToMsg(camera_position.translation().cast<double>(),
+			tf::vectorEigenToMsg(Mob.translation().cast<double>(),
 					tr.transform.translation);
 
 			tr.header.frame_id = "odom";
@@ -145,14 +149,12 @@ public:
 
 	}
 
-	void init_camera_position() {
+	void init_camera_position(const std::string & frame,
+			const ros::Time & time) {
 
 		tf::StampedTransform transform;
 		try {
-			ros::Time time = ros::Time::now();
-			//lr.waitForTransform("camera_rgb_optical_frame", "base_footprint", time, ros::Duration(5));
-			lr.lookupTransform("camera_rgb_optical_frame", "base_footprint",
-					time, transform);
+			lr.lookupTransform("base_footprint", frame, time, transform);
 
 			Eigen::Quaterniond q;
 			Eigen::Vector3d t;
@@ -164,6 +166,9 @@ public:
 		} catch (tf::TransformException & ex) {
 			ROS_ERROR("%s", ex.what());
 		}
+
+		ROS_INFO_STREAM(
+				"Initial camera position" << std::endl << camera_position.matrix());
 	}
 
 	void RGBDCallback(const sensor_msgs::Image::ConstPtr& yuv2_msg,
@@ -203,6 +208,8 @@ public:
 			}
 
 		} else {
+
+			init_camera_position(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 			keyframe::Ptr k(
 					new keyframe(yuv2->image, depth->image, camera_position,
