@@ -1,25 +1,21 @@
 #include <reduce_jacobian_rgb.h>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 reduce_jacobian_rgb::reduce_jacobian_rgb(
-		tbb::concurrent_vector<color_keyframe::Ptr> & frames,
-		std::vector<Eigen::Vector3f> & intrinsics_vector, int size,
-		int intrinsics_size, int subsample_level) :
-		size(size), intrinsics_size(intrinsics_size), subsample_level(
-				subsample_level), frames(frames), intrinsics_vector(
-				intrinsics_vector) {
+		tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size,
+		int subsample_level) :
+		size(size), subsample_level(subsample_level), frames(frames) {
 
-	JtJ.setZero(size * 3 + 3 * intrinsics_size, size * 3 + 3 * intrinsics_size);
-	Jte.setZero(size * 3 + 3 * intrinsics_size);
+	JtJ.setZero(size * 3 + 3, size * 3 + 3);
+	Jte.setZero(size * 3 + 3);
 
 }
 
 reduce_jacobian_rgb::reduce_jacobian_rgb(reduce_jacobian_rgb& rb, tbb::split) :
-		size(rb.size), intrinsics_size(rb.intrinsics_size), subsample_level(
-				rb.subsample_level), frames(rb.frames), intrinsics_vector(
-				rb.intrinsics_vector) {
-	JtJ.setZero(size * 3 + 3 * intrinsics_size, size * 3 + 3 * intrinsics_size);
-	Jte.setZero(size * 3 + 3 * intrinsics_size);
+		size(rb.size), subsample_level(rb.subsample_level), frames(rb.frames) {
+	JtJ.setZero(size * 3 + 3, size * 3 + 3);
+	Jte.setZero(size * 3 + 3);
 }
 
 void reduce_jacobian_rgb::compute_frame_jacobian(const Eigen::Vector3f & i,
@@ -214,26 +210,23 @@ void reduce_jacobian_rgb::operator()(
 		int i = it->first;
 		int j = it->second;
 
-		Eigen::Vector3f intrinsics = frames[i]->get_subsampled_intrinsics(
-				subsample_level);
-		cv::Mat intensity_i = frames[i]->get_subsampled_intencity(
-				subsample_level);
-		cv::Mat intensity_j = frames[j]->get_subsampled_intencity(
-				subsample_level);
+		Eigen::Vector3f intrinsics = frames[i]->get_intrinsics(subsample_level);
+
+		cv::Mat intensity_i, intensity_j;
+		//frames[i]->get_i(subsample_level).convertTo(intensity_i, CV_32F);
+		//frames[j]->get_i(subsample_level).convertTo(intensity_j, CV_32F);
+		intensity_i = frames[i]->get_i(subsample_level);
+		intensity_j = frames[j]->get_i(subsample_level);
 
 		Eigen::Quaternionf Qij =
-				frames[i]->get_position().unit_quaternion().inverse()
-						* frames[j]->get_position().unit_quaternion();
+				frames[i]->get_pos().unit_quaternion().inverse()
+						* frames[j]->get_pos().unit_quaternion();
 
 		Eigen::Matrix3f K;
 		K << intrinsics[0], 0, intrinsics[1], 0, intrinsics[0], intrinsics[2], 0, 0, 1;
 
 		Eigen::Matrix3f H = K * Qij.matrix() * K.inverse();
 		cv::Mat cvH(3, 3, CV_32F, H.data());
-
-		//std::cerr << "Intrinsics" << std::endl << intrinsics << std::endl << "H"
-		//		<< std::endl << H << std::endl << "cvH" << std::endl << cvH
-		//		<< std::endl;
 
 		cv::Mat intensity_j_warped, intensity_i_dx, intensity_i_dy;
 		intensity_j_warped = cv::Mat::zeros(intensity_j.size(),
@@ -246,78 +239,72 @@ void reduce_jacobian_rgb::operator()(
 		//cv::imshow("intensity_j_warped", intensity_j_warped);
 		//cv::waitKey();
 
-		intensity_i_dx = frames[i]->get_subsampled_intencity_dx(
-				subsample_level);
-		intensity_i_dy = frames[i]->get_subsampled_intencity_dy(
-				subsample_level);
+		intensity_i_dx = frames[i]->get_i_dx(subsample_level);
+		intensity_i_dy = frames[i]->get_i_dy(subsample_level);
 
-		cv::Mat error = intensity_i - intensity_j_warped;
+		//cv::Sobel(intensity_i, intensity_i_dx, CV_32F, 1, 0);
+		//cv::Sobel(intensity_i, intensity_i_dy, CV_32F, 0, 1);
 
-		int ki = frames[i]->get_intrinsics_idx();
-		int kj = frames[j]->get_intrinsics_idx();
+		Eigen::Matrix<float, 9, 3> Jwi, Jwj, Jwk;
 
-		if (ki == kj) {
+		compute_frame_jacobian(intrinsics,
+				frames[i]->get_pos().unit_quaternion().matrix(),
+				frames[j]->get_pos().unit_quaternion().matrix(), Jwi, Jwj,
+				Jwk);
 
-			Eigen::Matrix<float, 9, 3> Jwi, Jwj, Jwk;
+		for (int v = 0; v < intensity_i.rows; v++) {
+			for (int u = 0; u < intensity_i.cols; u++) {
+				if (intensity_j_warped.at<uint8_t>(v, u) != 0) {
 
-			compute_frame_jacobian(intrinsics,
-					frames[i]->get_position().unit_quaternion().matrix(),
-					frames[j]->get_position().unit_quaternion().matrix(), Jwi,
-					Jwj, Jwk);
+					float e = (float) intensity_i.at<uint8_t>(v, u) - (float) intensity_j_warped.at<uint8_t>(v, u);
 
-			for (int v = 0; v < intensity_i.rows; v++) {
-				for (int u = 0; u < intensity_i.cols; u++) {
-					if (intensity_j_warped.at<float>(v, u) != 0) {
+					float dx = intensity_i_dx.at<int16_t>(v, u);
+					float dy = intensity_i_dy.at<int16_t>(v, u);
+					float udx = dx * u;
+					float vdx = dx * v;
+					float udy = dy * u;
+					float vdy = dy * v;
 
-						float e = error.at<float>(v, u);
+					float mudxmvdy = -udx - vdy;
 
-						float dx = intensity_i_dx.at<float>(v, u);
-						float dy = intensity_i_dy.at<float>(v, u);
-						float udx = dx * u;
-						float vdx = dx * v;
-						float udy = dy * u;
-						float vdy = dy * v;
+					Eigen::Matrix<float, 1, 9> Jp;
+					Jp << udx, vdx, dx, udy, vdy, dy, u * mudxmvdy, v
+							* mudxmvdy, mudxmvdy;
 
-						float mudxmvdy = -udx - vdy;
+					Eigen::Matrix<float, 1, 3> Ji, Jj, Jk;
+					Ji = Jp * Jwi;
+					Jj = Jp * Jwj;
+					Jk = Jp * Jwk;
 
-						Eigen::Matrix<float, 1, 9> Jp;
-						Jp << udx, vdx, dx, udy, vdy, dy, u * mudxmvdy, v
-								* mudxmvdy, mudxmvdy;
+					//
+					JtJ.block<3, 3>(i * 3, i * 3) += Ji.transpose() * Ji;
+					JtJ.block<3, 3>(j * 3, j * 3) += Jj.transpose() * Jj;
+					JtJ.block<3, 3>(size * 3, size * 3) +=
+							Jk.transpose() * Jk;
+					// i and j
+					JtJ.block<3, 3>(i * 3, j * 3) += Ji.transpose() * Jj;
+					JtJ.block<3, 3>(j * 3, i * 3) += Jj.transpose() * Ji;
 
-						Eigen::Matrix<float, 1, 3> Ji, Jj, Jk;
-						Ji = Jp * Jwi;
-						Jj = Jp * Jwj;
-						Jk = Jp * Jwk;
+					// i and k
+					JtJ.block<3, 3>(i * 3, size * 3 ) += Ji.transpose()
+							* Jk;
+					JtJ.block<3, 3>(size * 3, i * 3) += Jk.transpose()
+							* Ji;
 
-						//
-						JtJ.block<3, 3>(i * 3, i * 3) += Ji.transpose() * Ji;
-						JtJ.block<3, 3>(j * 3, j * 3) += Jj.transpose() * Jj;
-						JtJ.block<3, 3>(size * 3 + ki, size * 3 + ki) +=
-								Jk.transpose() * Jk;
-						// i and j
-						JtJ.block<3, 3>(i * 3, j * 3) += Ji.transpose() * Jj;
-						JtJ.block<3, 3>(j * 3, i * 3) += Jj.transpose() * Ji;
+					// j and k
+					JtJ.block<3, 3>(size * 3, j * 3) += Jk.transpose()
+							* Jj;
+					JtJ.block<3, 3>(j * 3, size * 3) += Jj.transpose()
+							* Jk;
 
-						// i and k
-						JtJ.block<3, 3>(i * 3, size * 3 + ki) += Ji.transpose()
-								* Jk;
-						JtJ.block<3, 3>(size * 3 + ki, i * 3) += Jk.transpose()
-								* Ji;
+					// errors
+					Jte.segment<3>(i * 3) += Ji.transpose() * e;
+					Jte.segment<3>(j * 3) += Jj.transpose() * e;
+					Jte.segment<3>(size * 3) += Jk.transpose() * e;
 
-						// j and k
-						JtJ.block<3, 3>(size * 3 + ki, j * 3) += Jk.transpose()
-								* Jj;
-						JtJ.block<3, 3>(j * 3, size * 3 + ki) += Jj.transpose()
-								* Jk;
-
-						// errors
-						Jte.segment<3>(i * 3) += Ji.transpose() * e;
-						Jte.segment<3>(j * 3) += Jj.transpose() * e;
-						Jte.segment<3>(size * 3 + ki) += Jk.transpose() * e;
-
-					}
 				}
 			}
+
 		}
 
 	}

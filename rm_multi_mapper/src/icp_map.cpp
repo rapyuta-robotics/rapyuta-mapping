@@ -231,12 +231,10 @@ void icp_map::optimize() {
 
 			if (i != j) {
 
-				float centroid_distance = (frames[i]->get_centroid()
-						- frames[j]->get_centroid()).squaredNorm();
 
 				Eigen::Quaternionf diff_quat =
-						frames[i]->get_position().unit_quaternion()
-								* frames[j]->get_position().unit_quaternion().inverse();
+						frames[i]->get_pos().unit_quaternion()
+								* frames[j]->get_pos().unit_quaternion().inverse();
 
 				float angle = 2 * std::acos(std::abs(diff_quat.w()));
 
@@ -268,7 +266,7 @@ void icp_map::optimize() {
 	position_modification_mutex.lock();
 	for (int i = 0; i < size - 1; i++) {
 
-		frames[i + 1]->get_position() = Sophus::SE3f::exp(
+		frames[i + 1]->get_pos() = Sophus::SE3f::exp(
 				update.segment<6>(i * 6)) * frames[i + 1]->get_position();
 
 	}

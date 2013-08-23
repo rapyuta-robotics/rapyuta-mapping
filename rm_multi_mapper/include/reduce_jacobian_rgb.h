@@ -17,15 +17,13 @@ struct reduce_jacobian_rgb {
 	Eigen::MatrixXf JtJ;
 	Eigen::VectorXf Jte;
 	int size;
-	int intrinsics_size;
 	int subsample_level;
 
 	tbb::concurrent_vector<color_keyframe::Ptr> & frames;
-	std::vector<Eigen::Vector3f> & intrinsics_vector;
 
 
-	reduce_jacobian_rgb(tbb::concurrent_vector<color_keyframe::Ptr> & frames, std::vector<Eigen::Vector3f> & intrinsics_vector,
-			int size, int intrinsics_size, int subsample_level);
+	reduce_jacobian_rgb(tbb::concurrent_vector<color_keyframe::Ptr> & frames,
+			int size, int subsample_level);
 
 	reduce_jacobian_rgb(reduce_jacobian_rgb& rb, tbb::split);
 
