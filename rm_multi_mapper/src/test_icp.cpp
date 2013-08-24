@@ -18,13 +18,13 @@
 int main(int argc, char **argv) {
 
 	keyframe_map map;
-	map.load("keyframe_map_optimized");
+	map.load("keyframe_map");
 
 	cv::imshow("img", map.get_panorama_image());
 	cv::waitKey();
 
 	std::cerr << map.frames.size() << std::endl;
-	for (int level = 0; level >= 0; level--) {
+	for (int level = 2; level >= 0; level--) {
 		for (int i = 0; i < (level + 1) * (level + 1) * 10; i++) {
 			float max_update = map.optimize(level);
 
@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
 	cv::imshow("img", map.get_panorama_image());
 	cv::waitKey();
 
-	//map.save("keyframe_map_optimized");
+	map.save("keyframe_map_optimized");
 
 	return 0;
 

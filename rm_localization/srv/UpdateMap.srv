@@ -1,0 +1,4 @@
+int32[] idx
+rm_localization/Transform[] transform
+float32[3] intrinsics
+---

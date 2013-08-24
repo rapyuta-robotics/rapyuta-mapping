@@ -30,6 +30,7 @@ public:
 	void load(const std::string & dir_name);
 
 	tbb::concurrent_vector<color_keyframe::Ptr> frames;
+	tbb::concurrent_vector<int> idx;
 };
 
 #endif /* KEYFRAME_MAP_H_ */

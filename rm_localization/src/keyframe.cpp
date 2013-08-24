@@ -100,14 +100,33 @@ void keyframe::estimate_position(frame & f) {
 			//std::cerr << "Transform " << std::endl << f.position.matrix()
 			//		<< std::endl;
 
-
 		}
 	}
 
 }
 
+void keyframe::update_intrinsics(const Eigen::Vector3f & intrinsics) {
+	this->intrinsics = intrinsics;
+
+	for (int level = 0; level < max_level; level++) {
+
+		int c = cols >> level;
+		int r = rows >> level;
+
+		Eigen::Vector3f intrinsics = get_intrinsics(level);
+		clouds[level].setZero(4, c * r);
+
+		convert_depth_to_pointcloud sub(intencity_pyr[level], depth_pyr[level],
+				intrinsics, c, r, clouds[level], intencity_pyr_dx[level],
+				intencity_pyr_dy[level]);
+		tbb::parallel_for(tbb::blocked_range<int>(0, c * r), sub);
+
+	}
+
+}
+
 rm_localization::Keyframe::Ptr keyframe::to_msg(
-		const cv_bridge::CvImageConstPtr & yuv2) {
+		const cv_bridge::CvImageConstPtr & yuv2, int idx) {
 	rm_localization::Keyframe::Ptr k(new rm_localization::Keyframe);
 
 	cv::Mat rgb;
@@ -120,8 +139,12 @@ rm_localization::Keyframe::Ptr keyframe::to_msg(
 	k->header.stamp = yuv2->header.stamp;
 
 	memcpy(k->intrinsics.data(), intrinsics.data(), 3 * sizeof(float));
-	memcpy(k->unit_quaternion.data(), position.unit_quaternion().coeffs().data(), 4 * sizeof(float));
-	memcpy(k->position.data(), position.translation().data(), 3 * sizeof(float));
+	memcpy(k->transform.unit_quaternion.data(),
+			position.unit_quaternion().coeffs().data(), 4 * sizeof(float));
+	memcpy(k->transform.position.data(), position.translation().data(),
+			3 * sizeof(float));
+
+	k->idx = idx;
 
 	return k;
 }

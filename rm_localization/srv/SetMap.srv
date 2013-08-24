@@ -1,4 +1,0 @@
-sensor_msgs/PointCloud2 keypoints3d
-sensor_msgs/Image descriptors
-geometry_msgs/Point offset
----

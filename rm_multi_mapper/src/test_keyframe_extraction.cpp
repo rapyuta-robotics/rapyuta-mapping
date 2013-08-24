@@ -10,6 +10,7 @@
 #include <actionlib/client/terminal_state.h>
 #include <turtlebot_actions/TurtlebotMoveAction.h>
 #include <std_msgs/Float32.h>
+#include <rm_localization/UpdateMap.h>
 
 class TestKeyframeExtraction {
 
@@ -22,6 +23,8 @@ public:
 	ros::Publisher servo_pub;
 	ros::Subscriber keyframe_sub;
 
+	ros::ServiceClient update_map_service;
+
 	TestKeyframeExtraction(ros::NodeHandle & nh) :
 			action_client("/turtlebot_move", true), map(new keyframe_map) {
 		pointcloud_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
@@ -32,6 +35,9 @@ public:
 
 		keyframe_sub = nh.subscribe("keyframe", 10,
 				&TestKeyframeExtraction::chatterCallback, this);
+
+		update_map_service = nh.serviceClient<rm_localization::UpdateMap>(
+				"update_map");
 	}
 
 	void chatterCallback(const rm_localization::Keyframe::ConstPtr& msg) {
@@ -77,8 +83,6 @@ public:
 		for (; angle_msg.data > stop_angle; angle_msg.data -= delta) {
 
 			servo_pub.publish(angle_msg);
-			servo_pub.publish(angle_msg);
-			servo_pub.publish(angle_msg);
 			sleep(1);
 
 			turn();
@@ -87,6 +91,52 @@ public:
 		}
 
 		map->save("keyframe_map");
+
+	}
+
+	void optmize_panorama() {
+
+		for (int level = 2; level >= 0; level--) {
+			for (int i = 0; i < (level + 1) * (level + 1) * 10; i++) {
+				float max_update = map->optimize_panorama(level);
+
+				rm_localization::UpdateMap update_map_msg;
+				update_map_msg.request.idx.resize(map->frames.size());
+				update_map_msg.request.transform.resize(map->frames.size());
+
+				update_map_msg.request.intrinsics = {{0,0,0}};
+
+				for (size_t i = 0; i < map->frames.size(); i++) {
+					update_map_msg.request.idx[i] = map->idx[i];
+
+					Sophus::SE3f position = map->frames[i]->get_pos();
+
+					memcpy(
+							update_map_msg.request.transform[i].unit_quaternion.data(),
+							position.unit_quaternion().coeffs().data(),
+							4 * sizeof(float));
+
+					memcpy(update_map_msg.request.transform[i].position.data(),
+							position.translation().data(), 3 * sizeof(float));
+
+				}
+
+				update_map_service.call(update_map_msg);
+
+				pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
+						map->get_map_pointcloud();
+
+				cloud->header.frame_id = "odom";
+				cloud->header.stamp = ros::Time::now();
+				cloud->header.seq = 0;
+				pointcloud_pub.publish(cloud);
+
+				usleep(100000);
+
+				if (max_update < 1e-4)
+					break;
+			}
+		}
 
 	}
 
@@ -102,6 +152,7 @@ int main(int argc, char **argv) {
 	spinner.start();
 
 	t.capture_sphere();
+	t.optmize_panorama();
 
 	ros::waitForShutdown();
 

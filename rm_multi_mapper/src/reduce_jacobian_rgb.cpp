@@ -234,13 +234,15 @@ void reduce_jacobian_rgb::operator()(
 		cv::warpPerspective(intensity_j, intensity_j_warped, cvH.t(),
 				intensity_j.size());
 
+		intensity_i_dx = frames[i]->get_i_dx(subsample_level);
+		intensity_i_dy = frames[i]->get_i_dy(subsample_level);
+
 		//cv::imshow("intensity_i", intensity_i);
 		//cv::imshow("intensity_j", intensity_j);
 		//cv::imshow("intensity_j_warped", intensity_j_warped);
+		//cv::imshow("intensity_i_dx", intensity_i_dx);
+		//cv::imshow("intensity_i_dy", intensity_i_dy);
 		//cv::waitKey();
-
-		intensity_i_dx = frames[i]->get_i_dx(subsample_level);
-		intensity_i_dy = frames[i]->get_i_dy(subsample_level);
 
 		//cv::Sobel(intensity_i, intensity_i_dx, CV_32F, 1, 0);
 		//cv::Sobel(intensity_i, intensity_i_dy, CV_32F, 0, 1);
@@ -249,14 +251,14 @@ void reduce_jacobian_rgb::operator()(
 
 		compute_frame_jacobian(intrinsics,
 				frames[i]->get_pos().unit_quaternion().matrix(),
-				frames[j]->get_pos().unit_quaternion().matrix(), Jwi, Jwj,
-				Jwk);
+				frames[j]->get_pos().unit_quaternion().matrix(), Jwi, Jwj, Jwk);
 
 		for (int v = 0; v < intensity_i.rows; v++) {
 			for (int u = 0; u < intensity_i.cols; u++) {
 				if (intensity_j_warped.at<uint8_t>(v, u) != 0) {
 
-					float e = (float) intensity_i.at<uint8_t>(v, u) - (float) intensity_j_warped.at<uint8_t>(v, u);
+					float e = (float) intensity_i.at<uint8_t>(v, u)
+							- (float) intensity_j_warped.at<uint8_t>(v, u);
 
 					float dx = intensity_i_dx.at<int16_t>(v, u);
 					float dy = intensity_i_dy.at<int16_t>(v, u);
@@ -279,23 +281,18 @@ void reduce_jacobian_rgb::operator()(
 					//
 					JtJ.block<3, 3>(i * 3, i * 3) += Ji.transpose() * Ji;
 					JtJ.block<3, 3>(j * 3, j * 3) += Jj.transpose() * Jj;
-					JtJ.block<3, 3>(size * 3, size * 3) +=
-							Jk.transpose() * Jk;
+					JtJ.block<3, 3>(size * 3, size * 3) += Jk.transpose() * Jk;
 					// i and j
 					JtJ.block<3, 3>(i * 3, j * 3) += Ji.transpose() * Jj;
 					JtJ.block<3, 3>(j * 3, i * 3) += Jj.transpose() * Ji;
 
 					// i and k
-					JtJ.block<3, 3>(i * 3, size * 3 ) += Ji.transpose()
-							* Jk;
-					JtJ.block<3, 3>(size * 3, i * 3) += Jk.transpose()
-							* Ji;
+					JtJ.block<3, 3>(i * 3, size * 3) += Ji.transpose() * Jk;
+					JtJ.block<3, 3>(size * 3, i * 3) += Jk.transpose() * Ji;
 
 					// j and k
-					JtJ.block<3, 3>(size * 3, j * 3) += Jk.transpose()
-							* Jj;
-					JtJ.block<3, 3>(j * 3, size * 3) += Jj.transpose()
-							* Jk;
+					JtJ.block<3, 3>(size * 3, j * 3) += Jk.transpose() * Jj;
+					JtJ.block<3, 3>(j * 3, size * 3) += Jj.transpose() * Jk;
 
 					// errors
 					Jte.segment<3>(i * 3) += Ji.transpose() * e;

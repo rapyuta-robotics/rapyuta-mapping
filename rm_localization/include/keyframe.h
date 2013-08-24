@@ -184,6 +184,8 @@ public:
 
 	void estimate_position(frame & f);
 
+	void update_intrinsics(const Eigen::Vector3f & intrinsics);
+
 	inline cv::Mat get_i_dx(int level) {
 		return cv::Mat(rows / (1 << level), cols / (1 << level), CV_16S,
 				intencity_pyr_dx[level]);
@@ -203,7 +205,7 @@ public:
 	}
 
 	rm_localization::Keyframe::Ptr to_msg(
-			const cv_bridge::CvImageConstPtr & yuv2);
+			const cv_bridge::CvImageConstPtr & yuv2, int idx);
 
 protected:
 	int16_t ** intencity_pyr_dx;

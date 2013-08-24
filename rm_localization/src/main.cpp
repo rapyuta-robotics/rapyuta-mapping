@@ -17,6 +17,11 @@
 #include <tf_conversions/tf_eigen.h>
 #include <eigen_conversions/eigen_msg.h>
 
+#include <tbb/concurrent_vector.h>
+
+#include <std_srvs/Empty.h>
+#include <rm_localization/UpdateMap.h>
+
 #include <frame.h>
 #include <keyframe.h>
 
@@ -46,11 +51,15 @@ protected:
 	tf::TransformBroadcaster br;
 	tf::TransformListener lr;
 
-	std::vector<keyframe::Ptr> keyframes;
+	tbb::concurrent_vector<keyframe::Ptr> keyframes;
+	int closest_keyframe_idx;
 	Sophus::SE3f camera_position;
+	boost::mutex closest_keyframe_update_mutex;
 
 	ros::Publisher odom_pub;
 	ros::Publisher keyframe_pub;
+	ros::ServiceServer update_map_service;
+	ros::ServiceServer send_all_keyframes_service;
 
 public:
 
@@ -66,6 +75,12 @@ public:
 		odom_pub = nh_.advertise<nav_msgs::Odometry>("vo", queue_size_);
 		keyframe_pub = nh_.advertise<rm_localization::Keyframe>("keyframe",
 				queue_size_);
+
+		update_map_service = nh_.advertiseService("update_map",
+				&CaptureServer::update_map, this);
+
+		send_all_keyframes_service = nh_.advertiseService("send_all_keyframes",
+				&CaptureServer::send_all_keyframes, this);
 
 		rgb_sub.subscribe(nh_, "rgb/image_raw", queue_size_);
 		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
@@ -117,8 +132,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			lr.lookupTransform(frame, "base_footprint",
-					time, transform);
+			lr.lookupTransform(frame, "base_footprint", time, transform);
 
 			Eigen::Quaterniond q;
 			Eigen::Vector3d t;
@@ -147,6 +161,64 @@ public:
 			ROS_ERROR("%s", ex.what());
 		}
 
+	}
+
+	bool send_all_keyframes(std_srvs::Empty::Request &req,
+			std_srvs::Empty::Response &res) {
+
+		//for (size_t i = 0; i < keyframes.size(); i++) {
+		//	keyframe_pub.publish(keyframes[i]->to_msg(yuv2, i));
+		//}
+
+		return true;
+	}
+
+	bool update_map(rm_localization::UpdateMap::Request &req,
+			rm_localization::UpdateMap::Response &res) {
+
+		Eigen::Vector3f intrinsics;
+		memcpy(intrinsics.data(), req.intrinsics.data(), 3 * sizeof(float));
+
+		bool update_intrinsics = intrinsics[0] != 0.0f;
+
+		for (size_t i = 0; i < req.idx.size(); i++) {
+
+			Eigen::Quaternionf orientation;
+			Eigen::Vector3f position, intrinsics;
+
+			memcpy(orientation.coeffs().data(),
+					req.transform[i].unit_quaternion.data(), 4 * sizeof(float));
+			memcpy(position.data(), req.transform[i].position.data(),
+					3 * sizeof(float));
+
+			Sophus::SE3f new_pos(orientation, position);
+
+			if (req.idx[i] == closest_keyframe_idx) {
+				closest_keyframe_update_mutex.lock();
+
+				camera_position = new_pos
+						* keyframes[req.idx[i]]->get_pos().inverse()
+						* camera_position;
+
+				keyframes[req.idx[i]]->get_pos() = new_pos;
+
+				if (update_intrinsics) {
+					keyframes[req.idx[i]]->update_intrinsics(intrinsics);
+				}
+
+				closest_keyframe_update_mutex.unlock();
+
+			} else {
+				keyframes[req.idx[i]]->get_pos() = new_pos;
+
+				if (update_intrinsics) {
+					keyframes[req.idx[i]]->update_intrinsics(intrinsics);
+				}
+
+			}
+		}
+
+		return true;
 	}
 
 	void init_camera_position(const std::string & frame,
@@ -178,9 +250,12 @@ public:
 		cv_bridge::CvImageConstPtr yuv2 = cv_bridge::toCvShare(yuv2_msg);
 		cv_bridge::CvImageConstPtr depth = cv_bridge::toCvShare(depth_msg);
 
+		boost::mutex::scoped_lock lock(closest_keyframe_update_mutex);
+
 		if (keyframes.size() != 0) {
 
-			int closest_keyframe_idx = get_closest_keyframe();
+			closest_keyframe_idx = get_closest_keyframe();
+			//ROS_INFO("Closest keyframe %d", closest_keyframe_idx);
 
 			keyframe::Ptr closest_keyframe = keyframes[closest_keyframe_idx];
 
@@ -197,7 +272,7 @@ public:
 				closest_keyframe->estimate_position(*k);
 				camera_position = k->get_pos();
 
-				keyframe_pub.publish(k->to_msg(yuv2));
+				keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 				keyframes.push_back(k);
 				ROS_DEBUG("Adding new keyframe");
 
@@ -209,12 +284,13 @@ public:
 
 		} else {
 
-			init_camera_position(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
+			init_camera_position(yuv2_msg->header.frame_id,
+					yuv2_msg->header.stamp);
 
 			keyframe::Ptr k(
 					new keyframe(yuv2->image, depth->image, camera_position,
 							intrinsics));
-			keyframe_pub.publish(k->to_msg(yuv2));
+			keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 			keyframes.push_back(k);
 		}
 

@@ -73,9 +73,9 @@ color_keyframe::Ptr color_keyframe::from_msg(
 	Eigen::Vector3f position, intrinsics;
 
 	memcpy(intrinsics.data(), k->intrinsics.data(), 3 * sizeof(float));
-	memcpy(orientation.coeffs().data(), k->unit_quaternion.data(),
+	memcpy(orientation.coeffs().data(), k->transform.unit_quaternion.data(),
 			4 * sizeof(float));
-	memcpy(position.data(), k->position.data(), 3 * sizeof(float));
+	memcpy(position.data(), k->transform.position.data(), 3 * sizeof(float));
 
 	color_keyframe::Ptr res(
 			new color_keyframe(rgb, gray, depth,

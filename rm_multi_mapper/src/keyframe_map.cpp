@@ -11,6 +11,7 @@ keyframe_map::keyframe_map() {
 
 void keyframe_map::add_frame(const rm_localization::Keyframe::ConstPtr & k) {
 	frames.push_back(color_keyframe::from_msg(k));
+	idx.push_back(k->idx);
 
 }
 
@@ -44,7 +45,7 @@ float keyframe_map::optimize_panorama(int level) {
 					overlaping_keyframes.begin(), overlaping_keyframes.end()),
 			rj);
 
-	/*
+		/*
 	 rj(
 	 tbb::blocked_range<
 	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
@@ -108,19 +109,19 @@ float keyframe_map::optimize(int level) {
 
 	reduce_jacobian_rgb_3d rj(frames, size, level);
 
-	/*
+
 	tbb::parallel_reduce(
 			tbb::blocked_range<
 					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
 					overlaping_keyframes.begin(), overlaping_keyframes.end()),
 			rj);
-	*/
 
+	/*
 	rj(
 		 tbb::blocked_range<
 		 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
 		 overlaping_keyframes.begin(), overlaping_keyframes.end()));
-
+	*/
 	Eigen::VectorXf update =
 					-rj.JtJ.block(6, 6, (size-1) * 6, (size-1) * 6).ldlt().solve(
 							rj.Jte.segment(6, (size-1) * 6));
