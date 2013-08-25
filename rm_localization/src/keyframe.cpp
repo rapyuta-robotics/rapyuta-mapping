@@ -100,6 +100,12 @@ void keyframe::estimate_position(frame & f) {
 			//std::cerr << "Transform " << std::endl << f.position.matrix()
 			//		<< std::endl;
 
+			//if(level == 0) {
+			//	cv::imshow("intencity_warped", intencity_warped);
+			//	cv::imshow("intencity", intencity);
+			//	cv::waitKey(3);
+			//}
+
 		}
 	}
 

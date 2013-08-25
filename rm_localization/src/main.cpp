@@ -46,10 +46,10 @@ protected:
 
 	int queue_size_;
 
-	Eigen::Vector3f intrinsics;
-
 	tf::TransformBroadcaster br;
 	tf::TransformListener lr;
+
+	Eigen::Vector3f intrinsics;
 
 	tbb::concurrent_vector<keyframe::Ptr> keyframes;
 	int closest_keyframe_idx;
@@ -67,8 +67,6 @@ public:
 			nh_private("~") {
 
 		ROS_INFO("Creating localization");
-
-		intrinsics << 525.0 / 2, 319.5 / 2, 239.5 / 2;
 
 		queue_size_ = 5;
 
@@ -176,10 +174,18 @@ public:
 	bool update_map(rm_localization::UpdateMap::Request &req,
 			rm_localization::UpdateMap::Response &res) {
 
+		boost::mutex::scoped_lock lock(closest_keyframe_update_mutex);
+
 		Eigen::Vector3f intrinsics;
 		memcpy(intrinsics.data(), req.intrinsics.data(), 3 * sizeof(float));
 
 		bool update_intrinsics = intrinsics[0] != 0.0f;
+
+		if(update_intrinsics) {
+			ROS_INFO("Updated camera intrinsics");
+			this->intrinsics = intrinsics;
+			ROS_INFO_STREAM("New intrinsics" << std::endl << this->intrinsics);
+		}
 
 		for (size_t i = 0; i < req.idx.size(); i++) {
 
@@ -194,7 +200,7 @@ public:
 			Sophus::SE3f new_pos(orientation, position);
 
 			if (req.idx[i] == closest_keyframe_idx) {
-				closest_keyframe_update_mutex.lock();
+				//closest_keyframe_update_mutex.lock();
 
 				camera_position = new_pos
 						* keyframes[req.idx[i]]->get_pos().inverse()
@@ -202,18 +208,18 @@ public:
 
 				keyframes[req.idx[i]]->get_pos() = new_pos;
 
-				if (update_intrinsics) {
-					keyframes[req.idx[i]]->update_intrinsics(intrinsics);
-				}
+				//if (update_intrinsics) {
+				//	keyframes[req.idx[i]]->get_intrinsics() = intrinsics;
+				//}
 
-				closest_keyframe_update_mutex.unlock();
+				//closest_keyframe_update_mutex.unlock();
 
 			} else {
 				keyframes[req.idx[i]]->get_pos() = new_pos;
 
-				if (update_intrinsics) {
-					keyframes[req.idx[i]]->update_intrinsics(intrinsics);
-				}
+				//if (update_intrinsics) {
+				//	keyframes[req.idx[i]]->get_intrinsics() = intrinsics;
+				//}
 
 			}
 		}
@@ -283,6 +289,8 @@ public:
 			}
 
 		} else {
+
+			intrinsics << info_msg->K[0], info_msg->K[2], info_msg->K[5];
 
 			init_camera_position(yuv2_msg->header.frame_id,
 					yuv2_msg->header.stamp);
