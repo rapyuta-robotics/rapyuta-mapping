@@ -30,5 +30,8 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 rosbuild_add_executable(camera src/node.cpp src/frame_callback.cpp src/openni2_camera.cpp)
 target_link_libraries(camera OpenNI2)
 
+rosbuild_add_executable(camera_vo src/node_vo.cpp src/openni2_camera_vo.cpp)
+target_link_libraries(camera_vo OpenNI2)
+
 rosbuild_add_library(OpenNI2CameraNodelet src/nodelet.cpp src/frame_callback.cpp src/openni2_camera.cpp)
 target_link_libraries(OpenNI2CameraNodelet OpenNI2)

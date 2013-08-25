@@ -32,10 +32,16 @@ public:
 		return clouds[level];
 	}
 
+	inline Eigen::Vector3f get_centroid() {
+		return position * centroid;
+	}
+
+
 	static Ptr from_msg(const rm_localization::Keyframe::ConstPtr & k);
 
 protected:
 	cv::Mat rgb;
+	Eigen::Vector3f centroid;
 
 };
 

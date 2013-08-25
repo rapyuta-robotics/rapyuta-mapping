@@ -60,6 +60,7 @@ protected:
 	ros::Publisher keyframe_pub;
 	ros::ServiceServer update_map_service;
 	ros::ServiceServer send_all_keyframes_service;
+	ros::ServiceServer clear_keyframes_service;
 
 public:
 
@@ -79,6 +80,9 @@ public:
 
 		send_all_keyframes_service = nh_.advertiseService("send_all_keyframes",
 				&CaptureServer::send_all_keyframes, this);
+
+		clear_keyframes_service = nh_.advertiseService("clear_keyframes",
+						&CaptureServer::clear_keyframes, this);
 
 		rgb_sub.subscribe(nh_, "rgb/image_raw", queue_size_);
 		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
@@ -171,6 +175,16 @@ public:
 		return true;
 	}
 
+	bool clear_keyframes(std_srvs::Empty::Request &req,
+			std_srvs::Empty::Response &res) {
+
+		boost::mutex::scoped_lock lock(closest_keyframe_update_mutex);
+
+		keyframes.clear();
+
+		return true;
+	}
+
 	bool update_map(rm_localization::UpdateMap::Request &req,
 			rm_localization::UpdateMap::Response &res) {
 
@@ -181,7 +195,7 @@ public:
 
 		bool update_intrinsics = intrinsics[0] != 0.0f;
 
-		if(update_intrinsics) {
+		if (update_intrinsics) {
 			ROS_INFO("Updated camera intrinsics");
 			this->intrinsics = intrinsics;
 			ROS_INFO_STREAM("New intrinsics" << std::endl << this->intrinsics);

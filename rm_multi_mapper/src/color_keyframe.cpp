@@ -10,6 +10,19 @@ color_keyframe::color_keyframe(const cv::Mat & rgb, const cv::Mat & gray,
 		const Eigen::Vector3f & intrinsics, int max_level) :
 		keyframe(gray, depth, position, intrinsics, max_level), rgb(rgb) {
 
+	centroid.setZero();
+	int num_points = 0;
+
+	for (int i = 0; i < clouds[2].cols(); i++) {
+			Eigen::Vector4f vec = clouds[2].col(i);
+			if (vec(3) > 0) {
+				centroid += vec.segment<3>(0);
+				num_points++;
+			}
+		}
+
+	centroid /= num_points;
+
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr color_keyframe::get_pointcloud() const {

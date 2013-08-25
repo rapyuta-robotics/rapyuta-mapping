@@ -52,10 +52,10 @@ float keyframe_map::optimize_panorama(int level) {
 	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
 	 */
 
-	Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
-	//Eigen::VectorXf update =
-	//			-rj.JtJ.block(0, 0, size * 3, size* 3).ldlt().solve(
-	//					rj.Jte.segment(0, size * 3));
+	//Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
+	Eigen::VectorXf update =
+				-rj.JtJ.block(0, 0, size * 3, size* 3).ldlt().solve(
+						rj.Jte.segment(0, size * 3));
 
 	iteration_max_update = std::max(std::abs(update.maxCoeff()),
 			std::abs(update.minCoeff()));
@@ -69,9 +69,9 @@ float keyframe_map::optimize_panorama(int level) {
 
 		frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
 
-		frames[i]->get_intrinsics().array() =
-				update.segment<3>(size * 3).array().exp()
-						* frames[i]->get_intrinsics().array();
+		//frames[i]->get_intrinsics().array() =
+		//		update.segment<3>(size * 3).array().exp()
+		//				* frames[i]->get_intrinsics().array();
 
 		if (i == 0) {
 			Eigen::Vector3f intrinsics = frames[i]->get_intrinsics();
@@ -99,7 +99,9 @@ float keyframe_map::optimize(int level) {
 						frames[i]->get_pos().unit_quaternion().angularDistance(
 								frames[j]->get_pos().unit_quaternion());
 
-				if (angle < M_PI / 6) {
+				float centroid_distance = (frames[i]->get_centroid() - frames[j]->get_centroid()).norm();
+
+				if (angle < M_PI / 6 && centroid_distance < 1.0) {
 					overlaping_keyframes.push_back(std::make_pair(i, j));
 					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
 				}
