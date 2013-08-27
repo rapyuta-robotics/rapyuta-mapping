@@ -12,7 +12,7 @@
 			<param name="base_frame" value="base_footprint"/>
 			<param name="odom_frame" value="odom"/> 
 			<param name="turn_rate" value="0.3"/>
-			<param name="forward_rate" value="0.25"/>
+			<param name="forward_rate" value="0.1"/>
 		</node>
 		<node name="camera" pkg="rm_openni2_camera" type="camera" />
 		<node pkg="rm_localization" type="localization" respawn="true" name="localization" output="screen">
