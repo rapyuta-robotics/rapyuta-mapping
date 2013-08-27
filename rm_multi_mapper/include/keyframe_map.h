@@ -1,4 +1,3 @@
-
 #ifndef KEYFRAME_MAP_H_
 #define KEYFRAME_MAP_H_
 
@@ -25,6 +24,9 @@ public:
 
 	cv::Mat get_panorama_image();
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();
+
+	bool find_transform(const keyframe_map & other, Sophus::SE3f & t) const;
+	void merge(keyframe_map & other, const Sophus::SE3f & t);
 
 	void save(const std::string & dir_name);
 	void load(const std::string & dir_name);

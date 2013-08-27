@@ -1,401 +1,281 @@
 #include <robot_mapper.h>
+#include <tf_conversions/tf_eigen.h>
 
 robot_mapper::robot_mapper(ros::NodeHandle & nh,
 		const std::string & robot_prefix, const int robot_num) :
 		robot_num(robot_num), prefix(
 				"/" + robot_prefix
 						+ boost::lexical_cast<std::string>(robot_num)), merged(
-				false), move_base_action_client(prefix + "/move_base",
-				true), map_idx(0) {
+				false), action_client(prefix + "/turtlebot_move", true), map(
+				new keyframe_map) {
 
-	map_to_odom.setIdentity();
+	world_to_odom.setIdentity();
+	world_to_odom.setOrigin(tf::Vector3(0, robot_num * 10.0, 0));
 
-	std::string pref = robot_prefix
-			+ boost::lexical_cast<std::string>(robot_num);
-	octomap_server.reset(new RmOctomapServer(ros::NodeHandle(nh, pref), pref));
-	octomap_server->openFile("free_space.bt");
-
-	capture_client = nh.serviceClient<rm_capture_server::Capture>(
-			prefix + "/capture");
-
-	clear_costmaps_client = nh.serviceClient<std_srvs::Empty>(
-			prefix + "/move_base/clear_costmaps");
+	pointcloud_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
+			prefix + "/pointcloud", 1);
 
 	servo_pub = nh.advertise<std_msgs::Float32>(
-			prefix + "/mobile_base/commands/servo_angle", 1);
+			prefix + "/mobile_base/commands/servo_angle", 3);
 
-	pub_keypoints = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
-			prefix + "/keypoints", 10);
+	keyframe_sub = nh.subscribe(prefix + "/keyframe", 10,
+			&robot_mapper::keyframeCallback, this);
 
-	pub_position_update =
-			nh.advertise<geometry_msgs::PoseWithCovarianceStamped>(
-					prefix + "/initialpose", 1);
+	update_map_service = nh.serviceClient<rm_localization::UpdateMap>(
+			prefix + "/update_map");
 
-	set_map_client = nh.serviceClient<rm_localization::SetMap>(
-			prefix + "/set_map");
+	clear_keyframes_service = nh.serviceClient<std_srvs::Empty>(
+			prefix + "/clear_keyframes");
 
-	set_intial_pose = nh.serviceClient<rm_localization::SetInitialPose>(
-			prefix + "/set_initial_pose");
-
-	set_calibration = nh.serviceClient<sensor_msgs::SetCameraInfo>(
+	set_camera_info_service = nh.serviceClient<sensor_msgs::SetCameraInfo>(
 			prefix + "/rgb/set_camera_info");
 
-	visualization_offset = Eigen::Vector3f(0, robot_num * 20, 0);
+	std_srvs::Empty emp;
+	clear_keyframes_service.call(emp);
 
-	/*
-	 initial_transformation.setIdentity();
-	 initial_transformation.translate(
-	 Eigen::Vector3f(0, (robot_num - 1) * 30, 0));
+	publish_empty_cloud();
 
-	 rm_localization::SetInitialPose data;
-	 tf::Transform init_tf;
-	 tf::transformEigenToTF(initial_transformation.cast<double>(), init_tf);
-	 tf::transformTFToMsg(init_tf, data.request.pose);
-	 if (!set_intial_pose.call(data)) {
-	 ROS_ERROR("Coudld not set initial pose to robot");
-	 }
-	 */
+	boost::thread t(&robot_mapper::publish_tf, this);
 
 }
 
-void robot_mapper::save_image() {
+void robot_mapper::keyframeCallback(
+		const rm_localization::Keyframe::ConstPtr& msg) {
 
-	rm_capture_server::Capture srv;
-	srv.request.num_frames = 1;
+	boost::mutex::scoped_lock lock(merge_mutex);
 
-	bool res = capture_client.call(srv);
+	ROS_INFO("Received keyframe");
+	map->add_frame(msg);
 
-	if (res) {
-
-		cv::Mat rgb = cv::imdecode(srv.response.rgb_png_data,
-				CV_LOAD_IMAGE_UNCHANGED);
-
-		cv::Mat depth = cv::imdecode(srv.response.depth_png_data,
-				CV_LOAD_IMAGE_UNCHANGED);
-
-		cv::imwrite("rgb/" + boost::lexical_cast<std::string>(map_idx) + ".png",
-				rgb);
-		cv::imwrite(
-				"depth/" + boost::lexical_cast<std::string>(map_idx) + ".png",
-				depth);
-
-		map_idx++;
-	}
-
-}
-
-/*
- void robot_mapper::save_circle() {
-
- move_base_msgs::MoveBaseGoal goal;
- goal.target_pose.header.frame_id = "base_link";
- goal.target_pose.header.stamp = ros::Time::now();
-
- goal.target_pose.pose.position.x = 0;
- goal.target_pose.pose.position.y = 0;
- goal.target_pose.pose.position.z = 0;
-
- tf::Quaternion q;
- q.setRotation(tf::Vector3(0, 0, 1), M_PI / 9);
- tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
-
- for (int i = 0; i < 36; i++) {
-
- save_image();
-
- move_base_action_client.sendGoal(goal);
-
- //wait for the action to return
- bool finished_before_timeout = move_base_action_client.waitForResult(
- ros::Duration(30.0));
-
- if (finished_before_timeout) {
- actionlib::SimpleClientGoalState state =
- move_base_action_client.getState();
- ROS_INFO("Action finished: %s", state.toString().c_str());
- } else
- ROS_INFO("Action did not finish before the time out.");
-
- }
-
- map->publish_keypoints(pub_keypoints, prefix);
-
- }
-	q.setRotation(tf::Vector3(0, 0, 1), M_PI / 9);
- */
-
-void robot_mapper::capture(boost::shared_ptr<icp_map> & local_map) {
-	rm_capture_server::Capture srv;
-	srv.request.num_frames = 1;
-
-	bool res = capture_client.call(srv);
-
-	if (res) {
-
-		cv::Mat rgb = cv::imdecode(srv.response.rgb_png_data,
-				CV_LOAD_IMAGE_UNCHANGED);
-
-		cv::Mat depth = cv::imdecode(srv.response.depth_png_data,
-				CV_LOAD_IMAGE_UNCHANGED);
-
-		Eigen::Affine3d transform_d;
-		tf::transformMsgToEigen(srv.response.transform, transform_d);
-		Eigen::Affine3f transform_f = transform_d.cast<float>();
-		Sophus::SE3f transform(transform_f.rotation(),
-				transform_f.translation());
-
-		last_frame = local_map->add_frame(rgb, depth, transform);
-
+	if (!merged) {
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
-				local_map->get_map_pointcloud();
-		if (map.get()) {
-			*cloud += *(map->get_pointcloud());
-		}
-		cloud->header.frame_id = prefix + "/map";
+				map->get_map_pointcloud();
+		cloud->header.frame_id = prefix + "/odom";
 		cloud->header.stamp = ros::Time::now();
 		cloud->header.seq = 0;
-		pub_keypoints.publish(cloud);
-
-		map_idx++;
-
-		std::cerr << "Number frames in the map " << local_map->frames.size()
-				<< std::endl;
-
-	} else {
-		ROS_ERROR("Failed to call service /cloudbot%d/capture", robot_num);
-		return;
+		pointcloud_pub.publish(cloud);
 	}
-}
-
-void robot_mapper::capture_sphere() {
-
-	std_msgs::Float32 start_angle;
-	start_angle.data = M_PI / 4;
-	float stop_angle = -M_PI / 4;
-	float delta = -M_PI / 9;
-
-	boost::shared_ptr<icp_map> local_map(new icp_map);
-
-	for (int i = 0; i < 20; i++) {
-
-		move_base_msgs::MoveBaseGoal goal;
-		goal.target_pose.header.frame_id = "base_link";
-		goal.target_pose.header.stamp = ros::Time::now();
-
-		goal.target_pose.pose.position.x = 0;
-		goal.target_pose.pose.position.y = 0;
-		goal.target_pose.pose.position.z = 0;
-
-		tf::Quaternion q;
-		q.setRotation(tf::Vector3(0, 0, 1), M_PI / 9);
-		tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
-
-		move_base_action_client.sendGoal(goal);
-
-		//wait for the action to return
-		bool finished_before_timeout = move_base_action_client.waitForResult(
-				ros::Duration(30.0));
-
-		if (finished_before_timeout) {
-			actionlib::SimpleClientGoalState state =
-					move_base_action_client.getState();
-			ROS_INFO("Action finished: %s", state.toString().c_str());
-		} else
-			ROS_INFO("Action did not finish before the time out.");
-
-		for (float angle = start_angle.data + delta; angle >= stop_angle;
-				angle += delta) {
-
-			std_msgs::Float32 angle_msg;
-			angle_msg.data = angle;
-			servo_pub.publish(angle_msg);
-			sleep(1);
-			capture(local_map);
-		}
-	}
-
-	std_msgs::Float32 angle_msg;
-	angle_msg.data = 0;
-	servo_pub.publish(angle_msg);
-
-	for (int level = 2; level >= 0; level--) {
-		for (int i = 0; i < (level + 1) * (level + 1) * 10; i++) {
-			float max_update = local_map->optimize_rgb_with_intrinsics(level);
-
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
-					local_map->get_map_pointcloud();
-			if (map.get()) {
-				*cloud += *(map->get_pointcloud());
-			}
-			cloud->header.frame_id = prefix + "/map";
-			cloud->header.stamp = ros::Time::now();
-			cloud->header.seq = 0;
-			pub_keypoints.publish(cloud);
-
-			if (max_update < 1e-4)
-				break;
-
-		}
-	}
-
-	boost::shared_ptr<panorama_map> pmap(new panorama_map);
-
-	local_map->align_z_axis();
-	cv::Mat img, depth, rgb;
-	local_map->get_panorama_image(img, depth, rgb);
-	Sophus::SE3f t(Eigen::Matrix3f::Identity(),
-			local_map->frames[0]->get_position().translation());
-	pmap->add_frame(img, depth, rgb, t);
-
-	if (map.get()) {
-		map->merge(*pmap);
-
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_pointcloud();
-
-		cloud->header.frame_id = prefix + "/map";
-		cloud->header.stamp = ros::Time::now();
-		cloud->header.seq = 0;
-		pub_keypoints.publish(cloud);
-
-	} else {
-		map = pmap;
-	}
-
-	set_map();
 
 }
 
-void robot_mapper::set_map() {
-
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_pointcloud();
-	cloud->header.frame_id = prefix + "/map";
+void robot_mapper::publish_empty_cloud() {
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
+			new pcl::PointCloud<pcl::PointXYZRGB>);
+	cloud->push_back(pcl::PointXYZRGB(0, 0, 0));
+	cloud->header.frame_id = prefix + "/odom";
 	cloud->header.stamp = ros::Time::now();
 	cloud->header.seq = 0;
-	pub_keypoints.publish(cloud);
-
-	map->set_octomap(octomap_server);
-	std_srvs::Empty emt;
-	clear_costmaps_client.call(emt);
-
-	geometry_msgs::PoseWithCovarianceStamped p;
-
-	Eigen::Vector3f pos = (*last_frame)->get_position().translation();
-	Eigen::Vector3f Zw = (*last_frame)->get_position().unit_quaternion()
-			* Eigen::Vector3f::UnitZ();
-	float z_rotation = atan2(Zw[1], Zw[0]);
-
-	//std::cerr << "Transformed Z vector " << std::endl << Zw << std::endl << "Rotation " << z_rotation << std::endl;
-	Eigen::Quaternionf orient(
-			Eigen::AngleAxisf(z_rotation, Eigen::Vector3f::UnitZ()));
-	orient.normalize();
-
-	p.header.seq = 0;
-	p.header.frame_id = prefix + "/map";
-	p.pose.pose.position.x = pos[0];
-	p.pose.pose.position.y = pos[1];
-	p.pose.pose.position.z = 0;
-
-	p.pose.pose.orientation.x = orient.x();
-	p.pose.pose.orientation.y = orient.y();
-	p.pose.pose.orientation.z = orient.z();
-	p.pose.pose.orientation.w = orient.w();
-
-	p.pose.covariance = { {
-			0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
-			0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
-			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-			0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-			0.0, 0.0,0.0, 0.0, 0.0, 0.01}};
-
-	sleep(3);
-	pub_position_update.publish(p);
-
-	/*
-	 sensor_msgs::SetCameraInfo camera_info;
-	 camera_info.request.camera_info.K = { {map->intrinsics_vector[0][0], 0, map->intrinsics_vector[0][1],
-	 0, map->intrinsics_vector[0][0], map->intrinsics_vector[0][2],
-	 0, 0, 0}};
-
-	 camera_info.request.camera_info.P = { {map->intrinsics_vector[0][0], 0, map->intrinsics_vector[0][1], 0,
-	 0, map->intrinsics_vector[0][0], map->intrinsics_vector[0][2], 0,
-	 0, 0, 0, 0}};
-
-	 set_calibration.call(camera_info);
-	 */
-
+	pointcloud_pub.publish(cloud);
 }
 
-void robot_mapper::move_to_random_point() {
+void robot_mapper::move_straight() {
 
-	move_base_msgs::MoveBaseGoal goal;
-	goal.target_pose.header.frame_id = "map";
-	goal.target_pose.header.stamp = ros::Time::now();
+	ROS_INFO_STREAM("Received move command for " << prefix);
 
-	goal.target_pose.pose.position.x = 1.0;
-	goal.target_pose.pose.position.y = 0;
-	goal.target_pose.pose.position.z = 0;
+	turtlebot_actions::TurtlebotMoveGoal goal;
+	goal.forward_distance = 1.0;
+	goal.turn_distance = 0;
 
-	tf::Quaternion q;
-	q.setEuler(0, 0, 0);
-	tf::quaternionTFToMsg(q, goal.target_pose.pose.orientation);
-
-	move_base_action_client.sendGoal(goal);
+	action_client.waitForServer();
+	action_client.sendGoal(goal);
 
 	//wait for the action to return
-	bool finished_before_timeout = move_base_action_client.waitForResult(
-			ros::Duration(30.0));
+	bool finished_before_timeout = action_client.waitForResult(
+			ros::Duration(500.0));
 
 	if (finished_before_timeout) {
-		actionlib::SimpleClientGoalState state =
-				move_base_action_client.getState();
+		actionlib::SimpleClientGoalState state = action_client.getState();
 		ROS_INFO("Action finished: %s", state.toString().c_str());
 	} else
 		ROS_INFO("Action did not finish before the time out.");
 
-}
-
-void robot_mapper::update_map_to_odom() {
-
-	/*
-	 if (map->frames.size() > 0) {
-
-	 Sophus::SE3f delta;
-	 map->position_modification_mutex.lock();
-	 delta = (*last_frame)->get_position()
-	 * (*last_frame)->get_initial_position().inverse();
-	 (*last_frame)->get_initial_position() = (*last_frame)->get_position();
-	 map->position_modification_mutex.unlock();
-
-	 tf::Transform delta_tf;
-	 tf::transformEigenToTF(Eigen::Affine3d(delta.cast<double>().matrix()),
-	 delta_tf);
-
-	 map_to_odom = delta_tf * map_to_odom;
-	 }*/
+	map->save("corridor_map" + boost::lexical_cast<std::string>(robot_num));
 
 }
 
-/*
- void robot_mapper::merge(robot_mapper::Ptr & other) {
+void robot_mapper::publish_tf() {
 
- if (map->merge_keypoint_map(*other->map, 50, 5000)) {
- ROS_INFO("Merged maps from robot %d and %d", robot_num,
- other->robot_num);
- map->save(
- "maps/merged_map" + boost::lexical_cast<std::string>(robot_num)
- + "_"
- + boost::lexical_cast<std::string>(other->robot_num));
+	tf::TransformBroadcaster br;
 
- other->map = map;
- other->merged = true;
- other->visualization_offset = visualization_offset;
+	while (true) {
+		br.sendTransform(
+				tf::StampedTransform(world_to_odom, ros::Time::now(), "/world",
+						prefix + "/odom"));
+		usleep(33000);
+	}
 
- } else {
- ROS_INFO("Could not merge maps from robot %d and %d", robot_num,
- other->robot_num);
- }
+}
 
- }
- */
+void robot_mapper::turn() {
+	turtlebot_actions::TurtlebotMoveGoal goal;
+	goal.forward_distance = 0;
+	goal.turn_distance = M_PI;
+
+	action_client.waitForServer();
+	action_client.sendGoal(goal);
+
+	//wait for the action to return
+	bool finished_before_timeout = action_client.waitForResult(
+			ros::Duration(30.0));
+
+	if (finished_before_timeout) {
+		actionlib::SimpleClientGoalState state = action_client.getState();
+		ROS_INFO("Action finished: %s", state.toString().c_str());
+	} else
+		ROS_INFO("Action did not finish before the time out.");
+}
+
+void robot_mapper::capture_sphere() {
+
+	std_msgs::Float32 angle_msg;
+	angle_msg.data = 0 * M_PI / 18;
+	float stop_angle = -0.1 * M_PI / 18;
+	float delta = M_PI / 18;
+
+	sleep(3);
+
+	for (; angle_msg.data > stop_angle; angle_msg.data -= delta) {
+
+		servo_pub.publish(angle_msg);
+		sleep(1);
+
+		turn();
+		turn();
+
+	}
+
+	map->save("keyframe_map");
+
+}
+
+void robot_mapper::optmize_panorama() {
+
+	for (int level = 2; level >= 0; level--) {
+		for (int i = 0; i < (level + 1) * (level + 1) * 10; i++) {
+			float max_update = map->optimize_panorama(level);
+
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
+					map->get_map_pointcloud();
+
+			update_map();
+
+			cloud->header.frame_id = "/cloudbot0/odom";
+			cloud->header.stamp = ros::Time::now();
+			cloud->header.seq = 0;
+			pointcloud_pub.publish(cloud);
+
+			usleep(100000);
+
+			if (max_update < 1e-4)
+				break;
+		}
+	}
+
+	update_map(true);
+
+}
+
+void robot_mapper::optmize() {
+
+	if (map->frames.size() < 2)
+		return;
+
+	map->optimize(0);
+
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_map_pointcloud();
+
+	cloud->header.frame_id = "odom";
+	cloud->header.stamp = ros::Time::now();
+	cloud->header.seq = 0;
+	pointcloud_pub.publish(cloud);
+
+	update_map();
+
+}
+
+void robot_mapper::update_map(bool with_intrinsics) {
+
+	rm_localization::UpdateMap update_map_msg;
+	update_map_msg.request.idx.resize(map->frames.size());
+	update_map_msg.request.transform.resize(map->frames.size());
+
+	if (with_intrinsics) {
+
+		Eigen::Vector3f intrinsics = map->frames[0]->get_intrinsics();
+
+		/*
+		 sensor_msgs::SetCameraInfo s;
+		 s.request.camera_info.width = map->frames[0]->get_i(0).cols;
+		 s.request.camera_info.height = map->frames[0]->get_i(0).rows;
+
+		 // No distortion
+		 s.request.camera_info.D.resize(5, 0.0);
+		 s.request.camera_info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+
+		 // Simple camera matrix: square pixels (fx = fy), principal point at center
+		 s.request.camera_info.K.assign(0.0);
+		 s.request.camera_info.K[0] = s.request.camera_info.K[4] = intrinsics[0];
+		 s.request.camera_info.K[2] = intrinsics[1];
+		 s.request.camera_info.K[5] = intrinsics[2];
+		 s.request.camera_info.K[8] = 1.0;
+
+		 // No separate rectified image plane, so R = I
+		 s.request.camera_info.R.assign(0.0);
+		 s.request.camera_info.R[0] = s.request.camera_info.R[4] = s.request.camera_info.R[8] = 1.0;
+
+		 // Then P=K(I|0) = (K|0)
+		 s.request.camera_info.P.assign(0.0);
+		 s.request.camera_info.P[0] = s.request.camera_info.P[5] = s.request.camera_info.K[0]; // fx, fy
+		 s.request.camera_info.P[2] = s.request.camera_info.K[2]; // cx
+		 s.request.camera_info.P[6] = s.request.camera_info.K[5]; // cy
+		 s.request.camera_info.P[10] = 1.0;
+
+		 set_camera_info_service.call(s);
+		 */
+
+		memcpy(update_map_msg.request.intrinsics.data(), intrinsics.data(),
+				3 * sizeof(float));
+	} else {
+		update_map_msg.request.intrinsics = { {0,0,0}};
+	}
+
+	for (size_t i = 0; i < map->frames.size(); i++) {
+		update_map_msg.request.idx[i] = map->idx[i];
+
+		Sophus::SE3f position = map->frames[i]->get_pos();
+
+		memcpy(update_map_msg.request.transform[i].unit_quaternion.data(),
+				position.unit_quaternion().coeffs().data(), 4 * sizeof(float));
+
+		memcpy(update_map_msg.request.transform[i].position.data(),
+				position.translation().data(), 3 * sizeof(float));
+
+	}
+
+	update_map_service.call(update_map_msg);
+
+}
+
+bool robot_mapper::merge(robot_mapper & other) {
+
+	Sophus::SE3f transform;
+	if (map->find_transform(*other.map, transform)) {
+		boost::mutex::scoped_lock lock(merge_mutex);
+		boost::mutex::scoped_lock lock1(other.merge_mutex);
+
+		map->merge(*other.map, transform);
+		other.map = map;
+		other.merged = true;
+
+		Eigen::Affine3d t(transform.cast<double>().matrix());
+		tf::transformEigenToTF(t, other.world_to_odom);
+
+		other.publish_empty_cloud();
+
+		return true;
+	} else {
+		return false;
+	}
+
+}
 

@@ -61,9 +61,9 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr color_keyframe::get_colored_pointcloud(
 
 				pcl::PointXYZRGB p;
 				p.getVector4fMap() = transform * vec;
-				p.r = color[0];
+				p.r = color[2];
 				p.g = color[1];
-				p.b = color[2];
+				p.b = color[0];
 
 				cloud->push_back(p);
 			}
@@ -80,7 +80,7 @@ color_keyframe::Ptr color_keyframe::from_msg(
 
 	rgb = cv::imdecode(k->rgb_png_data, CV_LOAD_IMAGE_UNCHANGED);
 	depth = cv::imdecode(k->depth_png_data, CV_LOAD_IMAGE_UNCHANGED);
-	cv::cvtColor(rgb, gray, CV_RGB2GRAY);
+	cv::cvtColor(rgb, gray, CV_BGR2GRAY);
 
 	Eigen::Quaternionf orientation;
 	Eigen::Vector3f position, intrinsics;

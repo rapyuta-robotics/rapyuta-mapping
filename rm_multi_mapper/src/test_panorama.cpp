@@ -18,7 +18,7 @@
 int main(int argc, char **argv) {
 
 	keyframe_map map;
-	map.load("keyframe_map");
+	map.load(argv[1]);
 
 	cv::imshow("img", map.get_panorama_image());
 	cv::waitKey(3);
@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
 	cv::imshow("img", map.get_panorama_image());
 	cv::waitKey();
 
-	map.save("keyframe_map_optimized");
+	map.save(std::string(argv[1]) + "_optimized");
 
 	return 0;
 

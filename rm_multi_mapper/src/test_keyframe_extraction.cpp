@@ -31,25 +31,25 @@ public:
 	ros::ServiceClient set_camera_info_service;
 
 	TestKeyframeExtraction(ros::NodeHandle & nh) :
-			action_client("/turtlebot_move", true), map(new keyframe_map) {
+			action_client("/cloudbot0/turtlebot_move", true), map(
+					new keyframe_map) {
 		pointcloud_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
-				"pointcloud", 1);
+				"/cloudbot0/pointcloud", 1);
 
 		servo_pub = nh.advertise<std_msgs::Float32>(
-				"mobile_base/commands/servo_angle", 3);
+				"/cloudbot0/mobile_base/commands/servo_angle", 3);
 
-		keyframe_sub = nh.subscribe("keyframe", 10,
+		keyframe_sub = nh.subscribe("/cloudbot0/keyframe", 10,
 				&TestKeyframeExtraction::chatterCallback, this);
 
 		update_map_service = nh.serviceClient<rm_localization::UpdateMap>(
-				"update_map");
+				"/cloudbot0/update_map");
 
 		clear_keyframes_service = nh.serviceClient<std_srvs::Empty>(
-				"clear_keyframes");
+				"/cloudbot0/clear_keyframes");
 
 		set_camera_info_service = nh.serviceClient<sensor_msgs::SetCameraInfo>(
-				"rgb/set_camera_info");
-
+				"/cloudbot0/rgb/set_camera_info");
 
 		std_srvs::Empty emp;
 		clear_keyframes_service.call(emp);
@@ -61,7 +61,7 @@ public:
 		map->add_frame(msg);
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
 				map->get_map_pointcloud();
-		cloud->header.frame_id = "odom";
+		cloud->header.frame_id = "/cloudbot0/odom";
 		cloud->header.stamp = ros::Time::now();
 		cloud->header.seq = 0;
 		pointcloud_pub.publish(cloud);
@@ -85,6 +85,44 @@ public:
 			ROS_INFO("Action finished: %s", state.toString().c_str());
 		} else
 			ROS_INFO("Action did not finish before the time out.");
+	}
+
+	void move_straight() {
+
+		float current_angle = 0;
+		float desired_angle = 0;
+
+		/*
+		if (map->frames.size() > 0) {
+			Sophus::SE3f position =
+					map->frames[map->frames.size() - 1]->get_pos();
+			Eigen::Vector3f current_heading = position.unit_quaternion()
+					* Eigen::Vector3f::UnitZ();
+
+			current_angle = std::atan2(-current_heading(1), current_heading(0));
+			desired_angle = std::asin(position.translation()(1)/10.0);
+		}*/
+
+		turtlebot_actions::TurtlebotMoveGoal goal;
+		goal.forward_distance = 25.0;
+		goal.turn_distance = current_angle - desired_angle;
+
+		action_client.waitForServer();
+		action_client.sendGoal(goal);
+
+		//wait for the action to return
+		bool finished_before_timeout = action_client.waitForResult(
+				ros::Duration(500.0));
+
+		if (finished_before_timeout) {
+			actionlib::SimpleClientGoalState state = action_client.getState();
+			ROS_INFO("Action finished: %s", state.toString().c_str());
+		} else
+			ROS_INFO("Action did not finish before the time out.");
+
+
+		map->save("corridor_map");
+
 	}
 
 	void capture_sphere() {
@@ -121,7 +159,7 @@ public:
 
 				update_map();
 
-				cloud->header.frame_id = "odom";
+				cloud->header.frame_id = "/cloudbot0/odom";
 				cloud->header.stamp = ros::Time::now();
 				cloud->header.seq = 0;
 				pointcloud_pub.publish(cloud);
@@ -234,9 +272,11 @@ int main(int argc, char **argv) {
 	//t.capture_sphere();
 	//t.optmize_panorama();
 
-	while (true) {
-		t.optmize();
-	}
+		t.move_straight();
+
+	//while (true) {
+	//	t.optmize();
+	//}
 
 	ros::waitForShutdown();
 

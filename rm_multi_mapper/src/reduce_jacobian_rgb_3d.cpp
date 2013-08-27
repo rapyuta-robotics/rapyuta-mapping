@@ -66,19 +66,13 @@ void reduce_jacobian_rgb_3d::operator()(
 				frames[i]->get_pos(), subsample_level, intencity_warped,
 				depth_warped);
 
-/*
-		cv::Mat dx, dy;
-
-		intencity_dx.convertTo(dx, CV_32F, 1/256.0);
-		intencity_dy.convertTo(dy, CV_32F, 1/256.0);
 
 
-		cv::imshow("intencity", intencity);
-		cv::imshow("intencity_dx", dx);
-		cv::imshow("intencity_dy", dy);
-		cv::imshow("intencity_warped", intencity_warped);
-		cv::waitKey();
-*/
+
+		//cv::imshow("intencity", intencity);
+		//cv::imshow("intencity_warped", intencity_warped);
+		//cv::waitKey();
+
 
 		int size = intencity.rows * intencity.cols;
 		for (int vec = 0; vec < size; vec++) {

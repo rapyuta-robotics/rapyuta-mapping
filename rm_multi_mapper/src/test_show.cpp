@@ -19,7 +19,7 @@
 int main(int argc, char **argv) {
 
 	keyframe_map map;
-	map.load("keyframe_map_optimized");
+	map.load(argv[1]);
 
 	pcl::visualization::PCLVisualizer vis;
 

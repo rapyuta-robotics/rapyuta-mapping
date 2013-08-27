@@ -33,7 +33,7 @@ find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
 
-rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_rgb_3d.cpp)
+rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_rgb_3d.cpp src/robot_mapper.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization)
 
 rosbuild_add_executable(test_keyframe_extraction src/test_keyframe_extraction.cpp)
@@ -45,8 +45,8 @@ target_link_libraries(test_keyframe_extraction ${PROJECT_NAME})
 # src/panorama_map.cpp)
 #target_link_libraries(${PROJECT_NAME} tbb rm_localization_util)
 
-#rosbuild_add_executable(multi_mapper src/main.cpp)
-#target_link_libraries(multi_mapper ${VTK_LIBRARIES} ${PROJECT_NAME})
+rosbuild_add_executable(multi_mapper src/main.cpp)
+target_link_libraries(multi_mapper ${PROJECT_NAME})
 
 #rosbuild_add_executable(ransac_test src/test.cpp src/robot_mapper.cpp src/keypoint_map.cpp)
 #target_link_libraries(ransac_test cholmod vtkCommon vtkFiltering rm_localization_util)
@@ -61,8 +61,8 @@ target_link_libraries(test_keyframe_extraction ${PROJECT_NAME})
 rosbuild_add_executable(test_icp src/test_icp.cpp)
 target_link_libraries(test_icp ${PROJECT_NAME})
 
-#rosbuild_add_executable(test_merge src/test_merge.cpp)
-#target_link_libraries(test_merge ${VTK_LIBRARIES} ${PROJECT_NAME})
+rosbuild_add_executable(test_merge src/test_merge.cpp)
+target_link_libraries(test_merge ${VTK_LIBRARIES} ${PROJECT_NAME})
 
 rosbuild_add_executable(test_show src/test_show.cpp)
 target_link_libraries(test_show ${VTK_LIBRARIES} ${PROJECT_NAME})

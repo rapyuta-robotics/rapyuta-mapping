@@ -228,17 +228,18 @@ void reduce_jacobian_rgb::operator()(
 		Eigen::Matrix3f H = K * Qij.matrix() * K.inverse();
 		cv::Mat cvH(3, 3, CV_32F, H.data());
 
-		cv::Mat intensity_j_warped, intensity_i_dx, intensity_i_dy;
-		intensity_j_warped = cv::Mat::zeros(intensity_j.size(),
-				intensity_j.type());
-		cv::warpPerspective(intensity_j, intensity_j_warped, cvH.t(),
+		cv::Mat intensity_j_float, intensity_j_warped, intensity_i_dx, intensity_i_dy;
+		intensity_j.convertTo(intensity_j_float, CV_32F);
+		intensity_j_warped = cv::Mat::zeros(intensity_j_float.size(),
+				intensity_j_float.type());
+		cv::warpPerspective(intensity_j_float, intensity_j_warped, cvH.t(),
 				intensity_j.size());
 
 		intensity_i_dx = frames[i]->get_i_dx(subsample_level);
 		intensity_i_dy = frames[i]->get_i_dy(subsample_level);
 
 		//cv::imshow("intensity_i", intensity_i);
-		//cv::imshow("intensity_j", intensity_j);
+		//cv::imshow("intensity_j_float", intensity_j_float);
 		//cv::imshow("intensity_j_warped", intensity_j_warped);
 		//cv::imshow("intensity_i_dx", intensity_i_dx);
 		//cv::imshow("intensity_i_dy", intensity_i_dy);
@@ -255,10 +256,10 @@ void reduce_jacobian_rgb::operator()(
 
 		for (int v = 0; v < intensity_i.rows; v++) {
 			for (int u = 0; u < intensity_i.cols; u++) {
-				if (intensity_j_warped.at<uint8_t>(v, u) != 0) {
+				if (intensity_j_warped.at<float>(v, u) != 0) {
 
 					float e = (float) intensity_i.at<uint8_t>(v, u)
-							- (float) intensity_j_warped.at<uint8_t>(v, u);
+							-  intensity_j_warped.at<float>(v, u);
 
 					float dx = intensity_i_dx.at<int16_t>(v, u);
 					float dy = intensity_i_dy.at<int16_t>(v, u);
