@@ -1,0 +1,163 @@
+{
+    "url"     : "http://54.217.41.100:9000/",
+    "userID"  : "testUser",
+    "password": "testUser",
+    "robotID" : "$hostname",
+    
+    "containers" : [],
+    
+    "nodes" : [],
+    
+    "parameters" : [],
+    
+    "interfaces" : [
+
+	############ Keyframe topic #####################
+        {
+            "eTag"  : "$hostname",
+            "iTag"  : "KeyframeConverter$hostname", 
+            "iType" : "SubscriberConverter",
+            "iCls"  : "rm_localization/Keyframe", 
+            "addr"  : "/$hostname/keyframe"
+        },
+	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "KeyframeInterface$hostname", 
+            "iType" : "PublisherInterface",
+            "iCls"  : "rm_localization/Keyframe", 
+            "addr"  : "/$hostname/keyframe"
+        },
+
+
+	############ Turtlebot move actions topic (Robot side) #####################
+	{
+            "eTag"  : "$hostname",
+            "iTag"  : "TurtlebotMoveActionResultConverter$hostname", 
+            "iType" : "SubscriberConverter",
+            "iCls"  : "turtlebot_actions/TurtlebotMoveActionResult", 
+            "addr"  : "/$hostname/turtlebot_move/result"
+        },
+ 	{
+            "eTag"  : "$hostname",
+            "iTag"  : "TurtlebotMoveActionFeedbackConverter$hostname", 
+            "iType" : "SubscriberConverter",
+            "iCls"  : "turtlebot_actions/TurtlebotMoveActionFeedback", 
+            "addr"  : "/$hostname/turtlebot_move/feedback"
+        }, 
+	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "TurtlebotMoveActionResultInterface$hostname", 
+            "iType" : "PublisherInterface",
+            "iCls"  : "turtlebot_actions/TurtlebotMoveActionResult", 
+            "addr"  : "/$hostname/turtlebot_move/result"
+        },
+ 	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "TurtlebotMoveActionFeedbackInterface$hostname", 
+            "iType" : "PublisherInterface",
+            "iCls"  : "turtlebot_actions/TurtlebotMoveActionFeedback", 
+            "addr"  : "/$hostname/turtlebot_move/feedback"
+        },
+
+
+	############ Turtlebot move actions topic (Cloud side) #####################
+	{
+            "eTag"  : "$hostname",
+            "iTag"  : "TurtlebotMoveActionGoalConverter$hostname", 
+            "iType" : "PublisherConverter",
+            "iCls"  : "turtlebot_actions/TurtlebotMoveActionGoal", 
+            "addr"  : "/$hostname/turtlebot_move/goal"
+        },
+	{
+            "eTag"  : "$hostname",
+            "iTag"  : "TurtlebotMoveActionCancelConverter$hostname", 
+            "iType" : "PublisherConverter",
+            "iCls"  : "actionlib_msgs/GoalID", 
+            "addr"  : "/$hostname/turtlebot_move/cancel"
+        },
+	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "TurtlebotMoveActionGoalInterface$hostname", 
+            "iType" : "SubscriberInterface",
+            "iCls"  : "turtlebot_actions/TurtlebotMoveActionGoal", 
+            "addr"  : "/$hostname/turtlebot_move/goal"
+        }, 
+	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "TurtlebotMoveActionCancelInterface$hostname", 
+            "iType" : "SubscriberInterface",
+            "iCls"  : "actionlib_msgs/GoalID", 
+            "addr"  : "/$hostname/turtlebot_move/cancel"
+        }, 
+
+
+
+	############ Clear Keyframes Service #####################
+	{
+            "eTag"  : "$hostname",
+            "iTag"  : "ClearKeyframes$hostname", 
+            "iType" : "ServiceClientConverter",
+            "iCls"  : "std_srvs/Empty", 
+            "addr"  : "/$hostname/clear_keyframes"
+        },
+
+	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "ClearKeyframes$hostname", 
+            "iType" : "ServiceProviderInterface",
+            "iCls"  : "std_srvs/Empty", 
+            "addr"  : "/$hostname/clear_keyframes"
+        },
+
+
+	############ Update Map Service #####################
+	{
+            "eTag"  : "$hostname",
+            "iTag"  : "UpdateMap$hostname", 
+            "iType" : "ServiceClientConverter",
+            "iCls"  : "rm_localization/UpdateMap", 
+            "addr"  : "/$hostname/update_map"
+        },
+	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "UpdateMap$hostname", 
+            "iType" : "ServiceProviderInterface",
+            "iCls"  : "rm_localization/UpdateMap", 
+            "addr"  : "/$hostname/update_map"
+        }
+
+
+
+	
+    ],
+    
+    "connections" : [
+        {   "tagA" : "$hostname/KeyframeConverter$hostname",
+            "tagB" : "cloud_container/KeyframeInterface$hostname"
+        }, {
+            "tagA" : "$hostname/TurtlebotMoveActionResultConverter$hostname",
+            "tagB" : "cloud_container/TurtlebotMoveActionResultInterface$hostname"
+        }, {
+            "tagA" : "$hostname/TurtlebotMoveActionFeedbackConverter$hostname",
+            "tagB" : "cloud_container/TurtlebotMoveActionFeedbackInterface$hostname"
+        },
+
+	{
+            "tagA" : "$hostname/TurtlebotMoveActionGoalConverter$hostname",
+            "tagB" : "cloud_container/TurtlebotMoveActionGoalInterface$hostname"
+        }, {
+            "tagA" : "$hostname/TurtlebotMoveActionCancelConverter$hostname",
+            "tagB" : "cloud_container/TurtlebotMoveActionCancelInterface$hostname"
+        }, 
+
+	{
+            "tagA" : "$hostname/ClearKeyframes$hostname",
+            "tagB" : "cloud_container/ClearKeyframes$hostname"
+        }, {
+            "tagA" : "$hostname/UpdateMap$hostname",
+            "tagB" : "cloud_container/UpdateMap$hostname"
+        }
+
+
+    ]
+}
