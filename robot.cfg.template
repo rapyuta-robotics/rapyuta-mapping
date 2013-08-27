@@ -1,5 +1,5 @@
 {
-    "url"     : "http://54.217.41.100:9000/",
+    "url"     : "http://54.216.124.70:9000/",
     "userID"  : "testUser",
     "password": "testUser",
     "robotID" : "$hostname",
@@ -124,8 +124,17 @@
             "iType" : "ServiceProviderInterface",
             "iCls"  : "rm_localization/UpdateMap", 
             "addr"  : "/$hostname/update_map"
-        }
+        },
 
+
+	############ Tf #####################
+	{
+            "eTag"  : "$hostname",
+            "iTag"  : "TfInterface$hostname", 
+            "iType" : "SubscriberInterface",
+            "iCls"  : "tf/tfMessage", 
+            "addr"  : "/tf"
+        }
 
 
 	
@@ -156,6 +165,9 @@
         }, {
             "tagA" : "$hostname/UpdateMap$hostname",
             "tagB" : "cloud_container/UpdateMap$hostname"
+        }, {
+            "tagA" : "workstation/TfConverter",
+            "tagB" : "$hostname/TfInterface$hostname"
         }
 
 
