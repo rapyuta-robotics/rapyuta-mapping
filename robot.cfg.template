@@ -1,5 +1,5 @@
 {
-    "url"     : "http://54.216.124.70:9000/",
+    "url"     : "http://54.217.91.194:9000/",
     "userID"  : "testUser",
     "password": "testUser",
     "robotID" : "$hostname",
@@ -166,8 +166,8 @@
             "tagA" : "$hostname/UpdateMap$hostname",
             "tagB" : "cloud_container/UpdateMap$hostname"
         }, {
-            "tagA" : "$hostname/TfInterface$hostname",
-            "tagB" : "workstation/TfConverter"
+            "tagA" : "workstation/TfConverter",
+            "tagB" : "$hostname/TfInterface$hostname"
         }
 
 
