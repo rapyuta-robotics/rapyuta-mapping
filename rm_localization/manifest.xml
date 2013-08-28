@@ -9,7 +9,6 @@
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/rm_localization</url>
   <depend package="roscpp"/>
-  <depend package="pcl_ros"/>
   <depend package="opencv2"/>
   <depend package="tf"/>
   <depend package="tf_conversions"/>
