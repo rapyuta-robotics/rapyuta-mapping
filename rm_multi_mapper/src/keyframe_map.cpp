@@ -279,9 +279,9 @@ bool keyframe_map::find_transform(const keyframe_map & other,
 	int i = rand() % frames.size();
 	int j = rand() % other.frames.size();
 
-	//cv::imshow("i", frames[i]->get_rgb());
-	//cv::imshow("j", other.frames[j]->get_rgb());
-	//cv::waitKey(3);
+	cv::imshow("i", frames[i]->get_rgb());
+	cv::imshow("j", other.frames[j]->get_rgb());
+	cv::waitKey(3);
 
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
@@ -312,7 +312,7 @@ bool keyframe_map::find_transform(const keyframe_map & other,
 
 	if (res) {
 
-		Sophus::SE3f t = frames[i]->get_pos()
+		t = frames[i]->get_pos()
 				* Sophus::SE3f(transform.rotation(), transform.translation())
 				* other.frames[j]->get_pos().inverse();
 
@@ -322,12 +322,12 @@ bool keyframe_map::find_transform(const keyframe_map & other,
 			}
 		}
 
-		//cv::Mat matches_img;
-		//cv::drawMatches(other.frames[j]->get_rgb(), keypoints_j,
-		//		frames[i]->get_rgb(), keypoints_i, matches_filtered,
-		//		matches_img, cv::Scalar(0, 255, 0));
-		//cv::imshow("Matches", matches_img);
-		//cv::waitKey(0);
+		cv::Mat matches_img;
+		cv::drawMatches(other.frames[j]->get_rgb(), keypoints_j,
+				frames[i]->get_rgb(), keypoints_i, matches_filtered,
+				matches_img, cv::Scalar(0, 255, 0));
+		cv::imshow("Matches", matches_img);
+		cv::waitKey(0);
 
 		return true;
 

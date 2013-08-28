@@ -48,12 +48,7 @@ void robot_mapper::keyframeCallback(
 	map->add_frame(msg);
 
 	if (!merged) {
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
-				map->get_map_pointcloud();
-		cloud->header.frame_id = prefix + "/odom";
-		cloud->header.stamp = ros::Time::now();
-		cloud->header.seq = 0;
-		pointcloud_pub.publish(cloud);
+		publish_cloud();
 	}
 
 }
@@ -68,12 +63,20 @@ void robot_mapper::publish_empty_cloud() {
 	pointcloud_pub.publish(cloud);
 }
 
+void robot_mapper::publish_cloud() {
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_map_pointcloud();
+	cloud->header.frame_id = prefix + "/odom";
+	cloud->header.stamp = ros::Time::now();
+	cloud->header.seq = 0;
+	pointcloud_pub.publish(cloud);
+}
+
 void robot_mapper::move_straight() {
 
 	ROS_INFO_STREAM("Received move command for " << prefix);
 
 	turtlebot_actions::TurtlebotMoveGoal goal;
-	goal.forward_distance = 1.0;
+	goal.forward_distance = 15.0;
 	goal.turn_distance = 0;
 
 	action_client.waitForServer();
@@ -159,19 +162,16 @@ void robot_mapper::optmize_panorama() {
 
 			update_map();
 
-			cloud->header.frame_id = "/cloudbot0/odom";
-			cloud->header.stamp = ros::Time::now();
-			cloud->header.seq = 0;
-			pointcloud_pub.publish(cloud);
+			publish_cloud();
 
-			usleep(100000);
+			//usleep(100000);
 
 			if (max_update < 1e-4)
 				break;
 		}
 	}
 
-	update_map(true);
+	//update_map(true);
 
 }
 
@@ -181,14 +181,7 @@ void robot_mapper::optmize() {
 		return;
 
 	map->optimize(0);
-
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_map_pointcloud();
-
-	cloud->header.frame_id = "odom";
-	cloud->header.stamp = ros::Time::now();
-	cloud->header.seq = 0;
-	pointcloud_pub.publish(cloud);
-
+	publish_cloud();
 	update_map();
 
 }
@@ -263,6 +256,8 @@ bool robot_mapper::merge(robot_mapper & other) {
 		boost::mutex::scoped_lock lock(merge_mutex);
 		boost::mutex::scoped_lock lock1(other.merge_mutex);
 
+		ROS_INFO_STREAM("Transform" << std::endl << transform.matrix());
+
 		map->merge(*other.map, transform);
 		other.map = map;
 		other.merged = true;
@@ -271,6 +266,7 @@ bool robot_mapper::merge(robot_mapper & other) {
 		tf::transformEigenToTF(t, other.world_to_odom);
 
 		other.publish_empty_cloud();
+		publish_cloud();
 
 		return true;
 	} else {

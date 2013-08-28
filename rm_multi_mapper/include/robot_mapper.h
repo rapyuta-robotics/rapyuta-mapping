@@ -43,6 +43,7 @@ protected:
 	void turn();
 	void update_map(bool with_intrinsics = false);
 	void publish_empty_cloud();
+	void publish_cloud();
 
 
 

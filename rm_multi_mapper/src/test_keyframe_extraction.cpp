@@ -31,25 +31,25 @@ public:
 	ros::ServiceClient set_camera_info_service;
 
 	TestKeyframeExtraction(ros::NodeHandle & nh) :
-			action_client("/cloudbot0/turtlebot_move", true), map(
+			action_client("/cloudbot1/turtlebot_move", true), map(
 					new keyframe_map) {
 		pointcloud_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
-				"/cloudbot0/pointcloud", 1);
+				"/cloudbot1/pointcloud", 1);
 
 		servo_pub = nh.advertise<std_msgs::Float32>(
-				"/cloudbot0/mobile_base/commands/servo_angle", 3);
+				"/cloudbot1/mobile_base/commands/servo_angle", 3);
 
-		keyframe_sub = nh.subscribe("/cloudbot0/keyframe", 10,
+		keyframe_sub = nh.subscribe("/cloudbot1/keyframe", 10,
 				&TestKeyframeExtraction::chatterCallback, this);
 
 		update_map_service = nh.serviceClient<rm_localization::UpdateMap>(
-				"/cloudbot0/update_map");
+				"/cloudbot1/update_map");
 
 		clear_keyframes_service = nh.serviceClient<std_srvs::Empty>(
-				"/cloudbot0/clear_keyframes");
+				"/cloudbot1/clear_keyframes");
 
 		set_camera_info_service = nh.serviceClient<sensor_msgs::SetCameraInfo>(
-				"/cloudbot0/rgb/set_camera_info");
+				"/cloudbot1/rgb/set_camera_info");
 
 		std_srvs::Empty emp;
 		clear_keyframes_service.call(emp);
@@ -61,7 +61,7 @@ public:
 		map->add_frame(msg);
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
 				map->get_map_pointcloud();
-		cloud->header.frame_id = "/cloudbot0/odom";
+		cloud->header.frame_id = "/cloudbot1/odom";
 		cloud->header.stamp = ros::Time::now();
 		cloud->header.seq = 0;
 		pointcloud_pub.publish(cloud);
@@ -159,7 +159,7 @@ public:
 
 				update_map();
 
-				cloud->header.frame_id = "/cloudbot0/odom";
+				cloud->header.frame_id = "/cloudbot1/odom";
 				cloud->header.stamp = ros::Time::now();
 				cloud->header.seq = 0;
 				pointcloud_pub.publish(cloud);
@@ -204,7 +204,7 @@ public:
 
 			Eigen::Vector3f intrinsics = map->frames[0]->get_intrinsics();
 
-			/*
+
 			 sensor_msgs::SetCameraInfo s;
 			 s.request.camera_info.width = map->frames[0]->get_i(0).cols;
 			 s.request.camera_info.height = map->frames[0]->get_i(0).rows;
@@ -232,7 +232,7 @@ public:
 			 s.request.camera_info.P[10] = 1.0;
 
 			 set_camera_info_service.call(s);
-			 */
+
 
 			memcpy(update_map_msg.request.intrinsics.data(), intrinsics.data(),
 					3 * sizeof(float));
@@ -269,10 +269,10 @@ int main(int argc, char **argv) {
 	ros::AsyncSpinner spinner(4);
 	spinner.start();
 
-	//t.capture_sphere();
-	//t.optmize_panorama();
+	t.capture_sphere();
+	t.optmize_panorama();
 
-		t.move_straight();
+	//	t.move_straight();
 
 	//while (true) {
 	//	t.optmize();
