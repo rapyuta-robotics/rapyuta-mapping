@@ -30,6 +30,8 @@
 
 
 	############ Turtlebot move actions topic (Robot side) #####################
+
+	######## Result #############
 	{
             "eTag"  : "$hostname",
             "iTag"  : "TurtlebotMoveActionResultConverter$hostname", 
@@ -37,13 +39,6 @@
             "iCls"  : "turtlebot_actions/TurtlebotMoveActionResult", 
             "addr"  : "/$hostname/turtlebot_move/result"
         },
- 	{
-            "eTag"  : "$hostname",
-            "iTag"  : "TurtlebotMoveActionFeedbackConverter$hostname", 
-            "iType" : "SubscriberConverter",
-            "iCls"  : "turtlebot_actions/TurtlebotMoveActionFeedback", 
-            "addr"  : "/$hostname/turtlebot_move/feedback"
-        }, 
 	{
             "eTag"  : "cloud_container",
             "iTag"  : "TurtlebotMoveActionResultInterface$hostname", 
@@ -51,7 +46,16 @@
             "iCls"  : "turtlebot_actions/TurtlebotMoveActionResult", 
             "addr"  : "/$hostname/turtlebot_move/result"
         },
+
+	######## Feedback #############
  	{
+            "eTag"  : "$hostname",
+            "iTag"  : "TurtlebotMoveActionFeedbackConverter$hostname", 
+            "iType" : "SubscriberConverter",
+            "iCls"  : "turtlebot_actions/TurtlebotMoveActionFeedback", 
+            "addr"  : "/$hostname/turtlebot_move/feedback"
+        },
+	{
             "eTag"  : "cloud_container",
             "iTag"  : "TurtlebotMoveActionFeedbackInterface$hostname", 
             "iType" : "PublisherInterface",
@@ -59,8 +63,25 @@
             "addr"  : "/$hostname/turtlebot_move/feedback"
         },
 
+	######## Status #############
+	{
+            "eTag"  : "$hostname",
+            "iTag"  : "TurtlebotMoveActionStatusConverter$hostname", 
+            "iType" : "SubscriberConverter",
+            "iCls"  : "actionlib_msgs/GoalStatusArray", 
+            "addr"  : "/cloudbot0/turtlebot_move/status"
+        },
+	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "TurtlebotMoveActionStatusInterface$hostname", 
+            "iType" : "PublisherInterface",
+            "iCls"  : "actionlib_msgs/GoalStatusArray", 
+            "addr"  : "/cloudbot0/turtlebot_move/status"
+        },
 
-	############ Turtlebot move actions topic (Cloud side) #####################
+ 	
+
+	######## Goal #############
 	{
             "eTag"  : "$hostname",
             "iTag"  : "TurtlebotMoveActionGoalConverter$hostname", 
@@ -68,6 +89,16 @@
             "iCls"  : "turtlebot_actions/TurtlebotMoveActionGoal", 
             "addr"  : "/$hostname/turtlebot_move/goal"
         },
+	{
+            "eTag"  : "cloud_container",
+            "iTag"  : "TurtlebotMoveActionGoalInterface$hostname", 
+            "iType" : "SubscriberInterface",
+            "iCls"  : "turtlebot_actions/TurtlebotMoveActionGoal", 
+            "addr"  : "/$hostname/turtlebot_move/goal"
+        },
+
+
+	######## Cancel #############
 	{
             "eTag"  : "$hostname",
             "iTag"  : "TurtlebotMoveActionCancelConverter$hostname", 
@@ -77,18 +108,12 @@
         },
 	{
             "eTag"  : "cloud_container",
-            "iTag"  : "TurtlebotMoveActionGoalInterface$hostname", 
-            "iType" : "SubscriberInterface",
-            "iCls"  : "turtlebot_actions/TurtlebotMoveActionGoal", 
-            "addr"  : "/$hostname/turtlebot_move/goal"
-        }, 
-	{
-            "eTag"  : "cloud_container",
             "iTag"  : "TurtlebotMoveActionCancelInterface$hostname", 
             "iType" : "SubscriberInterface",
             "iCls"  : "actionlib_msgs/GoalID", 
             "addr"  : "/$hostname/turtlebot_move/cancel"
-        }, 
+        },
+	
 
 
 
@@ -150,13 +175,15 @@
             "tagA" : "$hostname/TurtlebotMoveActionFeedbackConverter$hostname",
             "tagB" : "cloud_container/TurtlebotMoveActionFeedbackInterface$hostname"
         },
-
 	{
             "tagA" : "$hostname/TurtlebotMoveActionGoalConverter$hostname",
             "tagB" : "cloud_container/TurtlebotMoveActionGoalInterface$hostname"
         }, {
             "tagA" : "$hostname/TurtlebotMoveActionCancelConverter$hostname",
             "tagB" : "cloud_container/TurtlebotMoveActionCancelInterface$hostname"
+        }, {
+            "tagA" : "$hostname/TurtlebotMoveActionStatusConverter$hostname",
+            "tagB" : "cloud_container/TurtlebotMoveActionStatusInterface$hostname"
         }, 
 
 	{
