@@ -40,7 +40,6 @@ protected:
 	message_filters::Subscriber<sensor_msgs::Image> depth_sub;
 	message_filters::Subscriber<sensor_msgs::CameraInfo> info_sub;
 
-
 	boost::shared_ptr<Synchronizer> sync;
 
 	int queue_size_;
@@ -87,11 +86,10 @@ public:
 		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
 		info_sub.subscribe(nh_, "rgb/camera_info", queue_size_);
 
-
 		// Synchronize inputs.
 		sync.reset(
-				new Synchronizer(SyncPolicy(queue_size_), rgb_sub,
-						depth_sub, info_sub));
+				new Synchronizer(SyncPolicy(queue_size_), rgb_sub, depth_sub,
+						info_sub));
 
 		sync->registerCallback(
 				boost::bind(&CaptureServer::RGBDCallback, this, _1, _2, _3));
@@ -247,17 +245,19 @@ public:
 						new keyframe(yuv2->image, depth->image, camera_position,
 								intrinsics));
 
-				closest_keyframe->estimate_position(*k);
-				camera_position = k->get_pos();
+				if (closest_keyframe->estimate_position(*k)) {
+					camera_position = k->get_pos();
 
-				keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
-				keyframes.push_back(k);
-				ROS_DEBUG("Adding new keyframe");
+					keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
+					keyframes.push_back(k);
+					ROS_DEBUG("Adding new keyframe");
+				}
 
 			} else {
 				frame f(yuv2->image, depth->image, camera_position);
-				closest_keyframe->estimate_position(f);
-				camera_position = f.get_pos();
+				if (closest_keyframe->estimate_position(f)) {
+					camera_position = f.get_pos();
+				}
 			}
 
 		} else {

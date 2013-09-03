@@ -79,6 +79,8 @@ struct reduce_jacobian {
 
 	Sophus::Matrix6f JtJ;
 	Sophus::Vector6f Jte;
+	int num_points;
+	float error_sum;
 
 	const uint8_t * intencity;
 	const int16_t * intencity_dx;
@@ -102,6 +104,8 @@ struct reduce_jacobian {
 
 		JtJ.setZero();
 		Jte.setZero();
+		num_points = 0;
+		error_sum = 0;
 
 	}
 
@@ -112,6 +116,8 @@ struct reduce_jacobian {
 					rb.cloud), cols(rb.cols), rows(rb.rows) {
 		JtJ.setZero();
 		Jte.setZero();
+		num_points = 0;
+		error_sum = 0;
 	}
 
 	inline void compute_jacobian(const Eigen::Vector4f & p,
@@ -157,6 +163,9 @@ struct reduce_jacobian {
 				JtJ += J.transpose() * J;
 				Jte += J.transpose() * error;
 
+				num_points++;
+				error_sum += error*error;
+
 			}
 
 		}
@@ -166,6 +175,8 @@ struct reduce_jacobian {
 	void join(reduce_jacobian& rb) {
 		JtJ += rb.JtJ;
 		Jte += rb.Jte;
+		num_points += rb.num_points;
+		error_sum += rb.error_sum;
 	}
 
 };
@@ -182,8 +193,8 @@ public:
 
 	~keyframe();
 
-	void estimate_position(frame & f);
-	void estimate_relative_position(frame & f, Sophus::SE3f & Mrc);
+	bool estimate_position(frame & f);
+	bool estimate_relative_position(frame & f, Sophus::SE3f & Mrc);
 
 	void update_intrinsics(const Eigen::Vector3f & intrinsics);
 

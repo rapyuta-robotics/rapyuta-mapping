@@ -55,14 +55,17 @@ keyframe::~keyframe() {
 
 }
 
-void keyframe::estimate_position(frame & f) {
+bool keyframe::estimate_position(frame & f) {
 	Sophus::SE3f Mrc;
-	estimate_relative_position(f, Mrc);
-	f.position = position * Mrc;
+	bool res = estimate_relative_position(f, Mrc);
+	if (res) {
+		f.position = position * Mrc;
+	}
+	return res;
 
 }
 
-void keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
+bool keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 
 	int level_iterations[] = { 1, 2, 3 };
 
@@ -77,26 +80,31 @@ void keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 							level);
 
 			Eigen::Vector3f intrinsics = get_intrinsics(level);
-			cv::Mat intencity_warped(intencity.rows, intencity.cols,
-					CV_32F), depth_warped(depth.rows, depth.cols,
-							CV_32F);
+			cv::Mat intencity_warped(intencity.rows, intencity.cols, CV_32F),
+					depth_warped(depth.rows, depth.cols, CV_32F);
 
 			int c = cols >> level;
 			int r = rows >> level;
 
-			f.warp(clouds[level], intrinsics, Mrc.inverse(), level, intencity_warped,
-					depth_warped);
+			f.warp(clouds[level], intrinsics, Mrc.inverse(), level,
+					intencity_warped, depth_warped);
 
 			reduce_jacobian rj(intencity_pyr[level], intencity_pyr_dx[level],
 					intencity_pyr_dy[level], (float *) intencity_warped.data,
-					(float *) depth_warped.data, intrinsics, clouds[level],
-					c, r);
+					(float *) depth_warped.data, intrinsics, clouds[level], c,
+					r);
 
 			tbb::parallel_reduce(
 					tbb::blocked_range<int>(0, intencity.cols * intencity.rows),
 					rj);
 
 			//rj(tbb::blocked_range<int>(0, intencity.cols * intencity.rows));
+
+			if ((float) rj.num_points / (c * r) < 0.2) {
+				return false;
+			}
+
+			//ROS_INFO("Mean error %f with %f\% valid points", std::sqrt(rj.error_sum)/rj.num_points, (float)rj.num_points / (c*r));
 
 			Sophus::Vector6f update = -rj.JtJ.ldlt().solve(rj.Jte);
 
@@ -116,6 +124,7 @@ void keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 		}
 	}
 
+	return true;
 
 }
 
