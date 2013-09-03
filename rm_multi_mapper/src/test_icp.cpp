@@ -20,33 +20,26 @@ int main(int argc, char **argv) {
 	ros::init(argc, argv, "multi_mapper");
 	ros::NodeHandle nh;
 
-	ros::Publisher pointcloud_pub = nh.advertise<pcl::PointCloud<pcl::PointXYZRGB> >(
-			"pointcloud", 1);
+	ros::Publisher pointcloud_pub = nh.advertise<
+			pcl::PointCloud<pcl::PointXYZRGB> >("pointcloud", 1);
 
 	keyframe_map map;
-	map.load("keyframe_map");
-
+	map.load("keyframe_map2");
 
 	std::cerr << map.frames.size() << std::endl;
-	for (int level = 0; level >= 0; level--) {
-		for (int i = 0; i < (level + 1) * (level + 1) * 30; i++) {
-			float max_update = map.optimize(level);
+	for (int i = 0; i < 100; i++) {
+		float max_update = map.optimize_slam();
 
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
-					map.get_map_pointcloud();
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
 
-			cloud->header.frame_id = "odom";
-			cloud->header.stamp = ros::Time::now();
-			cloud->header.seq = 0;
-			pointcloud_pub.publish(cloud);
+		cloud->header.frame_id = "world";
+		cloud->header.stamp = ros::Time::now();
+		cloud->header.seq = 0;
+		pointcloud_pub.publish(cloud);
 
-			if (max_update < 1e-4)
-				break;
-		}
+		if (max_update < 1e-4)
+			break;
 	}
-
-
-	//map.save("keyframe_map_optimized");
 
 	return 0;
 

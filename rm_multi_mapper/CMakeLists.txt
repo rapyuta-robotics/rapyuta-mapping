@@ -33,7 +33,8 @@ find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
 
-rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_rgb_3d.cpp src/robot_mapper.cpp)
+rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_rgb_3d.cpp
+src/reduce_jacobian_slam_3d.cpp src/robot_mapper.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization)
 
 rosbuild_add_executable(test_keyframe_extraction src/test_keyframe_extraction.cpp)

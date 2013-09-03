@@ -21,6 +21,7 @@ public:
 	void add_frame(const rm_localization::Keyframe::ConstPtr & k);
 	float optimize_panorama(int level);
 	float optimize(int level);
+	float optimize_slam();
 
 	cv::Mat get_panorama_image();
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();

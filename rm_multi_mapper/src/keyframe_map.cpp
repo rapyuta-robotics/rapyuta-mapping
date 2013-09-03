@@ -5,6 +5,7 @@
 #include <fstream>
 #include <reduce_jacobian_rgb.h>
 #include <reduce_jacobian_rgb_3d.h>
+#include <reduce_jacobian_slam_3d.h>
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
@@ -377,6 +378,67 @@ float keyframe_map::optimize(int level) {
 	}
 
 	reduce_jacobian_rgb_3d rj(frames, size, level);
+	/*
+	 tbb::parallel_reduce(
+	 tbb::blocked_range<
+	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
+	 rj);
+
+	 */
+	rj(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()));
+
+	Eigen::VectorXf update =
+			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(
+					rj.Jte.segment(6, (size - 1) * 6));
+
+	iteration_max_update = std::max(std::abs(update.maxCoeff()),
+			std::abs(update.minCoeff()));
+
+	ROS_INFO("Max update %f", iteration_max_update);
+
+	for (int i = 0; i < size - 1; i++) {
+		frames[i + 1]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i * 6))
+				* frames[i + 1]->get_pos();
+	}
+
+	return iteration_max_update;
+
+}
+
+
+float keyframe_map::optimize_slam() {
+
+	float iteration_max_update;
+	int size = frames.size();
+
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			if (i != j) {
+				float angle =
+						frames[i]->get_pos().unit_quaternion().angularDistance(
+								frames[j]->get_pos().unit_quaternion());
+
+				//float centroid_distance = (frames[i]->get_centroid()
+				//		- frames[j]->get_centroid()).norm();
+
+				float distance = (frames[i]->get_pos().translation()
+						- frames[j]->get_pos().translation()).norm();
+
+				if (angle < M_PI / 6 && distance < 0.5) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
+				}
+			}
+		}
+	}
+
+	reduce_jacobian_slam_3d rj(frames, size);
 	/*
 	 tbb::parallel_reduce(
 	 tbb::blocked_range<
