@@ -79,14 +79,14 @@ struct parallel_warp {
 	const Eigen::Vector3f & intrinsics;
 	int cols;
 	int rows;
-	uint8_t * intencity_warped;
-	uint16_t * depth_warped;
+	float * intencity_warped;
+	float * depth_warped;
 
 	parallel_warp(const uint8_t * intencity, const uint16_t * depth,
 			const Eigen::Matrix<float, 4, 4, Eigen::ColMajor> & transform,
 			const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
 			const Eigen::Vector3f & intrinsics, int cols, int rows,
-			uint8_t * intencity_warped, uint16_t * depth_warped) :
+			float * intencity_warped, float * depth_warped) :
 			intencity(intencity), depth(depth), transform(transform), cloud(
 					cloud), intrinsics(intrinsics), cols(cols), rows(rows), intencity_warped(
 					intencity_warped), depth_warped(depth_warped) {

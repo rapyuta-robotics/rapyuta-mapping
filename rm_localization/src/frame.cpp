@@ -62,8 +62,8 @@ void frame::warp(const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> 
 	int r = rows >> level;
 
 	parallel_warp w(intencity_pyr[level], depth_pyr[level], transform, cloud,
-			intrinsics, c, r, (uint8_t *) intencity_warped.data,
-			(uint16_t *) depth_warped.data);
+			intrinsics, c, r, (float *) intencity_warped.data,
+			(float *) depth_warped.data);
 
 	tbb::parallel_for(tbb::blocked_range<int>(0, c * r), w);
 

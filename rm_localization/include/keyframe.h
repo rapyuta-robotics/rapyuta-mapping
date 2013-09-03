@@ -83,16 +83,16 @@ struct reduce_jacobian {
 	const uint8_t * intencity;
 	const int16_t * intencity_dx;
 	const int16_t * intencity_dy;
-	const uint8_t * intencity_warped;
-	const uint16_t * depth_warped;
+	const float * intencity_warped;
+	const float * depth_warped;
 	const Eigen::Vector3f & intrinsics;
 	const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud;
 	int cols;
 	int rows;
 
 	reduce_jacobian(const uint8_t * intencity, const int16_t * intencity_dx,
-			const int16_t * intencity_dy, const uint8_t * intencity_warped,
-			const uint16_t * depth_warped, const Eigen::Vector3f & intrinsics,
+			const int16_t * intencity_dy, const float * intencity_warped,
+			const float * depth_warped, const Eigen::Vector3f & intrinsics,
 			const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
 			int cols, int rows) :
 			intencity(intencity), intencity_dx(intencity_dx), intencity_dy(

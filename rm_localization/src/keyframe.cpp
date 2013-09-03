@@ -78,8 +78,8 @@ void keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 
 			Eigen::Vector3f intrinsics = get_intrinsics(level);
 			cv::Mat intencity_warped(intencity.rows, intencity.cols,
-					intencity.type()), depth_warped(depth.rows, depth.cols,
-					depth.type());
+					CV_32F), depth_warped(depth.rows, depth.cols,
+							CV_32F);
 
 			int c = cols >> level;
 			int r = rows >> level;
@@ -88,8 +88,8 @@ void keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 					depth_warped);
 
 			reduce_jacobian rj(intencity_pyr[level], intencity_pyr_dx[level],
-					intencity_pyr_dy[level], (uint8_t *) intencity_warped.data,
-					(uint16_t *) depth_warped.data, intrinsics, clouds[level],
+					intencity_pyr_dy[level], (float *) intencity_warped.data,
+					(float *) depth_warped.data, intrinsics, clouds[level],
 					c, r);
 
 			tbb::parallel_reduce(
