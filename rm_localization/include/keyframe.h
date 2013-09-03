@@ -183,6 +183,7 @@ public:
 	~keyframe();
 
 	void estimate_position(frame & f);
+	void estimate_relative_position(frame & f, Sophus::SE3f & Mrc);
 
 	void update_intrinsics(const Eigen::Vector3f & intrinsics);
 

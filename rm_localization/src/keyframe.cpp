@@ -56,14 +56,21 @@ keyframe::~keyframe() {
 }
 
 void keyframe::estimate_position(frame & f) {
+	Sophus::SE3f Mrc;
+	estimate_relative_position(f, Mrc);
+	f.position = position * Mrc;
+
+}
+
+void keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 
 	int level_iterations[] = { 1, 2, 3 };
+
+	Mrc = position.inverse() * f.position;
 
 	for (int level = 2; level >= 0; level--) {
 		for (int iteration = 0; iteration < level_iterations[level];
 				iteration++) {
-
-			Sophus::SE3f Mrc = position.inverse() * f.position;
 
 			cv::Mat intencity = get_i(level), depth = get_d(level),
 					intencity_dx = get_i_dx(level), intencity_dy = get_i_dy(
@@ -77,7 +84,7 @@ void keyframe::estimate_position(frame & f) {
 			int c = cols >> level;
 			int r = rows >> level;
 
-			f.warp(clouds[level], intrinsics, position, level, intencity_warped,
+			f.warp(clouds[level], intrinsics, Mrc.inverse(), level, intencity_warped,
 					depth_warped);
 
 			reduce_jacobian rj(intencity_pyr[level], intencity_pyr_dx[level],
@@ -91,11 +98,11 @@ void keyframe::estimate_position(frame & f) {
 
 			//rj(tbb::blocked_range<int>(0, intencity.cols * intencity.rows));
 
-			Sophus::Vector6f update = -rj.JtJ.llt().solve(rj.Jte);
+			Sophus::Vector6f update = -rj.JtJ.ldlt().solve(rj.Jte);
 
 			//std::cerr << "update " << std::endl << update << std::endl;
 
-			f.position = position * Sophus::SE3f::exp(update) * Mrc;
+			Mrc = Sophus::SE3f::exp(update) * Mrc;
 
 			//std::cerr << "Transform " << std::endl << f.position.matrix()
 			//		<< std::endl;
@@ -108,6 +115,7 @@ void keyframe::estimate_position(frame & f) {
 
 		}
 	}
+
 
 }
 
