@@ -156,7 +156,7 @@ public:
 			Sophus::SE3f Mcb = Sophus::SE3f(q.cast<float>(), t.cast<float>());
 			Sophus::SE3f Mob = camera_position * Mcb;
 
-			odom.header.stamp = time;
+			odom.header.stamp = ros::Time::now();
 			odom.header.frame_id = frame;
 
 			tf::quaternionEigenToMsg(Mob.unit_quaternion().cast<double>(),
