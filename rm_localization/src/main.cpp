@@ -46,7 +46,7 @@ protected:
 
 	int queue_size_;
 
-	//tf::TransformBroadcaster br;
+	tf::TransformBroadcaster br;
 	tf::TransformListener lr;
 
 	Eigen::Vector3f intrinsics;
@@ -100,7 +100,7 @@ public:
 		info_sub.subscribe(nh_, "rgb/camera_info", queue_size_);
 
 		rgb_tf_sub = new tf::MessageFilter<sensor_msgs::Image>(rgb_sub, lr,
-				"odom_combined", queue_size_);
+				"base_footprint", queue_size_);
 
 		// Synchronize inputs.
 		sync.reset(
@@ -165,6 +165,41 @@ public:
 					odom.pose.pose.position);
 
 			odom_pub.publish(odom);
+
+		} catch (tf::TransformException & ex) {
+			ROS_ERROR("%s", ex.what());
+		}
+
+	}
+
+	void publish_tf(const std::string & frame, const ros::Time & time) {
+
+		tf::StampedTransform transform;
+		try {
+			lr.lookupTransform(frame, "base_footprint", time, transform);
+
+			Eigen::Quaterniond q;
+			Eigen::Vector3d t;
+
+			tf::quaternionTFToEigen(transform.getRotation(), q);
+			tf::vectorTFToEigen(transform.getOrigin(), t);
+
+			Sophus::SE3f Mcb = Sophus::SE3f(q.cast<float>(), t.cast<float>());
+
+			Sophus::SE3f Mob = camera_position * Mcb;
+
+			geometry_msgs::TransformStamped tr;
+
+			tf::quaternionEigenToMsg(Mob.unit_quaternion().cast<double>(),
+					tr.transform.rotation);
+			tf::vectorEigenToMsg(Mob.translation().cast<double>(),
+					tr.transform.translation);
+
+			tr.header.frame_id = "odom_combined";
+			tr.header.stamp = time;
+			tr.child_frame_id = "base_footprint";
+
+			br.sendTransform(tr);
 
 		} catch (tf::TransformException & ex) {
 			ROS_ERROR("%s", ex.what());
@@ -253,7 +288,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			lr.lookupTransform("odom_combined", frame, time, transform);
+			lr.lookupTransform("base_footprint", frame, time, transform);
 
 			Eigen::Quaterniond q;
 			Eigen::Vector3d t;
@@ -279,7 +314,7 @@ public:
 
 		boost::mutex::scoped_lock lock(closest_keyframe_update_mutex);
 
-		init_camera_position(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
+		//init_camera_position(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 		if (keyframes.size() != 0) {
 
@@ -306,7 +341,7 @@ public:
 				keyframes.push_back(k);
 				ROS_DEBUG("Adding new keyframe");
 
-				publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
+				//publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 			} else {
 				frame f(yuv2->image, depth->image, camera_position);
@@ -314,11 +349,13 @@ public:
 
 				camera_position = f.get_pos();
 
-				publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
+				//publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 			}
 
 		} else {
+
+			init_camera_position(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 			intrinsics << info_msg->K[0], info_msg->K[2], info_msg->K[5];
 
@@ -328,6 +365,8 @@ public:
 			keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 			keyframes.push_back(k);
 		}
+
+		publish_tf(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 	}
 
