@@ -71,7 +71,7 @@ public:
 
 		ROS_INFO("Creating localization");
 
-		double var = 1e-3;
+		double var = 1e-10;
 		odom.pose.covariance = { {
 				var, 0, 0, 0, 0, 0,
 				0, var, 0, 0, 0, 0,
