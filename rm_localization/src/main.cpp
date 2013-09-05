@@ -46,7 +46,7 @@ protected:
 
 	int queue_size_;
 
-	tf::TransformBroadcaster br;
+	//tf::TransformBroadcaster br;
 	tf::TransformListener lr;
 
 	Eigen::Vector3f intrinsics;
@@ -55,6 +55,8 @@ protected:
 	int closest_keyframe_idx;
 	Sophus::SE3f camera_position;
 	boost::mutex closest_keyframe_update_mutex;
+
+	nav_msgs::Odometry odom;
 
 	ros::Publisher odom_pub;
 	ros::Publisher keyframe_pub;
@@ -69,6 +71,15 @@ public:
 
 		ROS_INFO("Creating localization");
 
+		double var = 1e-3;
+		odom.pose.covariance = { {
+				var, 0, 0, 0, 0, 0,
+				0, var, 0, 0, 0, 0,
+				0, 0, var, 0, 0, 0,
+				0, 0, 0, var, 0, 0,
+				0, 0, 0, 0, var, 0,
+				0, 0, 0, 0, 0, var}};
+
 		queue_size_ = 5;
 
 		odom_pub = nh_.advertise<nav_msgs::Odometry>("vo", queue_size_);
@@ -82,14 +93,14 @@ public:
 				&CaptureServer::send_all_keyframes, this);
 
 		clear_keyframes_service = nh_.advertiseService("clear_keyframes",
-						&CaptureServer::clear_keyframes, this);
+				&CaptureServer::clear_keyframes, this);
 
 		rgb_sub.subscribe(nh_, "rgb/image_raw", queue_size_);
 		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
 		info_sub.subscribe(nh_, "rgb/camera_info", queue_size_);
 
 		rgb_tf_sub = new tf::MessageFilter<sensor_msgs::Image>(rgb_sub, lr,
-				"base_footprint", queue_size_);
+				"odom_combined", queue_size_);
 
 		// Synchronize inputs.
 		sync.reset(
@@ -130,7 +141,7 @@ public:
 		return res;
 	}
 
-	void publish_tf(const std::string & frame, const ros::Time & time) {
+	void publish_odom(const std::string & frame, const ros::Time & time) {
 
 		tf::StampedTransform transform;
 		try {
@@ -143,21 +154,17 @@ public:
 			tf::vectorTFToEigen(transform.getOrigin(), t);
 
 			Sophus::SE3f Mcb = Sophus::SE3f(q.cast<float>(), t.cast<float>());
-
 			Sophus::SE3f Mob = camera_position * Mcb;
 
-			geometry_msgs::TransformStamped tr;
+			odom.header.stamp = time;
+			odom.header.frame_id = frame;
 
 			tf::quaternionEigenToMsg(Mob.unit_quaternion().cast<double>(),
-					tr.transform.rotation);
-			tf::vectorEigenToMsg(Mob.translation().cast<double>(),
-					tr.transform.translation);
+					odom.pose.pose.orientation);
+			tf::pointEigenToMsg(Mob.translation().cast<double>(),
+					odom.pose.pose.position);
 
-			tr.header.frame_id = "odom";
-			tr.header.stamp = time;
-			tr.child_frame_id = "base_footprint";
-
-			br.sendTransform(tr);
+			odom_pub.publish(odom);
 
 		} catch (tf::TransformException & ex) {
 			ROS_ERROR("%s", ex.what());
@@ -246,7 +253,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			lr.lookupTransform("base_footprint", frame, time, transform);
+			lr.lookupTransform("odom_combined", frame, time, transform);
 
 			Eigen::Quaterniond q;
 			Eigen::Vector3d t;
@@ -259,8 +266,8 @@ public:
 			ROS_ERROR("%s", ex.what());
 		}
 
-		ROS_INFO_STREAM(
-				"Initial camera position" << std::endl << camera_position.matrix());
+		//ROS_INFO_STREAM(
+		//		"Initial camera position" << std::endl << camera_position.matrix());
 	}
 
 	void RGBDCallback(const sensor_msgs::Image::ConstPtr& yuv2_msg,
@@ -271,6 +278,8 @@ public:
 		cv_bridge::CvImageConstPtr depth = cv_bridge::toCvShare(depth_msg);
 
 		boost::mutex::scoped_lock lock(closest_keyframe_update_mutex);
+
+		init_camera_position(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 		if (keyframes.size() != 0) {
 
@@ -289,25 +298,30 @@ public:
 						new keyframe(yuv2->image, depth->image, camera_position,
 								intrinsics));
 
-				closest_keyframe->estimate_position(*k);
-				camera_position = k->get_pos();
+				if (closest_keyframe->estimate_position(*k)) {
+					camera_position = k->get_pos();
 
-				keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
-				keyframes.push_back(k);
-				ROS_DEBUG("Adding new keyframe");
+					keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
+					keyframes.push_back(k);
+					ROS_DEBUG("Adding new keyframe");
+
+					publish_odom(yuv2_msg->header.frame_id,
+							yuv2_msg->header.stamp);
+				}
 
 			} else {
 				frame f(yuv2->image, depth->image, camera_position);
-				closest_keyframe->estimate_position(f);
-				camera_position = f.get_pos();
+				if (closest_keyframe->estimate_position(f)) {
+					camera_position = f.get_pos();
+
+					publish_odom(yuv2_msg->header.frame_id,
+							yuv2_msg->header.stamp);
+				}
 			}
 
 		} else {
 
 			intrinsics << info_msg->K[0], info_msg->K[2], info_msg->K[5];
-
-			init_camera_position(yuv2_msg->header.frame_id,
-					yuv2_msg->header.stamp);
 
 			keyframe::Ptr k(
 					new keyframe(yuv2->image, depth->image, camera_position,
@@ -315,8 +329,6 @@ public:
 			keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 			keyframes.push_back(k);
 		}
-
-		publish_tf(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 	}
 

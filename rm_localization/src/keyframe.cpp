@@ -100,7 +100,7 @@ bool keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 
 			//rj(tbb::blocked_range<int>(0, intencity.cols * intencity.rows));
 
-			if ((float) rj.num_points / (c * r) < 0.2) {
+			if ((float) rj.num_points / (c * r) < 0.4) {
 				return false;
 			}
 
