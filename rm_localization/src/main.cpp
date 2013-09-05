@@ -298,25 +298,24 @@ public:
 						new keyframe(yuv2->image, depth->image, camera_position,
 								intrinsics));
 
-				if (closest_keyframe->estimate_position(*k)) {
-					camera_position = k->get_pos();
+				closest_keyframe->estimate_position(*k);
 
-					keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
-					keyframes.push_back(k);
-					ROS_DEBUG("Adding new keyframe");
+				camera_position = k->get_pos();
 
-					publish_odom(yuv2_msg->header.frame_id,
-							yuv2_msg->header.stamp);
-				}
+				keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
+				keyframes.push_back(k);
+				ROS_DEBUG("Adding new keyframe");
+
+				publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 			} else {
 				frame f(yuv2->image, depth->image, camera_position);
-				if (closest_keyframe->estimate_position(f)) {
-					camera_position = f.get_pos();
+				closest_keyframe->estimate_position(f);
 
-					publish_odom(yuv2_msg->header.frame_id,
-							yuv2_msg->header.stamp);
-				}
+				camera_position = f.get_pos();
+
+				publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
+
 			}
 
 		} else {
