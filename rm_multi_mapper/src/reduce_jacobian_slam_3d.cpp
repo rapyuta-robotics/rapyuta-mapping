@@ -1,12 +1,18 @@
 #include <reduce_jacobian_slam_3d.h>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include <pcl/visualization/pcl_visualizer.h>
+
 reduce_jacobian_slam_3d::reduce_jacobian_slam_3d(
 		tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size) :
 		size(size), frames(frames) {
 
 	JtJ.setZero(size * 6, size * 6);
 	Jte.setZero(size * 6);
+
+	icp.setMaxCorrespondenceDistance(0.2);
+	boost::shared_ptr<PointToPlane> point_to_plane(new PointToPlane);
+	icp.setTransformationEstimation(point_to_plane);
 
 }
 
@@ -15,6 +21,10 @@ reduce_jacobian_slam_3d::reduce_jacobian_slam_3d(reduce_jacobian_slam_3d& rb,
 		size(rb.size), frames(rb.frames) {
 	JtJ.setZero(size * 6, size * 6);
 	Jte.setZero(size * 6);
+
+	icp.setMaxCorrespondenceDistance(0.2);
+	boost::shared_ptr<PointToPlane> point_to_plane(new PointToPlane);
+	icp.setTransformationEstimation(point_to_plane);
 }
 
 // Miw = Mij * Mjw
@@ -78,29 +88,116 @@ void reduce_jacobian_slam_3d::operator()(
 		int i = it->first;
 		int j = it->second;
 
-		Sophus::SE3f Mij;
-		frames[i]->estimate_relative_position(*frames[j], Mij);
+		//ROS_INFO_STREAM(
+		//		"Computing transformation between frames " << i << " and " << j);
 
-		Sophus::Vector6f error = Sophus::SE3f::log(
-				Mij * frames[j]->get_pos().inverse() * frames[i]->get_pos());
+		Sophus::SE3f Mij = frames[i]->get_pos().inverse()
+				* frames[j]->get_pos();
 
-		Sophus::Matrix6f Ji, Jj;
-		compute_frame_jacobian(frames[i]->get_pos().matrix(),
-				(Mij * frames[j]->get_pos().inverse()).matrix(), Ji);
+		pcl::PointCloud<pcl::PointNormal>::Ptr Final(
+				new pcl::PointCloud<pcl::PointNormal>);
 
-		Jj = -Ji;
+		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_j =
+				frames[j]->get_pointcloud_with_normals(2, false);
+		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_i =
+				frames[i]->get_pointcloud_with_normals(2, false);
 
-		//
-		JtJ.block<6, 6>(i * 6, i * 6) += Ji.transpose() * Ji;
-		JtJ.block<6, 6>(j * 6, j * 6) += Jj.transpose() * Jj;
-		// i and j
-		JtJ.block<6, 6>(i * 6, j * 6) += Ji.transpose() * Jj;
-		JtJ.block<6, 6>(j * 6, i * 6) += Jj.transpose() * Ji;
+		pcl::transformPointCloudWithNormals(*cloud_j, *cloud_j, Mij.matrix());
 
-		// errors
-		Jte.segment<6>(i * 6) += Ji.transpose() * error;
-		Jte.segment<6>(j * 6) += Jj.transpose() * error;
+		/*static pcl::visualization::PCLVisualizer vis;
+		 {
+		 vis.removeAllPointClouds();
+		 pcl::visualization::PointCloudColorHandlerCustom<pcl::PointNormal> color_i(
+		 cloud_i, 255, 0, 0);
+		 vis.addPointCloud<pcl::PointNormal>(cloud_i, color_i, "cloud_i");
+		 pcl::visualization::PointCloudColorHandlerCustom<pcl::PointNormal> color_j(
+		 cloud_j, 0, 255, 0);
+		 vis.addPointCloud<pcl::PointNormal>(cloud_j, color_j, "cloud_j");
+		 vis.spin();
+		 }*/
 
+		icp.setInputCloud(cloud_j);
+		icp.setInputTarget(cloud_i);
+		icp.align(*Final);
+		if (icp.hasConverged()) {
+
+			//std::cout << "has converged:" << icp.hasConverged() << " score: "
+			//		<< icp.getFitnessScore() << std::endl;
+			//std::cout << icp.getFinalTransformation() << std::endl;
+
+			Eigen::Affine3f tm(icp.getFinalTransformation());
+			Mij = Sophus::SE3f(tm.rotation(), tm.translation()) * Mij;
+
+			/*{
+			 Final->clear();
+			 pcl::transformPointCloudWithNormals(*frames[j]->get_pointcloud_with_normals(4, false), *Final, Mij.matrix());
+
+			 vis.removeAllPointClouds();
+			 pcl::visualization::PointCloudColorHandlerCustom<
+			 pcl::PointNormal> color_i(cloud_i, 255, 0, 0);
+			 vis.addPointCloud<pcl::PointNormal>(cloud_i, color_i,
+			 "cloud_i");
+			 pcl::visualization::PointCloudColorHandlerCustom<
+			 pcl::PointNormal> color_j(Final, 0, 0, 255);
+			 vis.addPointCloud<pcl::PointNormal>(Final, color_j, "cloud_j");
+			 vis.spin();
+			 }*/
+
+			Sophus::SE3f error_transform = Mij * frames[j]->get_pos().inverse()
+					* frames[i]->get_pos();
+
+			Eigen::Matrix4f e = error_transform.matrix();
+			Sophus::Vector6f error;
+			error << e(0, 3), e(1, 3), e(2, 3), -e(1, 2) + e(2, 1), e(0, 2)
+					- e(2, 0), -e(0, 1) + e(1, 0);
+
+			Sophus::Matrix6f Ji, Jj;
+			compute_frame_jacobian(frames[i]->get_pos().matrix(),
+					(Mij * frames[j]->get_pos().inverse()).matrix(), Ji);
+
+			Jj = -Ji;
+
+			//
+			JtJ.block<6, 6>(i * 6, i * 6) += Ji.transpose() * Ji;
+			JtJ.block<6, 6>(j * 6, j * 6) += Jj.transpose() * Jj;
+			// i and j
+			JtJ.block<6, 6>(i * 6, j * 6) += Ji.transpose() * Jj;
+			JtJ.block<6, 6>(j * 6, i * 6) += Jj.transpose() * Ji;
+
+			// errors
+			Jte.segment<6>(i * 6) += Ji.transpose() * error;
+			Jte.segment<6>(j * 6) += Jj.transpose() * error;
+
+		}
+
+		if (frames[i]->estimate_relative_position(*frames[j], Mij)) {
+
+			Sophus::SE3f error_transform = Mij * frames[j]->get_pos().inverse()
+								* frames[i]->get_pos();
+
+			Eigen::Matrix4f e = error_transform.matrix();
+			Sophus::Vector6f error;
+			error << e(0, 3), e(1, 3), e(2, 3), -e(1, 2) + e(2, 1), e(0, 2)
+					- e(2, 0), -e(0, 1) + e(1, 0);
+
+			Sophus::Matrix6f Ji, Jj;
+			compute_frame_jacobian(frames[i]->get_pos().matrix(),
+					(Mij * frames[j]->get_pos().inverse()).matrix(), Ji);
+
+			Jj = -Ji;
+
+			//
+			JtJ.block<6, 6>(i * 6, i * 6) += Ji.transpose() * Ji;
+			JtJ.block<6, 6>(j * 6, j * 6) += Jj.transpose() * Jj;
+			// i and j
+			JtJ.block<6, 6>(i * 6, j * 6) += Ji.transpose() * Jj;
+			JtJ.block<6, 6>(j * 6, i * 6) += Jj.transpose() * Ji;
+
+			// errors
+			Jte.segment<6>(i * 6) += Ji.transpose() * error;
+			Jte.segment<6>(j * 6) += Jj.transpose() * error;
+
+		}
 	}
 }
 

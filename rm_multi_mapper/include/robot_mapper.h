@@ -29,10 +29,13 @@ public:
 	robot_mapper(ros::NodeHandle & nh, const std::string & robot_prefix,
 			const int robot_num);
 
-	void move_straight();
+	void move_straight(float distance);
+	void full_rotation();
+	void turn(float angle);
 	void capture_sphere();
 	void optmize_panorama();
 	void optmize();
+	void save_map(const std::string & dirname);
 
 	bool merge(robot_mapper & other);
 
@@ -40,7 +43,6 @@ protected:
 
 	void keyframeCallback(const rm_localization::Keyframe::ConstPtr& msg);
 	void publish_tf();
-	void turn();
 	void update_map(bool with_intrinsics = false);
 	void publish_empty_cloud();
 	void publish_cloud();

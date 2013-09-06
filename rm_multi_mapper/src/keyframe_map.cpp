@@ -11,6 +11,28 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
 
+#include <g2o/core/sparse_optimizer.h>
+#include <g2o/solvers/dense/linear_solver_dense.h>
+#include <g2o/solvers/pcg/linear_solver_pcg.h>
+#include <g2o/solvers/cholmod/linear_solver_cholmod.h>
+#include <g2o/core/block_solver.h>
+#include <g2o/core/solver.h>
+#include <g2o/core/optimization_algorithm_levenberg.h>
+#include <g2o/core/optimization_algorithm_gauss_newton.h>
+#include <g2o/core/optimization_algorithm_dogleg.h>
+#include <g2o/core/robust_kernel_impl.h>
+
+#include <g2o/core/estimate_propagator.h>
+
+#include <g2o/types/slam3d/vertex_se3.h>
+#include <g2o/types/slam3d/edge_se3.h>
+#include <g2o/types/slam3d/edge_se3_offset.h>
+
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/registration/icp.h>
+#include <pcl/registration/transformation_estimation_point_to_plane.h>
+
 void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,
 		cv::Ptr<cv::DescriptorMatcher> & dm) {
@@ -273,7 +295,7 @@ float keyframe_map::optimize_panorama(int level) {
 bool keyframe_map::find_transform(const keyframe_map & other,
 		Sophus::SE3f & t) const {
 
-	if(frames.size() < 2 || other.frames.size() < 2) {
+	if (frames.size() < 2 || other.frames.size() < 2) {
 		return false;
 	}
 
@@ -409,11 +431,99 @@ float keyframe_map::optimize(int level) {
 
 }
 
-
 float keyframe_map::optimize_slam() {
 
 	float iteration_max_update;
 	int size = frames.size();
+
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			if (i != j) {
+				float angle =
+						frames[i]->get_pos().unit_quaternion().angularDistance(
+								frames[j]->get_pos().unit_quaternion());
+
+				//float centroid_distance = (frames[i]->get_centroid()
+				//		- frames[j]->get_centroid()).norm();
+
+				float distance = (frames[i]->get_pos().translation()
+						- frames[j]->get_pos().translation()).norm();
+
+				//if (angle < M_PI / 6 && distance < 0.5) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
+				//}
+			}
+		}
+	}
+
+	reduce_jacobian_slam_3d rj(frames, size);
+
+
+	tbb::parallel_reduce(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rj);
+
+	/*
+	 rj(
+	 tbb::blocked_range<
+	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
+	 */
+
+
+	Eigen::VectorXf update =
+			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(
+					rj.Jte.segment(6, (size - 1) * 6));
+
+	iteration_max_update = std::max(std::abs(update.maxCoeff()),
+			std::abs(update.minCoeff()));
+
+	ROS_INFO("Max update %f", iteration_max_update);
+
+	for (int i = 0; i < size - 1; i++) {
+		frames[i + 1]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i * 6))
+				* frames[i + 1]->get_pos();
+	}
+
+	return iteration_max_update;
+
+}
+
+void keyframe_map::optimize_g2o() {
+
+	size_t size = frames.size();
+
+	g2o::SparseOptimizer optimizer;
+	optimizer.setVerbose(true);
+	g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
+
+	linearSolver = new g2o::LinearSolverCholmod<
+			g2o::BlockSolver_6_3::PoseMatrixType>();
+
+	g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
+	g2o::OptimizationAlgorithmLevenberg* solver =
+			new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+	optimizer.setAlgorithm(solver);
+
+	for (size_t i = 0; i < size; i++) {
+		Sophus::SE3f & pos = frames[i]->get_pos();
+
+		g2o::SE3Quat pose(pos.unit_quaternion().cast<double>(),
+				pos.translation().cast<double>());
+		g2o::VertexSE3 * v_se3 = new g2o::VertexSE3();
+
+		v_se3->setId(i);
+		if (i < 1) {
+			v_se3->setFixed(true);
+		}
+		v_se3->setEstimate(pose);
+		optimizer.addVertex(v_se3);
+	}
 
 	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
 
@@ -438,35 +548,92 @@ float keyframe_map::optimize_slam() {
 		}
 	}
 
-	reduce_jacobian_slam_3d rj(frames, size);
-	/*
-	 tbb::parallel_reduce(
-	 tbb::blocked_range<
-	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
-	 rj);
+	pcl::IterativeClosestPoint<pcl::PointNormal, pcl::PointNormal> icp;
+	icp.setMaxCorrespondenceDistance(0.2);
+	pcl::PointCloud<pcl::PointNormal> Final;
 
-	 */
-	rj(
-			tbb::blocked_range<
-					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-					overlaping_keyframes.begin(), overlaping_keyframes.end()));
+	typedef pcl::registration::TransformationEstimationPointToPlane<
+			pcl::PointNormal, pcl::PointNormal> PointToPlane;
+	boost::shared_ptr<PointToPlane> point_to_plane(new PointToPlane);
+	icp.setTransformationEstimation(point_to_plane);
 
-	Eigen::VectorXf update =
-			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(
-					rj.Jte.segment(6, (size - 1) * 6));
+	for (size_t it = 0; it < overlaping_keyframes.size(); it++) {
+		int i = overlaping_keyframes[it].first;
+		int j = overlaping_keyframes[it].second;
 
-	iteration_max_update = std::max(std::abs(update.maxCoeff()),
-			std::abs(update.minCoeff()));
+		Sophus::SE3f Mij;
 
-	ROS_INFO("Max update %f", iteration_max_update);
+		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_j =
+				frames[j]->get_pointcloud_with_normals(4, false);
+		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_i =
+				frames[i]->get_pointcloud_with_normals(4, false);
 
-	for (int i = 0; i < size - 1; i++) {
-		frames[i + 1]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i * 6))
-				* frames[i + 1]->get_pos();
+		pcl::transformPointCloudWithNormals(*cloud_j, *cloud_j,
+				(frames[i]->get_pos().inverse() * frames[j]->get_pos()).matrix());
+
+		icp.setInputCloud(cloud_j);
+		icp.setInputTarget(cloud_i);
+
+		icp.align(Final);
+
+		if (icp.hasConverged()) {
+
+			Eigen::Affine3f tm(icp.getFinalTransformation());
+			Mij = Sophus::SE3f(tm.rotation(), tm.translation());
+
+			//if (frames[i]->estimate_relative_position(*frames[j], Mij)) {
+
+			g2o::EdgeSE3 * e = new g2o::EdgeSE3();
+
+			e->setVertex(0,
+					dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+							j)->second));
+			e->setVertex(1,
+					dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+							i)->second));
+			e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
+			e->information() = Sophus::Matrix6d::Identity();
+
+			optimizer.addEdge(e);
+		}
+
 	}
 
-	return iteration_max_update;
+	//optimizer.save("debug.txt");
+
+	optimizer.initializeOptimization();
+	optimizer.setVerbose(true);
+
+	std::cout << std::endl;
+	std::cout << "Performing full BA:" << std::endl;
+	optimizer.optimize(10);
+	std::cout << std::endl;
+
+	for (int i = 0; i < size; i++) {
+		g2o::HyperGraph::VertexIDMap::iterator v_it = optimizer.vertices().find(
+				i);
+		if (v_it == optimizer.vertices().end()) {
+			std::cerr << "Vertex " << i << " not in graph!" << std::endl;
+			exit(-1);
+		}
+
+		g2o::VertexSE3 * v_se3 = dynamic_cast<g2o::VertexSE3 *>(v_it->second);
+		if (v_se3 == 0) {
+			std::cerr << "Vertex " << i << "is not a VertexSE3Expmap!"
+					<< std::endl;
+			exit(-1);
+		}
+
+		double est[7];
+		v_se3->getEstimateData(est);
+
+		Eigen::Vector3d v(est);
+		Eigen::Quaterniond q(est + 3);
+
+		Sophus::SE3f t(q.cast<float>(), v.cast<float>());
+
+		frames[i]->get_pos() = t;
+	}
 
 }
 

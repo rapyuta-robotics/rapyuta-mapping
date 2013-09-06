@@ -24,11 +24,11 @@ int main(int argc, char **argv) {
 			pcl::PointCloud<pcl::PointXYZRGB> >("pointcloud", 1);
 
 	keyframe_map map;
-	map.load("keyframe_map2");
+	map.load(argv[1]);
 
 	std::cerr << map.frames.size() << std::endl;
 	for (int i = 0; i < 100; i++) {
-		float max_update = map.optimize_slam();
+		map.optimize_slam();
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
 
@@ -37,8 +37,7 @@ int main(int argc, char **argv) {
 		cloud->header.seq = 0;
 		pointcloud_pub.publish(cloud);
 
-		if (max_update < 1e-4)
-			break;
+
 	}
 
 	return 0;

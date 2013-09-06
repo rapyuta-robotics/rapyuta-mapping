@@ -35,7 +35,7 @@ include_directories(${VTK_INCLUDE_DIRS})
 
 rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_rgb_3d.cpp
 src/reduce_jacobian_slam_3d.cpp src/robot_mapper.cpp)
-target_link_libraries(${PROJECT_NAME} tbb rm_localization)
+target_link_libraries(${PROJECT_NAME} tbb rm_localization g2o_core g2o_types_slam3d g2o_solver_cholmod cholmod)
 
 rosbuild_add_executable(test_keyframe_extraction src/test_keyframe_extraction.cpp)
 target_link_libraries(test_keyframe_extraction ${PROJECT_NAME})
@@ -72,3 +72,6 @@ target_link_libraries(test_show ${VTK_LIBRARIES} ${PROJECT_NAME})
 
 rosbuild_add_executable(test_panorama src/test_panorama.cpp)
 target_link_libraries(test_panorama ${PROJECT_NAME})
+
+rosbuild_add_executable(test_opt src/test_opt.cpp)
+target_link_libraries(test_opt)

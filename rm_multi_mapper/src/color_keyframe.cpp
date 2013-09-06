@@ -14,34 +14,65 @@ color_keyframe::color_keyframe(const cv::Mat & rgb, const cv::Mat & gray,
 	int num_points = 0;
 
 	for (int i = 0; i < clouds[2].cols(); i++) {
-			Eigen::Vector4f vec = clouds[2].col(i);
-			if (vec(3) > 0) {
-				centroid += vec.segment<3>(0);
-				num_points++;
-			}
+		Eigen::Vector4f vec = clouds[2].col(i);
+		if (vec(3) > 0) {
+			centroid += vec.segment<3>(0);
+			num_points++;
 		}
+	}
 
 	centroid /= num_points;
 
 }
 
-pcl::PointCloud<pcl::PointXYZ>::Ptr color_keyframe::get_pointcloud() const {
+pcl::PointCloud<pcl::PointXYZ>::Ptr color_keyframe::get_pointcloud(
+		int subsample, bool transformed) const {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
 			new pcl::PointCloud<pcl::PointXYZ>);
 
 	Eigen::Matrix<float, 4, 4, Eigen::ColMajor> transform = position.matrix();
 
-	int size = cols * rows;
-	for (int i = 0; i < size; i++) {
-		Eigen::Vector4f vec = clouds[0].col(i);
-		if (vec(3) > 0) {
-			pcl::PointXYZ p;
-			p.getVector4fMap() = transform * vec;
-			cloud->push_back(p);
+	for (int v = 0; v < rows; v += subsample) {
+		for (int u = 0; u < cols; u += subsample) {
+			int i = v * cols + u;
+			Eigen::Vector4f vec = clouds[0].col(i);
+			if (vec(3) > 0) {
+
+				pcl::PointXYZ p;
+				if (transformed)
+					p.getVector4fMap() = transform * vec;
+				else
+					p.getVector4fMap() = vec;
+
+				cloud->push_back(p);
+			}
 		}
 	}
 
 	return cloud;
+}
+
+pcl::PointCloud<pcl::PointNormal>::Ptr color_keyframe::get_pointcloud_with_normals(
+		int subsample, bool transformed) const {
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = get_pointcloud(subsample, transformed);
+
+	pcl::NormalEstimation<pcl::PointXYZ, pcl::PointNormal> ne;
+	ne.setInputCloud(cloud);
+
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
+			new pcl::search::KdTree<pcl::PointXYZ>());
+	ne.setSearchMethod(tree);
+
+	pcl::PointCloud<pcl::PointNormal>::Ptr cloud_with_normals(
+			new pcl::PointCloud<pcl::PointNormal>);
+
+	ne.setRadiusSearch(0.05);
+
+	ne.compute(*cloud_with_normals);
+
+	pcl::copyPointCloud(*cloud, *cloud_with_normals);
+
+	return cloud_with_normals;
 }
 
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr color_keyframe::get_colored_pointcloud(
@@ -53,7 +84,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr color_keyframe::get_colored_pointcloud(
 
 	for (int v = 0; v < rows; v += subsample) {
 		for (int u = 0; u < cols; u += subsample) {
-			int i = v*cols + u;
+			int i = v * cols + u;
 			Eigen::Vector4f vec = clouds[0].col(i);
 			if (vec(3) > 0) {
 

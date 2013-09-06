@@ -57,7 +57,7 @@ void robot_mapper::publish_empty_cloud() {
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
 			new pcl::PointCloud<pcl::PointXYZRGB>);
 	cloud->push_back(pcl::PointXYZRGB(0, 0, 0));
-	cloud->header.frame_id = prefix + "/odom";
+	cloud->header.frame_id = prefix + "/odom_combined";
 	cloud->header.stamp = ros::Time::now();
 	cloud->header.seq = 0;
 	pointcloud_pub.publish(cloud);
@@ -65,24 +65,23 @@ void robot_mapper::publish_empty_cloud() {
 
 void robot_mapper::publish_cloud() {
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_map_pointcloud();
-	cloud->header.frame_id = prefix + "/odom";
+	cloud->header.frame_id = prefix + "/odom_combined";
 	cloud->header.stamp = ros::Time::now();
 	cloud->header.seq = 0;
 	pointcloud_pub.publish(cloud);
 }
 
-void robot_mapper::move_straight() {
+void robot_mapper::move_straight(float distance) {
 
 	ROS_INFO_STREAM("Received move command for " << prefix);
 
 	turtlebot_actions::TurtlebotMoveGoal goal;
-	goal.forward_distance = 15.0;
+	goal.forward_distance = distance;
 	goal.turn_distance = 0;
 
 	action_client.waitForServer();
 	action_client.sendGoal(goal);
 
-	//wait for the action to return
 	bool finished_before_timeout = action_client.waitForResult(
 			ros::Duration(500.0));
 
@@ -92,7 +91,13 @@ void robot_mapper::move_straight() {
 	} else
 		ROS_INFO("Action did not finish before the time out.");
 
-	map->save("corridor_map" + boost::lexical_cast<std::string>(robot_num));
+}
+
+void robot_mapper::full_rotation() {
+
+	ROS_INFO_STREAM("Received turn command for " << prefix);
+	turn(M_PI);
+	turn(M_PI);
 
 }
 
@@ -103,13 +108,17 @@ void robot_mapper::publish_tf() {
 	while (true) {
 		br.sendTransform(
 				tf::StampedTransform(world_to_odom, ros::Time::now(), "/world",
-						prefix + "/odom"));
+						prefix + "/odom_combined"));
 		usleep(33000);
 	}
 
 }
 
-void robot_mapper::turn() {
+void robot_mapper::turn(float angle) {
+
+	ROS_INFO("Turn angle %f", angle);
+	//assert(angle >= -M_PI && angle <= M_PI);
+
 	turtlebot_actions::TurtlebotMoveGoal goal;
 	goal.forward_distance = 0;
 	goal.turn_distance = M_PI;
@@ -142,8 +151,7 @@ void robot_mapper::capture_sphere() {
 		servo_pub.publish(angle_msg);
 		sleep(1);
 
-		turn();
-		turn();
+		full_rotation();
 
 	}
 
@@ -180,10 +188,14 @@ void robot_mapper::optmize() {
 	if (map->frames.size() < 2)
 		return;
 
-	map->optimize(0);
+	map->optimize_g2o();
 	publish_cloud();
 	update_map();
 
+}
+
+void robot_mapper::save_map(const std::string & dirname) {
+	map->save(dirname + boost::lexical_cast<std::string>(robot_num));
 }
 
 void robot_mapper::update_map(bool with_intrinsics) {

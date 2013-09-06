@@ -14,11 +14,19 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/registration/icp.h>
+#include <pcl/registration/transformation_estimation_point_to_plane.h>
+
 struct reduce_jacobian_slam_3d {
 
 	Eigen::MatrixXf JtJ;
 	Eigen::VectorXf Jte;
 	int size;
+
+	typedef pcl::registration::TransformationEstimationPointToPlane<pcl::PointNormal, pcl::PointNormal> PointToPlane;
+	pcl::IterativeClosestPoint<pcl::PointNormal, pcl::PointNormal> icp;
 
 	tbb::concurrent_vector<color_keyframe::Ptr> & frames;
 

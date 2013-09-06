@@ -21,8 +21,9 @@ public:
 			const cv::Mat & depth, const Sophus::SE3f & position,
 			const Eigen::Vector3f & intrinsics, int max_level = 3);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud() const;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud(int subsample = 1, bool transformed = true) const;
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud(int subsample = 1) const;
+	pcl::PointCloud<pcl::PointNormal>::Ptr get_pointcloud_with_normals(int subsample = 1, bool transformed = true) const;
 
 	inline cv::Mat get_rgb() {
 		return rgb;

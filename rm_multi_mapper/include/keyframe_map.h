@@ -23,6 +23,8 @@ public:
 	float optimize(int level);
 	float optimize_slam();
 
+	void optimize_g2o();
+
 	cv::Mat get_panorama_image();
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();
 
