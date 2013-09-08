@@ -158,11 +158,18 @@ rm_localization::Keyframe::Ptr keyframe::to_msg(
 	k->header.frame_id = yuv2->header.frame_id;
 	k->header.stamp = yuv2->header.stamp;
 
-	memcpy(k->intrinsics.data(), intrinsics.data(), 3 * sizeof(float));
-	memcpy(k->transform.unit_quaternion.data(),
-			position.unit_quaternion().coeffs().data(), 4 * sizeof(float));
-	memcpy(k->transform.position.data(), position.translation().data(),
-			3 * sizeof(float));
+	k->intrinsics[0] = intrinsics[0];
+	k->intrinsics[1] = intrinsics[1];
+	k->intrinsics[2] = intrinsics[2];
+
+	k->transform.unit_quaternion[0] = position.unit_quaternion().coeffs()[0];
+	k->transform.unit_quaternion[1] = position.unit_quaternion().coeffs()[1];
+	k->transform.unit_quaternion[2] = position.unit_quaternion().coeffs()[2];
+	k->transform.unit_quaternion[3] = position.unit_quaternion().coeffs()[3];
+
+	k->transform.position[0] = position.translation()[0];
+	k->transform.position[1] = position.translation()[1];
+	k->transform.position[2] = position.translation()[2];
 
 	k->idx = idx;
 

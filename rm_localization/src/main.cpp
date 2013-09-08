@@ -233,7 +233,9 @@ public:
 		boost::mutex::scoped_lock lock(closest_keyframe_update_mutex);
 
 		Eigen::Vector3f intrinsics;
-		memcpy(intrinsics.data(), req.intrinsics.data(), 3 * sizeof(float));
+		intrinsics[0] = req.intrinsics[0];
+		intrinsics[1] = req.intrinsics[1];
+		intrinsics[2] = req.intrinsics[2];
 
 		bool update_intrinsics = intrinsics[0] != 0.0f;
 
@@ -248,10 +250,14 @@ public:
 			Eigen::Quaternionf orientation;
 			Eigen::Vector3f position;
 
-			memcpy(orientation.coeffs().data(),
-					req.transform[i].unit_quaternion.data(), 4 * sizeof(float));
-			memcpy(position.data(), req.transform[i].position.data(),
-					3 * sizeof(float));
+			orientation.coeffs()[0] = req.transform[i].unit_quaternion[0];
+			orientation.coeffs()[1] = req.transform[i].unit_quaternion[1];
+			orientation.coeffs()[2] = req.transform[i].unit_quaternion[2];
+			orientation.coeffs()[3] = req.transform[i].unit_quaternion[3];
+
+			position[0] = req.transform[i].position[0];
+			position[1] = req.transform[i].position[1];
+			position[2] = req.transform[i].position[2];
 
 			Sophus::SE3f new_pos(orientation, position);
 
@@ -265,8 +271,8 @@ public:
 			keyframes[req.idx[i]]->get_pos() = new_pos;
 
 			if (update_intrinsics) {
-				ROS_INFO_STREAM("New intrinsics " << this->intrinsics.transpose());
 				keyframes[req.idx[i]]->update_intrinsics(intrinsics);
+				ROS_INFO_STREAM("New intrinsics " << keyframes[req.idx[i]]->get_intrinsics().transpose());
 			}
 
 		}

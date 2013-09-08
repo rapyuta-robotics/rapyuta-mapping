@@ -26,7 +26,8 @@ color_keyframe::color_keyframe(const cv::Mat & rgb, const cv::Mat & gray,
 }
 
 pcl::PointCloud<pcl::PointXYZ>::Ptr color_keyframe::get_pointcloud(
-		int subsample, bool transformed) const {
+		int subsample, bool transformed, float min_height,
+		float max_height) const {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
 			new pcl::PointCloud<pcl::PointXYZ>);
 
@@ -44,7 +45,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr color_keyframe::get_pointcloud(
 				else
 					p.getVector4fMap() = vec;
 
-				cloud->push_back(p);
+				if (p.z > min_height && p.z < max_height)
+					cloud->push_back(p);
 			}
 		}
 	}
@@ -54,7 +56,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr color_keyframe::get_pointcloud(
 
 pcl::PointCloud<pcl::PointNormal>::Ptr color_keyframe::get_pointcloud_with_normals(
 		int subsample, bool transformed) const {
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = get_pointcloud(subsample, transformed);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = get_pointcloud(subsample,
+			transformed);
 
 	pcl::NormalEstimation<pcl::PointXYZ, pcl::PointNormal> ne;
 	ne.setInputCloud(cloud);
@@ -116,10 +119,18 @@ color_keyframe::Ptr color_keyframe::from_msg(
 	Eigen::Quaternionf orientation;
 	Eigen::Vector3f position, intrinsics;
 
-	memcpy(intrinsics.data(), k->intrinsics.data(), 3 * sizeof(float));
-	memcpy(orientation.coeffs().data(), k->transform.unit_quaternion.data(),
-			4 * sizeof(float));
-	memcpy(position.data(), k->transform.position.data(), 3 * sizeof(float));
+	intrinsics[0] = k->intrinsics[0];
+	intrinsics[1] = k->intrinsics[1];
+	intrinsics[2] = k->intrinsics[2];
+
+	orientation.coeffs()[0] = k->transform.unit_quaternion[0];
+	orientation.coeffs()[1] = k->transform.unit_quaternion[1];
+	orientation.coeffs()[2] = k->transform.unit_quaternion[2];
+	orientation.coeffs()[3] = k->transform.unit_quaternion[3];
+
+	position[0] = k->transform.position[0];
+	position[1] = k->transform.position[1];
+	position[2] = k->transform.position[2];
 
 	color_keyframe::Ptr res(
 			new color_keyframe(rgb, gray, depth,
