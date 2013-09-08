@@ -116,29 +116,32 @@ public:
 		delete rgb_tf_sub;
 	}
 
-	int get_closest_keyframe() {
+	// 1.0 when 10 degrees rotation or 1m translation
+	inline float distance(const Sophus::SE3f & t1, const Sophus::SE3f t2) {
+		float distance = (t1.translation() - t2.translation()).norm();
+		float angle = t1.unit_quaternion().angularDistance(
+				t2.unit_quaternion());
 
-		int res = -1;
-		float dist = 10000.0;
+		return angle / (M_PI / 18) + distance;
+
+	}
+
+	void get_closest_keyframe(int & res, float & dist) {
+
+		res = -1;
+		dist = std::numeric_limits<float>::max();
 
 		for (size_t i = 0; i < keyframes.size(); i++) {
-			Sophus::SE3f t = keyframes[i]->get_pos();
+			Sophus::SE3f & t = keyframes[i]->get_pos();
 
-			if ((camera_position.translation() - t.translation()).norm()
-					< 0.5) {
+			float current_dist = distance(camera_position, t);
 
-				float current_dist = t.unit_quaternion().angularDistance(
-						camera_position.unit_quaternion());
-
-				if (current_dist < dist) {
-					res = i;
-					dist = current_dist;
-				}
+			if (current_dist < dist) {
+				res = i;
+				dist = current_dist;
 			}
 
 		}
-
-		return res;
 	}
 
 	void publish_odom(const std::string & frame, const ros::Time & time) {
@@ -272,7 +275,8 @@ public:
 
 			if (update_intrinsics) {
 				keyframes[req.idx[i]]->update_intrinsics(intrinsics);
-				ROS_INFO_STREAM("New intrinsics " << keyframes[req.idx[i]]->get_intrinsics().transpose());
+				ROS_INFO_STREAM(
+						"New intrinsics " << keyframes[req.idx[i]]->get_intrinsics().transpose());
 			}
 
 		}
@@ -315,20 +319,14 @@ public:
 
 		if (keyframes.size() != 0) {
 
-			closest_keyframe_idx = get_closest_keyframe();
-			//ROS_INFO("Closest keyframe %d", closest_keyframe_idx);
+			float distance;
+			get_closest_keyframe(closest_keyframe_idx, distance);
 
 			keyframe::Ptr closest_keyframe = keyframes[closest_keyframe_idx];
 
-			Sophus::SE3f tt = closest_keyframe->get_pos();
 			ROS_INFO("Closest keyframe %d", closest_keyframe_idx);
 
-			float distance = (tt.translation() - camera_position.translation()).norm();
-			float angle = tt.unit_quaternion().angularDistance(
-					camera_position.unit_quaternion());
-
-			if ( distance > 0.3
-					|| angle > M_PI / 18) {
+			if (distance > 1) {
 				keyframe::Ptr k(
 						new keyframe(yuv2->image, depth->image, camera_position,
 								intrinsics));
@@ -339,8 +337,10 @@ public:
 
 				keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 				keyframes.push_back(k);
-				ROS_INFO_STREAM("Added keyframe with intrinsics " << k->get_intrinsics().transpose());
-				ROS_INFO_STREAM("Closest keyframe at distance " << distance << " angle " << angle);
+				ROS_INFO_STREAM(
+						"Added keyframe with intrinsics " << k->get_intrinsics().transpose());
+				ROS_INFO_STREAM(
+						"Closest keyframe at distance " << distance);
 
 				//publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
@@ -366,7 +366,8 @@ public:
 							intrinsics));
 			keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 			keyframes.push_back(k);
-			ROS_INFO_STREAM("Added keyframe with intrinsics " << k->get_intrinsics().transpose());
+			ROS_INFO_STREAM(
+					"Added keyframe with intrinsics " << k->get_intrinsics().transpose());
 		}
 
 		publish_tf(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
