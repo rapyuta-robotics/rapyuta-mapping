@@ -240,7 +240,7 @@ public:
 		if (update_intrinsics) {
 			ROS_INFO("Updated camera intrinsics");
 			this->intrinsics = intrinsics;
-			ROS_INFO_STREAM("New intrinsics" << std::endl << this->intrinsics);
+			ROS_INFO_STREAM("New intrinsics " << this->intrinsics.transpose());
 		}
 
 		for (size_t i = 0; i < req.idx.size(); i++) {
@@ -260,22 +260,15 @@ public:
 				camera_position = new_pos
 						* keyframes[req.idx[i]]->get_pos().inverse()
 						* camera_position;
-
-				keyframes[req.idx[i]]->get_pos() = new_pos;
-
-				if (update_intrinsics) {
-					keyframes[req.idx[i]]->update_intrinsics(intrinsics);
-				}
-
-
-			} else {
-				keyframes[req.idx[i]]->get_pos() = new_pos;
-
-				if (update_intrinsics) {
-					keyframes[req.idx[i]]->update_intrinsics(intrinsics);
-				}
-
 			}
+
+			keyframes[req.idx[i]]->get_pos() = new_pos;
+
+			if (update_intrinsics) {
+				ROS_INFO_STREAM("New intrinsics " << this->intrinsics.transpose());
+				keyframes[req.idx[i]]->update_intrinsics(intrinsics);
+			}
+
 		}
 
 		return true;
@@ -337,7 +330,7 @@ public:
 
 				keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 				keyframes.push_back(k);
-				ROS_DEBUG("Adding new keyframe");
+				ROS_INFO_STREAM("Added keyframe with intrinsics " << k->get_intrinsics().transpose());
 
 				//publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
@@ -353,7 +346,8 @@ public:
 
 		} else {
 
-			init_camera_position(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
+			init_camera_position(yuv2_msg->header.frame_id,
+					yuv2_msg->header.stamp);
 
 			intrinsics << info_msg->K[0], info_msg->K[2], info_msg->K[5];
 
@@ -362,6 +356,7 @@ public:
 							intrinsics));
 			keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 			keyframes.push_back(k);
+			ROS_INFO_STREAM("Added keyframe with intrinsics " << k->get_intrinsics().transpose());
 		}
 
 		publish_tf(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
