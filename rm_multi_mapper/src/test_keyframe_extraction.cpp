@@ -180,7 +180,7 @@ public:
 		if (map->frames.size() < 2)
 			return;
 
-		map->optimize(0);
+		map->optimize_slam();
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
 				map->get_map_pointcloud();
