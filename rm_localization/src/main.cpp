@@ -246,7 +246,7 @@ public:
 		for (size_t i = 0; i < req.idx.size(); i++) {
 
 			Eigen::Quaternionf orientation;
-			Eigen::Vector3f position, intrinsics;
+			Eigen::Vector3f position;
 
 			memcpy(orientation.coeffs().data(),
 					req.transform[i].unit_quaternion.data(), 4 * sizeof(float));
@@ -256,7 +256,6 @@ public:
 			Sophus::SE3f new_pos(orientation, position);
 
 			if (req.idx[i] == closest_keyframe_idx) {
-				//closest_keyframe_update_mutex.lock();
 
 				camera_position = new_pos
 						* keyframes[req.idx[i]]->get_pos().inverse()
@@ -264,18 +263,17 @@ public:
 
 				keyframes[req.idx[i]]->get_pos() = new_pos;
 
-				//if (update_intrinsics) {
-				//	keyframes[req.idx[i]]->get_intrinsics() = intrinsics;
-				//}
+				if (update_intrinsics) {
+					keyframes[req.idx[i]]->update_intrinsics(intrinsics);
+				}
 
-				//closest_keyframe_update_mutex.unlock();
 
 			} else {
 				keyframes[req.idx[i]]->get_pos() = new_pos;
 
-				//if (update_intrinsics) {
-				//	keyframes[req.idx[i]]->get_intrinsics() = intrinsics;
-				//}
+				if (update_intrinsics) {
+					keyframes[req.idx[i]]->update_intrinsics(intrinsics);
+				}
 
 			}
 		}
