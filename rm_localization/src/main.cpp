@@ -321,11 +321,14 @@ public:
 			keyframe::Ptr closest_keyframe = keyframes[closest_keyframe_idx];
 
 			Sophus::SE3f tt = closest_keyframe->get_pos();
-			ROS_DEBUG("Closest keyframe %d", closest_keyframe_idx);
+			ROS_INFO("Closest keyframe %d", closest_keyframe_idx);
 
-			if ((tt.translation() - camera_position.translation()).norm() > 0.3
-					|| tt.unit_quaternion().angularDistance(
-							camera_position.unit_quaternion()) > M_PI / 18) {
+			float distance = (tt.translation() - camera_position.translation()).norm();
+			float angle = tt.unit_quaternion().angularDistance(
+					camera_position.unit_quaternion());
+
+			if ( distance > 0.3
+					|| angle > M_PI / 18) {
 				keyframe::Ptr k(
 						new keyframe(yuv2->image, depth->image, camera_position,
 								intrinsics));
@@ -337,6 +340,7 @@ public:
 				keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 				keyframes.push_back(k);
 				ROS_INFO_STREAM("Added keyframe with intrinsics " << k->get_intrinsics().transpose());
+				ROS_INFO_STREAM("Closest keyframe at distance " << distance << " angle " << angle);
 
 				//publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
