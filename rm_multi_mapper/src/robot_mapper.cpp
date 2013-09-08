@@ -101,6 +101,40 @@ void robot_mapper::full_rotation() {
 
 }
 
+void robot_mapper::turn_to_initial_heading() {
+	tf::StampedTransform transform;
+	try {
+		ros::Time t = ros::Time::now();
+		lr.waitForTransform(prefix + "/base_footprint", prefix + "/odom_combined", t, ros::Duration(5));
+		lr.lookupTransform(prefix + "/base_footprint", prefix + "/odom_combined", t, transform);
+
+		tf::Quaternion q;
+		q.setEuler(0,0,0);
+		float angle = transform.getRotation().angle(q);
+		turn(angle);
+
+	} catch (tf::TransformException & ex) {
+		ROS_ERROR("%s", ex.what());
+	}
+
+}
+
+void robot_mapper::start_optimization_loop() {
+	run_optimization = true;
+	optimization_loop_thread.reset(
+			new boost::thread(&robot_mapper::optimization_loop, this));
+}
+void robot_mapper::stop_optimization_loop() {
+	robot_mapper::run_optimization = false;
+	optimization_loop_thread->join();
+}
+
+void robot_mapper::optimization_loop() {
+	while (run_optimization) {
+		optmize();
+	}
+}
+
 void robot_mapper::publish_tf() {
 
 	tf::TransformBroadcaster br;
@@ -121,7 +155,7 @@ void robot_mapper::turn(float angle) {
 
 	turtlebot_actions::TurtlebotMoveGoal goal;
 	goal.forward_distance = 0;
-	goal.turn_distance = M_PI;
+	goal.turn_distance = angle;
 
 	action_client.waitForServer();
 	action_client.sendGoal(goal);
@@ -140,9 +174,9 @@ void robot_mapper::turn(float angle) {
 void robot_mapper::capture_sphere() {
 
 	std_msgs::Float32 angle_msg;
-	angle_msg.data = 0 * M_PI / 18;
-	float stop_angle = -0.1 * M_PI / 18;
-	float delta = M_PI / 18;
+	angle_msg.data = 1 * M_PI / 18;
+	float stop_angle = 0.9 * M_PI / 18;
+	float delta = M_PI / 36;
 
 	sleep(3);
 
@@ -155,7 +189,8 @@ void robot_mapper::capture_sphere() {
 
 	}
 
-	map->save("keyframe_map");
+	//angle_msg.data = 0;
+	//servo_pub.publish(angle_msg);
 
 }
 
@@ -179,7 +214,9 @@ void robot_mapper::optmize_panorama() {
 		}
 	}
 
-	//update_map(true);
+	map->align_z_axis();
+	update_map(true);
+	publish_cloud();
 
 }
 
@@ -188,7 +225,7 @@ void robot_mapper::optmize() {
 	if (map->frames.size() < 2)
 		return;
 
-	map->optimize_g2o();
+	map->optimize_slam();
 	publish_cloud();
 	update_map();
 
@@ -238,8 +275,10 @@ void robot_mapper::update_map(bool with_intrinsics) {
 		 set_camera_info_service.call(s);
 		 */
 
-		memcpy(update_map_msg.request.intrinsics.data(), intrinsics.data(),
-				3 * sizeof(float));
+		update_map_msg.request.intrinsics[0] = intrinsics[0];
+		update_map_msg.request.intrinsics[1] = intrinsics[1];
+		update_map_msg.request.intrinsics[2] = intrinsics[2];
+
 	} else {
 		update_map_msg.request.intrinsics = { {0,0,0}};
 	}
@@ -249,11 +288,16 @@ void robot_mapper::update_map(bool with_intrinsics) {
 
 		Sophus::SE3f position = map->frames[i]->get_pos();
 
-		memcpy(update_map_msg.request.transform[i].unit_quaternion.data(),
-				position.unit_quaternion().coeffs().data(), 4 * sizeof(float));
 
-		memcpy(update_map_msg.request.transform[i].position.data(),
-				position.translation().data(), 3 * sizeof(float));
+		update_map_msg.request.transform[i].unit_quaternion[0] = position.unit_quaternion().coeffs()[0];
+		update_map_msg.request.transform[i].unit_quaternion[1] = position.unit_quaternion().coeffs()[1];
+		update_map_msg.request.transform[i].unit_quaternion[2] = position.unit_quaternion().coeffs()[2];
+		update_map_msg.request.transform[i].unit_quaternion[3] = position.unit_quaternion().coeffs()[3];
+
+		update_map_msg.request.transform[i].position[0] = position.translation()[0];
+		update_map_msg.request.transform[i].position[1] = position.translation()[1];
+		update_map_msg.request.transform[i].position[2] = position.translation()[2];
+
 
 	}
 
