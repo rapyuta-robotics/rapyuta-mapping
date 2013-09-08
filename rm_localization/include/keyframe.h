@@ -208,21 +208,12 @@ public:
 				intencity_pyr_dy[level]);
 	}
 
-	inline Eigen::Vector3f get_intrinsics(int level) {
-		return intrinsics / (1 << level);
-	}
-
-	inline Eigen::Vector3f & get_intrinsics() {
-		return intrinsics;
-	}
-
 	rm_localization::Keyframe::Ptr to_msg(
 			const cv_bridge::CvImageConstPtr & yuv2, int idx);
 
 protected:
 	int16_t ** intencity_pyr_dx;
 	int16_t ** intencity_pyr_dy;
-	Eigen::Vector3f intrinsics;
 
 	std::vector<Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> > clouds;
 

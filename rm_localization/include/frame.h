@@ -137,8 +137,8 @@ struct parallel_warp {
 		float v0 = vw - v;
 		float u1 = 1 - u0;
 		float v1 = 1 - v0;
-		uint16_t z_p_eps = z*1000 - 50;
-		uint16_t z_m_eps = z*1000 + 50;
+		uint16_t z_p_eps = z * 1000 - 50;
+		uint16_t z_m_eps = z * 1000 + 50;
 
 		float val = 0;
 		float sum = 0;
@@ -180,13 +180,15 @@ public:
 	typedef boost::shared_ptr<frame> Ptr;
 
 	frame(const cv::Mat & yuv, const cv::Mat & depth,
-			const Sophus::SE3f & position, int max_level = 3);
+			const Sophus::SE3f & position, const Eigen::Vector3f & intrinsics,
+			int max_level = 3);
 
 	~frame();
 
-	void warp(const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
-			const Eigen::Vector3f & intrinsics, const Sophus::SE3f & position,
-			int level, cv::Mat & intencity_warped, cv::Mat & depth_warped);
+	void warp(
+			const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
+			const Sophus::SE3f & position, int level,
+			cv::Mat & intencity_warped, cv::Mat & depth_warped);
 
 	inline cv::Mat get_i(int level) {
 		return cv::Mat(rows / (1 << level), cols / (1 << level), CV_8U,
@@ -202,11 +204,20 @@ public:
 		return position;
 	}
 
+	inline Eigen::Vector3f get_intrinsics(int level) {
+		return intrinsics / (1 << level);
+	}
+
+	inline Eigen::Vector3f & get_intrinsics() {
+		return intrinsics;
+	}
+
 protected:
 
 	uint8_t ** intencity_pyr;
 	uint16_t ** depth_pyr;
 	Sophus::SE3f position;
+	Eigen::Vector3f intrinsics;
 
 	int max_level;
 	int cols;

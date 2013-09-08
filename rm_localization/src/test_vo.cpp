@@ -254,7 +254,7 @@ public:
 				}
 
 			} else {
-				frame f(yuv2->image, depth->image, camera_position);
+				frame f(yuv2->image, depth->image, camera_position, intrinsics);
 				if (closest_keyframe->estimate_position(f)) {
 					camera_position = f.get_pos();
 				}

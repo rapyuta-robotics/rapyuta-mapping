@@ -5,9 +5,7 @@
 keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 		const Sophus::SE3f & position, const Eigen::Vector3f & intrinsics,
 		int max_level) :
-		frame(yuv, depth, position, max_level) {
-
-	this->intrinsics = intrinsics;
+		frame(yuv, depth, position, intrinsics, max_level) {
 
 	intencity_pyr_dx = new int16_t *[max_level];
 	intencity_pyr_dy = new int16_t *[max_level];
@@ -79,14 +77,13 @@ bool keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 					intencity_dx = get_i_dx(level), intencity_dy = get_i_dy(
 							level);
 
-			Eigen::Vector3f intrinsics = get_intrinsics(level);
 			cv::Mat intencity_warped(intencity.rows, intencity.cols, CV_32F),
 					depth_warped(depth.rows, depth.cols, CV_32F);
 
 			int c = cols >> level;
 			int r = rows >> level;
 
-			f.warp(clouds[level], intrinsics, Mrc.inverse(), level,
+			f.warp(clouds[level], Mrc.inverse(), level,
 					intencity_warped, depth_warped);
 
 			reduce_jacobian rj(intencity_pyr[level], intencity_pyr_dx[level],

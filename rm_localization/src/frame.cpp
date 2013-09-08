@@ -3,11 +3,13 @@
 //#include <opencv2/highgui/highgui.hpp>
 
 frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
-		const Sophus::SE3f & position, int max_level) {
+		const Sophus::SE3f & position, const Eigen::Vector3f & intrinsics,
+		int max_level) {
 
 	assert(yuv.cols == depth.cols && yuv.rows == depth.rows);
 
 	this->position = position;
+	this->intrinsics = intrinsics;
 
 	cols = yuv.cols;
 	rows = yuv.rows;
@@ -52,14 +54,18 @@ frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 
 }
 
-void frame::warp(const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
-		const Eigen::Vector3f & intrinsics, const Sophus::SE3f & relative_position,
-		int level, cv::Mat & intencity_warped, cv::Mat & depth_warped) {
+void frame::warp(
+		const Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & cloud,
+		const Sophus::SE3f & relative_position, int level,
+		cv::Mat & intencity_warped, cv::Mat & depth_warped) {
 
-	Eigen::Matrix<float, 4, 4, Eigen::ColMajor> transform(relative_position.matrix());
+	Eigen::Matrix<float, 4, 4, Eigen::ColMajor> transform(
+			relative_position.matrix());
 
 	int c = cols >> level;
 	int r = rows >> level;
+
+	Eigen::Vector3f intrinsics = get_intrinsics(level);
 
 	parallel_warp w(intencity_pyr[level], depth_pyr[level], transform, cloud,
 			intrinsics, c, r, (float *) intencity_warped.data,

@@ -335,7 +335,7 @@ public:
 				//publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
 			} else {
-				frame f(yuv2->image, depth->image, camera_position);
+				frame f(yuv2->image, depth->image, camera_position, intrinsics);
 				closest_keyframe->estimate_position(f);
 
 				camera_position = f.get_pos();
