@@ -21,7 +21,7 @@ data = np.zeros(period, dtype=np.int16)
 data[0:zero_pos] = ii16.max
 
 current_angle = np.zeros(1, dtype=np.float32)
-angles = np.zeros(25, dtype=np.float32)
+angles = np.zeros(100, dtype=np.float32)
 
 joint_states_pub = rospy.Publisher('joint_states', JointState)
 
