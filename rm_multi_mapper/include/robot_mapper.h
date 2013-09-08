@@ -79,6 +79,7 @@ protected:
 	boost::shared_ptr<boost::thread> optimization_loop_thread;
 	bool run_optimization;
 
+	int skip_first_n_in_optimization;
 
 };
 

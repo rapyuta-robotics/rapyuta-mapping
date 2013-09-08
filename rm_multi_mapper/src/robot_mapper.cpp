@@ -9,6 +9,8 @@ robot_mapper::robot_mapper(ros::NodeHandle & nh,
 				false), action_client(prefix + "/turtlebot_move", true), map(
 				new keyframe_map) {
 
+	skip_first_n_in_optimization = 1;
+
 	world_to_odom.setIdentity();
 	world_to_odom.setOrigin(tf::Vector3(0, robot_num * 10.0, 0));
 
@@ -218,6 +220,8 @@ void robot_mapper::optmize_panorama() {
 	update_map(true);
 	publish_cloud();
 
+	skip_first_n_in_optimization = map->frames.size();
+
 }
 
 void robot_mapper::optmize() {
@@ -225,7 +229,7 @@ void robot_mapper::optmize() {
 	if (map->frames.size() < 2)
 		return;
 
-	map->optimize_slam();
+	map->optimize_slam(skip_first_n_in_optimization);
 	publish_cloud();
 	update_map();
 

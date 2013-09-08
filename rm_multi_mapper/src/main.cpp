@@ -29,19 +29,19 @@ bool start_capturing(std_srvs::Empty::Request &req,
 
 	tg.join_all();
 
-/*	for (int i = 0; i < num_robots; i++) {
+	/*	for (int i = 0; i < num_robots; i++) {
 		tg.create_thread(
 				boost::bind(&robot_mapper::turn_to_initial_heading,
 						robot_mappers[i].get()));
 	}
 
 	tg.join_all();
-
+*/
 
 	for (int i = 0; i < num_robots; i++) {
 		robot_mappers[i]->start_optimization_loop();
 	}
-
+	/*
 	for (int i = 0; i < num_robots; i++) {
 		tg.create_thread(
 				boost::bind(&robot_mapper::move_straight,

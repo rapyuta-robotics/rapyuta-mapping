@@ -20,7 +20,7 @@ public:
 
 	void add_frame(const rm_localization::Keyframe::ConstPtr & k);
 	float optimize_panorama(int level);
-	float optimize_slam();
+	float optimize_slam(int skip_n = 1);
 	void align_z_axis();
 
 	void optimize_g2o();

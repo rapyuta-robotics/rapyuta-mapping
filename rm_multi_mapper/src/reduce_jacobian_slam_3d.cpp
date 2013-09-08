@@ -282,7 +282,7 @@ void reduce_jacobian_slam_3d::operator()(
 		int j = it->second;
 
 		if (j >= 0) {
-			add_icp_measurement(i, j);
+			//add_icp_measurement(i, j);
 			add_rgbd_measurement(i, j);
 		} else {
 			add_floor_measurement(i);

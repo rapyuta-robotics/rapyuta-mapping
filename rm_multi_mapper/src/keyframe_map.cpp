@@ -437,10 +437,13 @@ void keyframe_map::merge(keyframe_map & other, const Sophus::SE3f & t) {
 
 }
 
-float keyframe_map::optimize_slam() {
+float keyframe_map::optimize_slam(int skip_n) {
 
 	float iteration_max_update;
 	int size = frames.size();
+
+	if(size < skip_n + 2)
+		return 0;
 
 	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
 
@@ -484,18 +487,21 @@ float keyframe_map::optimize_slam() {
 	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
 	 */
 
+	int begin = skip_n * 6;
+	int length = (size - skip_n) * 6;
+
 	Eigen::VectorXf update =
-			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(
-					rj.Jte.segment(6, (size - 1) * 6));
+			-rj.JtJ.block(begin, begin, length, length).ldlt().solve(
+					rj.Jte.segment(begin, length));
 
 	iteration_max_update = std::max(std::abs(update.maxCoeff()),
 			std::abs(update.minCoeff()));
 
 	ROS_INFO("Max update %f", iteration_max_update);
 
-	for (int i = 0; i < size - 1; i++) {
-		frames[i + 1]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i * 6))
-				* frames[i + 1]->get_pos();
+	for (int i = 0; i < size - skip_n; i++) {
+		frames[i + skip_n]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i * 6))
+				* frames[i + skip_n]->get_pos();
 	}
 
 	return iteration_max_update;
