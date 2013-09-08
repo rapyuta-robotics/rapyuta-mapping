@@ -39,6 +39,10 @@ struct reduce_jacobian_slam_3d {
 			const Eigen::Matrix4f & Miw,
 			Eigen::Matrix<float, 6, 6> & Ji);
 
+	void add_icp_measurement(int i, int j);
+	void add_rgbd_measurement(int i, int j);
+	void add_floor_measurement(int i);
+
 	void operator()(
 			const tbb::blocked_range<
 					tbb::concurrent_vector<std::pair<int, int> >::iterator>& r);

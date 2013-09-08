@@ -8,12 +8,14 @@ const std::string prefix = "cloudbot";
 std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
 boost::thread_group tg;
 
+bool maps_initiated = false;
+
 bool start_capturing(std_srvs::Empty::Request &req,
 		std_srvs::Empty::Response &res) {
 
 	for (int i = 0; i < num_robots; i++) {
 		tg.create_thread(
-				boost::bind(&robot_mapper::full_rotation,
+				boost::bind(&robot_mapper::capture_sphere,
 						robot_mappers[i].get()));
 	}
 
@@ -27,17 +29,32 @@ bool start_capturing(std_srvs::Empty::Request &req,
 
 	tg.join_all();
 
-	for (int i = 0; i < num_robots; i++) {
+/*	for (int i = 0; i < num_robots; i++) {
 		tg.create_thread(
-				boost::bind(&robot_mapper::move_straight,
-						robot_mappers[i].get(), 4.3));
+				boost::bind(&robot_mapper::turn_to_initial_heading,
+						robot_mappers[i].get()));
 	}
 
 	tg.join_all();
 
+
+	for (int i = 0; i < num_robots; i++) {
+		robot_mappers[i]->start_optimization_loop();
+	}
+
 	for (int i = 0; i < num_robots; i++) {
 		tg.create_thread(
-				boost::bind(&robot_mapper::full_rotation,
+				boost::bind(&robot_mapper::move_straight,
+						robot_mappers[i].get(), 4.0));
+	}
+
+	tg.join_all();
+
+	sleep(60);
+
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(
+				boost::bind(&robot_mapper::capture_sphere,
 						robot_mappers[i].get()));
 	}
 
@@ -45,11 +62,12 @@ bool start_capturing(std_srvs::Empty::Request &req,
 
 	for (int i = 0; i < num_robots; i++) {
 		tg.create_thread(
-				boost::bind(&robot_mapper::save_map,
-						robot_mappers[i].get(), "room_corridor_map"));
+				boost::bind(&robot_mapper::save_map, robot_mappers[i].get(),
+						"room_corridor_map"));
 	}
 
 	tg.join_all();
+*/
 
 	return true;
 }

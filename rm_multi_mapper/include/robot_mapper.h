@@ -18,6 +18,7 @@
 #include <std_srvs/Empty.h>
 #include <rm_localization/UpdateMap.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 #include <boost/thread.hpp>
 
 class robot_mapper {
@@ -32,12 +33,17 @@ public:
 	void move_straight(float distance);
 	void full_rotation();
 	void turn(float angle);
+	void turn_to_initial_heading();
 	void capture_sphere();
 	void optmize_panorama();
 	void optmize();
 	void save_map(const std::string & dirname);
 
 	bool merge(robot_mapper & other);
+
+	void start_optimization_loop();
+	void stop_optimization_loop();
+
 
 protected:
 
@@ -47,12 +53,16 @@ protected:
 	void publish_empty_cloud();
 	void publish_cloud();
 
+	void optimization_loop();
+
 
 
 	int robot_num;
 	std::string prefix;
 	bool merged;
 	tf::Transform world_to_odom;
+
+	tf::TransformListener lr;
 
 	actionlib::SimpleActionClient<turtlebot_actions::TurtlebotMoveAction> action_client;
 
@@ -66,6 +76,8 @@ protected:
 	ros::ServiceClient set_camera_info_service;
 
 	boost::mutex merge_mutex;
+	boost::shared_ptr<boost::thread> optimization_loop_thread;
+	bool run_optimization;
 
 
 };

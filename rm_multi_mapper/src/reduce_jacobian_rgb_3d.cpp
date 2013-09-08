@@ -62,9 +62,9 @@ void reduce_jacobian_rgb_3d::operator()(
 				intencity.type()), depth_warped(depth.rows, depth.cols,
 				depth.type());
 
-		frames[j]->warp(frames[i]->get_cloud(subsample_level), intrinsics_i,
-				frames[i]->get_pos(), subsample_level, intencity_warped,
-				depth_warped);
+		//frames[j]->warp(frames[i]->get_cloud(subsample_level),
+		//		frames[i]->get_pos(), subsample_level, intencity_warped,
+		//		depth_warped);
 
 
 

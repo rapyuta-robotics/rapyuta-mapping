@@ -25,6 +25,9 @@ int main(int argc, char **argv) {
 
 	keyframe_map map;
 	map.load(argv[1]);
+	//map.frames.resize(150);
+	map.align_z_axis();
+
 
 	std::cerr << map.frames.size() << std::endl;
 	for (int i = 0; i < 100; i++) {

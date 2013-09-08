@@ -1,7 +1,6 @@
 #ifndef COLOR_KEYFRAME_H_
 #define COLOR_KEYFRAME_H_
 
-
 #include <keyframe.h>
 #include <boost/shared_ptr.hpp>
 #include <opencv2/core/core.hpp>
@@ -21,22 +20,27 @@ public:
 			const cv::Mat & depth, const Sophus::SE3f & position,
 			const Eigen::Vector3f & intrinsics, int max_level = 3);
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud(int subsample = 1, bool transformed = true) const;
-	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud(int subsample = 1) const;
-	pcl::PointCloud<pcl::PointNormal>::Ptr get_pointcloud_with_normals(int subsample = 1, bool transformed = true) const;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr get_pointcloud(int subsample = 1,
+			bool transformed = true,
+			float min_height = std::numeric_limits<float>::min(),
+			float max_height = std::numeric_limits<float>::max()) const;
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_colored_pointcloud(
+			int subsample = 1) const;
+	pcl::PointCloud<pcl::PointNormal>::Ptr get_pointcloud_with_normals(
+			int subsample = 1, bool transformed = true) const;
 
 	inline cv::Mat get_rgb() {
 		return rgb;
 	}
 
-	inline Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & get_cloud(int level) {
+	inline Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor> & get_cloud(
+			int level) {
 		return clouds[level];
 	}
 
 	inline Eigen::Vector3f get_centroid() {
 		return position * centroid;
 	}
-
 
 	static Ptr from_msg(const rm_localization::Keyframe::ConstPtr & k);
 

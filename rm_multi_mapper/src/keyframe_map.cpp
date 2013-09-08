@@ -32,6 +32,9 @@
 #include <pcl/point_types.h>
 #include <pcl/registration/icp.h>
 #include <pcl/registration/transformation_estimation_point_to_plane.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
 
 void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,
@@ -219,6 +222,70 @@ keyframe_map::keyframe_map() {
 void keyframe_map::add_frame(const rm_localization::Keyframe::ConstPtr & k) {
 	frames.push_back(color_keyframe::from_msg(k));
 	idx.push_back(k->idx);
+
+}
+
+
+void keyframe_map::align_z_axis() {
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud(
+			new pcl::PointCloud<pcl::PointXYZ>);
+
+	for (size_t i = 0; i < frames.size(); i++) {
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frames[i]->get_pointcloud(8, true, -0.2, 0.2);
+
+		*point_cloud += *cloud;
+	}
+
+	pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+
+	pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+	// Create the segmentation object
+	pcl::SACSegmentation<pcl::PointXYZ> seg;
+	// Optional
+	seg.setOptimizeCoefficients(true);
+	// Mandatory
+	seg.setModelType(pcl::SACMODEL_PLANE);
+	seg.setMethodType(pcl::SAC_RANSAC);
+	seg.setDistanceThreshold(0.02);
+	seg.setProbability(0.99);
+	seg.setMaxIterations(5000);
+
+	seg.setInputCloud(point_cloud);
+	seg.segment(*inliers, *coefficients);
+
+	std::cerr << "Model coefficients: " << coefficients->values[0] << " "
+			<< coefficients->values[1] << " " << coefficients->values[2] << " "
+			<< coefficients->values[3] << " Num inliers "
+			<< inliers->indices.size() << std::endl;
+
+	Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+	if (coefficients->values[2] > 0) {
+		transform.matrix().coeffRef(0, 2) = coefficients->values[0];
+		transform.matrix().coeffRef(1, 2) = coefficients->values[1];
+		transform.matrix().coeffRef(2, 2) = coefficients->values[2];
+	} else {
+		transform.matrix().coeffRef(0, 2) = -coefficients->values[0];
+		transform.matrix().coeffRef(1, 2) = -coefficients->values[1];
+		transform.matrix().coeffRef(2, 2) = -coefficients->values[2];
+	}
+
+	transform.matrix().col(0).head<3>() =
+			transform.matrix().col(1).head<3>().cross(
+					transform.matrix().col(2).head<3>());
+	transform.matrix().col(1).head<3>() =
+			transform.matrix().col(2).head<3>().cross(
+					transform.matrix().col(0).head<3>());
+
+	transform = transform.inverse();
+
+	transform.matrix().coeffRef(2, 3) = coefficients->values[3];
+
+	Sophus::SE3f t(transform.rotation(), transform.translation());
+
+	for (size_t i = 0; i < frames.size(); i++) {
+		frames[i]->get_pos() = t * frames[i]->get_pos();
+	}
 
 }
 
@@ -451,12 +518,14 @@ float keyframe_map::optimize_slam() {
 				float distance = (frames[i]->get_pos().translation()
 						- frames[j]->get_pos().translation()).norm();
 
-				//if (angle < M_PI / 6 && distance < 0.5) {
+				if (angle < M_PI / 6 && distance < 0.5) {
 					overlaping_keyframes.push_back(std::make_pair(i, j));
 					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
-				//}
+				}
 			}
 		}
+
+		overlaping_keyframes.push_back(std::make_pair(i, -1));
 	}
 
 	reduce_jacobian_slam_3d rj(frames, size);
@@ -468,13 +537,13 @@ float keyframe_map::optimize_slam() {
 					overlaping_keyframes.begin(), overlaping_keyframes.end()),
 			rj);
 
-	/*
+
+	 /*
 	 rj(
 	 tbb::blocked_range<
 	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
 	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
 	 */
-
 
 	Eigen::VectorXf update =
 			-rj.JtJ.block(6, 6, (size - 1) * 6, (size - 1) * 6).ldlt().solve(

@@ -22,6 +22,7 @@ public:
 	float optimize_panorama(int level);
 	float optimize(int level);
 	float optimize_slam();
+	void align_z_axis();
 
 	void optimize_g2o();
 
