@@ -10,6 +10,8 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
 
+
+/*
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/solvers/dense/linear_solver_dense.h>
 #include <g2o/solvers/pcg/linear_solver_pcg.h>
@@ -26,6 +28,7 @@
 #include <g2o/types/slam3d/vertex_se3.h>
 #include <g2o/types/slam3d/edge_se3.h>
 #include <g2o/types/slam3d/edge_se3_offset.h>
+*/
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -508,6 +511,7 @@ float keyframe_map::optimize_slam(int skip_n) {
 
 }
 
+/*
 void keyframe_map::optimize_g2o() {
 
 	size_t size = frames.size();
@@ -650,6 +654,7 @@ void keyframe_map::optimize_g2o() {
 	}
 
 }
+*/
 
 cv::Mat keyframe_map::get_panorama_image() {
 	cv::Mat res = cv::Mat::zeros(512, 1024, CV_32F);
