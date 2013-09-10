@@ -76,8 +76,5 @@ target_link_libraries(test_panorama ${PROJECT_NAME})
 #rosbuild_add_executable(test_opt src/test_opt.cpp)
 #target_link_libraries(test_opt)
 
-rosbuild_add_executable(test_data src/test_data.cpp)
-target_link_libraries(test_data ${PROJECT_NAME})
-
 rosbuild_add_executable(test_mysql src/test_mysql.cpp)
 target_link_libraries(test_mysql mysqlcppconn)
