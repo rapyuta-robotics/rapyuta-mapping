@@ -19,7 +19,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 #uncomment if you have defined messages
-#rosbuild_genmsg()
+rosbuild_genmsg()
 #uncomment if you have defined services
 #rosbuild_gensrv()
 
@@ -35,7 +35,7 @@ include_directories(${VTK_INCLUDE_DIRS})
 
 rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp 
 src/reduce_jacobian_slam_3d.cpp src/robot_mapper.cpp)
-target_link_libraries(${PROJECT_NAME} tbb rm_localization)
+target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn)
 
 rosbuild_add_executable(test_keyframe_extraction src/test_keyframe_extraction.cpp)
 target_link_libraries(test_keyframe_extraction ${PROJECT_NAME})
@@ -73,5 +73,11 @@ target_link_libraries(test_show ${VTK_LIBRARIES} ${PROJECT_NAME})
 rosbuild_add_executable(test_panorama src/test_panorama.cpp)
 target_link_libraries(test_panorama ${PROJECT_NAME})
 
-rosbuild_add_executable(test_opt src/test_opt.cpp)
-target_link_libraries(test_opt)
+#rosbuild_add_executable(test_opt src/test_opt.cpp)
+#target_link_libraries(test_opt)
+
+rosbuild_add_executable(test_data src/test_data.cpp)
+target_link_libraries(test_data ${PROJECT_NAME})
+
+rosbuild_add_executable(test_mysql src/test_mysql.cpp)
+target_link_libraries(test_mysql mysqlcppconn)

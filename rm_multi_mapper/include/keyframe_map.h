@@ -33,6 +33,7 @@ public:
 
 	void save(const std::string & dir_name);
 	void load(const std::string & dir_name);
+	void load_mysql(std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > & positions);
 
 	tbb::concurrent_vector<color_keyframe::Ptr> frames;
 	tbb::concurrent_vector<int> idx;
