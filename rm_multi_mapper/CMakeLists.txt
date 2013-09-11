@@ -35,7 +35,7 @@ find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
 rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_ros.cpp
-src/reduce_jacobian_slam_3d.cpp src/robot_mapper.cpp src/web_image_loader.cpp )
+src/reduce_jacobian_slam_3d.cpp src/robot_mapper.cpp src/util.cpp )
 target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn PocoFoundation PocoNet)
 
 rosbuild_add_executable(test_keyframe_extraction src/test_keyframe_extraction.cpp)
