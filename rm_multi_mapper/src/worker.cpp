@@ -15,6 +15,7 @@
 
 #include <keyframe_map.h>
 #include <reduce_jacobian_ros.h>
+#include <web_image_loader.h>
 
 #include <ros/ros.h>
 #include <actionlib/server/simple_action_server.h>
@@ -109,14 +110,14 @@ class WorkerAction
 	        load_mysql(positions);
 
 	        std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
-
+            web_image_loader loader;
 	        for (size_t i = 0; i < positions.size(); i++) {
-		        cv::Mat rgb = cv::imread(
+		        cv::Mat rgb = loader.stringtoMat(
 				        dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
-						        + ".png", CV_LOAD_IMAGE_UNCHANGED);
-		        cv::Mat depth = cv::imread(
+						        + ".png");
+		        cv::Mat depth = loader.stringtoMat(
 				        dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
-						        + ".png", CV_LOAD_IMAGE_UNCHANGED);
+						        + ".png");
 
 		        cv::Mat gray;
 		        cv::cvtColor(rgb, gray, CV_RGB2GRAY);
@@ -145,7 +146,7 @@ class WorkerAction
                 success = false;
             }
             
-            load("/home/marcus/rapyuta-mapping/keyframe_map/"); //will replace with server
+            load("http://localhost/keyframe_map"); //will replace with server
             
             reduce_jacobian_ros rj(frames_, frames_.size(), 0);
             
@@ -185,7 +186,7 @@ class WorkerAction
 
                 ROS_INFO("Max update %f", iteration_max_update);
 
-                for (int i = 0; i < frames_.size(); i++) {
+                for (int i = 0; i < (int)frames_.size(); i++) {
 
 	                frames_[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
 			                * frames_[i]->get_pos().so3();
