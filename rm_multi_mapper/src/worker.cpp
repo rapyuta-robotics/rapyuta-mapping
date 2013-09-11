@@ -34,7 +34,6 @@ class WorkerAction
         ros::NodeHandle nh_;
         actionlib::SimpleActionServer<rm_multi_mapper::WorkerAction> as_; 
         std::string action_name_;
-        // create messages that are used to published feedback/result
         rm_multi_mapper::WorkerFeedback feedback_;
         rm_multi_mapper::WorkerResult result_;
         std::vector<color_keyframe::Ptr> frames_;
@@ -52,26 +51,40 @@ class WorkerAction
         {
         }
 
+        void eigen2vector(rm_multi_mapper::Vector & v1, const Eigen::VectorXf & Jte) {
+            for(int i=0;i<Jte.size();i++)
+            {
+                v1.vector.push_back(Jte[i]);
+            }    
+        }
+        
+        void eigen2matrix(rm_multi_mapper::Matrix & m1, const Eigen::MatrixXf & JtJ) {
+            for(int i=0;i<JtJ.rows();i++)
+            {
+                rm_multi_mapper::Vector row;
+                for(int j=0;j<JtJ.cols();j++)
+                {
+                    row.vector.push_back(JtJ(i,j));
 
+                }
+                m1.matrix.push_back(row);
+            }
+        }
 
         void executeCB(const rm_multi_mapper::WorkerGoalConstPtr &goal)
         {
-            // helper variables
             ros::Rate r(1);
             bool success = true;
 
-            // start executing the action
-            // check that preempt has not been requested by the client
             if (as_.isPreemptRequested() || !ros::ok())
             {
                 ROS_INFO("%s: Preempted", action_name_.c_str());
-                // set the action state to preempted
                 as_.setPreempted();
                 success = false;
             }
             
             util U;
-            U.load("http://localhost/keyframe_map", frames_); //will replace with server
+            U.load("http://localhost/keyframe_map", frames_); 
             
             reduce_jacobian_ros rj(frames_, frames_.size(), 0);
             
@@ -80,32 +93,11 @@ class WorkerAction
             if(success)
             {
             
-                //result_.Jte = rj.Jte;
-                for(int i=0;i<rj.Jte.rows();i++)
-                {
-                    rm_multi_mapper::MatRow row;
-                    for(int j=0;j<rj.Jte.cols();j++)
-                    {
-                        row.matrow.push_back(rj.Jte(i,j));
+                eigen2vector(result_.Jte, rj.Jte);
 
-                    }
-                    result_.Jte.matrix.push_back(row);
-                }
-                
-                //result_.JtJ = rj.JtJ;                
-                for(int i=0;i<rj.JtJ.rows();i++)
-                {
-                    rm_multi_mapper::MatRow row;
-                    for(int j=0;j<rj.JtJ.cols();j++)
-                    {
-                        row.matrow.push_back(rj.JtJ(i,j));
-
-                    }
-                    result_.JtJ.matrix.push_back(row);
-                }
+                eigen2matrix(result_.JtJ, rj.JtJ);
 
                 ROS_INFO("%s: Succeeded", action_name_.c_str());
-                // set the action state to succeeded
                 as_.setSucceeded(result_);
             }
         }
