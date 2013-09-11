@@ -314,12 +314,14 @@ float keyframe_map::optimize_panorama(int level) {
 								frames[j]->get_pos().unit_quaternion());
 
 				if (angle < M_PI / 6) {
+				    std::cout<<i<<" "<<j<<std::endl;
 					overlaping_keyframes.push_back(std::make_pair(i, j));
 					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
 				}
 			}
 		}
 	}
+	std::cout<<std::endl;
 
 	reduce_jacobian_rgb rj(frames, size, level);
 
@@ -350,13 +352,11 @@ float keyframe_map::optimize_panorama(int level) {
 
 		frames[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
 				* frames[i]->get_pos().so3();
-
 		frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
-
+        //std::cout<<frames[i]->get_pos();
 		frames[i]->get_intrinsics().array() =
 				update.segment<3>(size * 3).array().exp()
 						* frames[i]->get_intrinsics().array();
-
 		if (i == 0) {
 			Eigen::Vector3f intrinsics = frames[i]->get_intrinsics();
 			ROS_INFO("New intrinsics %f, %f, %f", intrinsics(0), intrinsics(1),

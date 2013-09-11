@@ -8,7 +8,9 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 set(ROS_BUILD_TYPE RelWithDebInfo)
-
+rosbuild_find_ros_package(actionlib_msgs)
+include(${actionlib_msgs_PACKAGE_PATH}/cmake/actionbuild.cmake)
+genaction()
 rosbuild_init()
 
 include_directories(/usr/include/suitesparse)
@@ -32,8 +34,7 @@ rosbuild_genmsg()
 find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
-
-rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp 
+rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_ros.cpp
 src/reduce_jacobian_slam_3d.cpp src/robot_mapper.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn)
 
@@ -72,6 +73,12 @@ target_link_libraries(test_show ${VTK_LIBRARIES} ${PROJECT_NAME})
 
 rosbuild_add_executable(test_panorama src/test_panorama.cpp)
 target_link_libraries(test_panorama ${PROJECT_NAME})
+
+rosbuild_add_executable(panorama src/panorama.cpp)
+target_link_libraries(panorama ${PROJECT_NAME} mysqlcppconn)
+
+rosbuild_add_executable(worker src/worker.cpp)
+target_link_libraries(worker ${PROJECT_NAME} mysqlcppconn)
 
 #rosbuild_add_executable(test_opt src/test_opt.cpp)
 #target_link_libraries(test_opt)

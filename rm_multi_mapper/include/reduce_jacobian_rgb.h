@@ -26,7 +26,7 @@ struct reduce_jacobian_rgb {
 			int size, int subsample_level);
 
 	reduce_jacobian_rgb(reduce_jacobian_rgb& rb, tbb::split);
-
+	
 	void compute_frame_jacobian(const Eigen::Vector3f & i,
 			const Eigen::Matrix3f & Rwi, const Eigen::Matrix3f & Rwj,
 			Eigen::Matrix<float, 9, 3> & Ji, Eigen::Matrix<float, 9, 3> & Jj, Eigen::Matrix<float, 9, 3> & Jk);
