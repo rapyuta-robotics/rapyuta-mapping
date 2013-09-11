@@ -20,6 +20,13 @@
 #include <actionlib/server/simple_action_server.h>
 #include "rm_multi_mapper/WorkerAction.h"
 
+/*MySQL includes */
+#include "mysql_connection.h"
+#include <cppconn/driver.h>
+#include <cppconn/exception.h>
+#include <cppconn/resultset.h>
+#include <cppconn/prepared_statement.h>
+
 class WorkerAction
 {
     protected:
@@ -29,6 +36,7 @@ class WorkerAction
         // create messages that are used to published feedback/result
         rm_multi_mapper::WorkerFeedback feedback_;
         rm_multi_mapper::WorkerResult result_;
+        std::vector<color_keyframe::Ptr> frames_;
 
     public:
 
@@ -41,6 +49,84 @@ class WorkerAction
 
         ~WorkerAction(void)
         {
+        }
+
+        void load_mysql(std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > & positions) {
+
+            try {
+                    sql::Driver *driver;
+                    sql::Connection *con;
+                    sql::PreparedStatement *pstmt;
+                    sql::ResultSet *res;
+
+                    /* Create a connection */
+                    driver = get_driver_instance();
+                    con = driver->connect("tcp://127.0.0.1:3306", "root", "123456");
+                    /* Connect to the MySQL test database */
+                    con->setSchema("panorama");
+
+                    /* Select in ascending order */
+                    pstmt = con->prepareStatement("SELECT * FROM positions");
+                    res = pstmt->executeQuery();
+
+                    while (res->next())
+                    {
+                        Eigen::Quaternionf q;
+		                Eigen::Vector3f t;
+                		Eigen::Vector3f intrinsics;
+                        q.coeffs()[0] = res->getDouble("q0");
+                        q.coeffs()[1] = res->getDouble("q1");
+                        q.coeffs()[2] = res->getDouble("q2");
+                        q.coeffs()[3] = res->getDouble("q3");
+                        t[0] = res->getDouble("t0");
+                        t[1] = res->getDouble("t1");
+                        t[2] = res->getDouble("t2");
+                        intrinsics[0] = res->getDouble("int0");
+                        intrinsics[1] = res->getDouble("int1");
+                        intrinsics[2] = res->getDouble("int2");
+                        positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
+                    }
+
+                    delete res;
+                    delete pstmt;
+                    delete con;
+
+                } catch (sql::SQLException &e) {
+                    std::cout << "# ERR: SQLException in " << __FILE__;
+                    std::cout << "(" << __FUNCTION__ << ") on line " 
+                    << __LINE__ << std::endl;
+                    std::cout << "# ERR: " << e.what();
+                    std::cout << " (MySQL error code: " << e.getErrorCode();
+                    std::cout << ", SQLState: " << e.getSQLState() << " )" << std::endl;
+                }
+
+        }
+
+        void load(const std::string & dir_name) {
+
+	        std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
+
+	        load_mysql(positions);
+
+	        std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
+
+	        for (size_t i = 0; i < positions.size(); i++) {
+		        cv::Mat rgb = cv::imread(
+				        dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
+						        + ".png", CV_LOAD_IMAGE_UNCHANGED);
+		        cv::Mat depth = cv::imread(
+				        dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
+						        + ".png", CV_LOAD_IMAGE_UNCHANGED);
+
+		        cv::Mat gray;
+		        cv::cvtColor(rgb, gray, CV_RGB2GRAY);
+
+		        color_keyframe::Ptr k(
+				        new color_keyframe(rgb, gray, depth, positions[i].first,
+						        positions[i].second));
+		        frames_.push_back(k);
+	        }
+
         }
 
         void executeCB(const rm_multi_mapper::WorkerGoalConstPtr &goal)
@@ -59,10 +145,16 @@ class WorkerAction
                 success = false;
             }
             
-            reduce_jacobian_ros rj;
+            load("/home/marcus/rapyuta-mapping/keyframe_map/"); //will replace with server
+            
+            reduce_jacobian_ros rj(frames_, frames_.size(), 0);
+            
+            rj.reduce(goal);
             
             if(success)
             {
+            
+                //result_.Jte = rj.Jte;
                 for(int i=0;i<rj.Jte.rows();i++)
                 {
                     rm_multi_mapper::MatRow row;
@@ -73,6 +165,8 @@ class WorkerAction
                     }
                     result_.Jte.matrix.push_back(row);
                 }
+                
+                //result_.JtJ = rj.JtJ;                
                 for(int i=0;i<rj.JtJ.rows();i++)
                 {
                     rm_multi_mapper::MatRow row;
@@ -83,8 +177,32 @@ class WorkerAction
                     }
                     result_.JtJ.matrix.push_back(row);
                 }
-                //result_.Jte = rj.Jte;
-                //result_.JtJ = rj.JtJ;
+                
+                Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
+
+                float iteration_max_update = std::max(std::abs(update.maxCoeff()),
+		                std::abs(update.minCoeff()));
+
+                ROS_INFO("Max update %f", iteration_max_update);
+
+                for (int i = 0; i < frames_.size(); i++) {
+
+	                frames_[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
+			                * frames_[i]->get_pos().so3();
+	                frames_[i]->get_pos().translation() = frames_[0]->get_pos().translation();
+                    //std::cout<<frames[i]->get_pos();
+	                frames_[i]->get_intrinsics().array() =
+			                update.segment<3>(frames_.size() * 3).array().exp()
+					                * frames_[i]->get_intrinsics().array();
+	                if (i == 0) {
+		                Eigen::Vector3f intrinsics = frames_[i]->get_intrinsics();
+		                ROS_INFO("New intrinsics %f, %f, %f", intrinsics(0), intrinsics(1),
+				                intrinsics(2));
+	                }
+
+                }
+
+
                 ROS_INFO("%s: Succeeded", action_name_.c_str());
                 // set the action state to succeeded
                 as_.setSucceeded(result_);
