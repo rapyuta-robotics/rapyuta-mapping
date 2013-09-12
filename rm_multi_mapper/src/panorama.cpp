@@ -68,82 +68,99 @@ void vector2eigen(const rm_multi_mapper::Vector & v1, Eigen::VectorXf & eigen) {
 int main(int argc, char **argv) {
 
 	std::vector<std::pair<int, int> > overlapping_keyframes;
-	std::vector<std::pair<int, int> > overlap1;
-	std::vector<std::pair<int, int> > overlap2;
 	std::vector<color_keyframe::Ptr> frames;
 	int size;
-
+    int workers = argc-1;
     ros::init(argc, argv, "panorama");
-	ros::NodeHandle n;
 	
-    actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction> ac1(argv[1], true);
-    actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction> ac2(argv[2], true);
+    std::vector<actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>* > ac_list;
+    for(int i=0; i<workers; i++)
+    {
+        actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>* ac = 
+            new actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>(std::string(argv[i+1]),true);
+        ac_list.push_back(ac);
+    }
+
     sql::ResultSet *res;
 
     util U;
     U.load("http://localhost/keyframe_map", frames);
     size = frames.size();
 	get_pairs(overlapping_keyframes);
-	rm_multi_mapper::WorkerGoal goal1;
-	rm_multi_mapper::WorkerGoal goal2;
-	
-    for(int i=0; i<(int)overlapping_keyframes.size()/2;i++)
-    {
-        rm_multi_mapper::KeyframePair keyframe;
-        keyframe.first = overlapping_keyframes[i].first;
-        keyframe.second = overlapping_keyframes[i].second;
-        goal1.Overlap.push_back(keyframe);
+	std::vector<rm_multi_mapper::WorkerGoal> goals;
+    int keyframes_size = (int)overlapping_keyframes.size();	
+
+	for(int k=0; k<workers; k++)
+	{
+        rm_multi_mapper::WorkerGoal goal;
+
+        int last_elem = (keyframes_size/workers)*(k+1);
+        if (k == workers-1) last_elem = keyframes_size;
+
+        for(int i=(keyframes_size/workers)*k; i<last_elem; i++)
+        {
+            rm_multi_mapper::KeyframePair keyframe;
+
+            keyframe.first = overlapping_keyframes[i].first;
+            keyframe.second = overlapping_keyframes[i].second;
+            goal.Overlap.push_back(keyframe);
+        }
+        goals.push_back(goal);
     }
     
-    for(int i=overlapping_keyframes.size()/2; i<(int)overlapping_keyframes.size();i++)
-    {
-        rm_multi_mapper::KeyframePair keyframe;
-        keyframe.first = overlapping_keyframes[i].first;
-        keyframe.second = overlapping_keyframes[i].second;
-        goal2.Overlap.push_back(keyframe);
-    }
-
     ROS_INFO("Waiting for action server to start.");
-    ac1.waitForServer(); 
-    ac2.waitForServer();
+    for(int i=0; i<workers; i++)
+    {
+        ac_list[i]->waitForServer(); 
+    }
 
     ROS_INFO("Action server started, sending goal.");
     
     // send a goal to the action
-    ac1.sendGoal(goal1);
-    ac2.sendGoal(goal2);
+    for(int i=0; i<workers; i++)
+    {
+        ac_list[i]->sendGoal(goals[i]); 
+    }
+    
 
     //wait for the action to return
-    bool finished_before_timeout1 = ac1.waitForResult(ros::Duration(30.0));
-    bool finished_before_timeout2 = ac2.waitForResult(ros::Duration(30.0));
-
-    Eigen::MatrixXf JtJ;
-    Eigen::VectorXf Jte;
-    Eigen::MatrixXf JtJ2;
-    Eigen::VectorXf Jte2;
-    if (finished_before_timeout1 && finished_before_timeout2)
+    std::vector<bool> finished;
+    for(int i=0; i<workers; i++)
+    {
+        bool finished_before_timeout = ac_list[i]->waitForResult(ros::Duration(30.0));
+        finished.push_back(finished_before_timeout);
+    }
+    
+    bool success = true;
+    for(int i=0; i<workers; i++)
+    {
+        success = finished[i] && success;
+    }
+    
+    Eigen::MatrixXf acc_JtJ;
+    acc_JtJ.setZero(size * 3 + 3, size * 3 + 3);
+    Eigen::VectorXf acc_Jte;
+    acc_Jte.setZero(size * 3 + 3);
+    
+    if (success)
     {
 
-       	JtJ.setZero(size * 3 + 3, size * 3 + 3);
-    	Jte.setZero(size * 3 + 3);
-    	
-       	JtJ2.setZero(size * 3 + 3, size * 3 + 3);
-    	Jte2.setZero(size * 3 + 3);
-    	
-    	rm_multi_mapper::Vector rosJte = ac1.getResult()->Jte;
-    	rm_multi_mapper::Matrix rosJtJ = ac1.getResult()->JtJ;
-    	
-    	rm_multi_mapper::Vector rosJte2 = ac2.getResult()->Jte;
-    	rm_multi_mapper::Matrix rosJtJ2 = ac2.getResult()->JtJ;
-    	
-        vector2eigen(rosJte, Jte);
-        matrix2eigen(rosJtJ, JtJ);
-        
-        vector2eigen(rosJte2, Jte2);
-        matrix2eigen(rosJtJ2, JtJ2);
-        
-        JtJ += JtJ2;
-        Jte += Jte2;
+   	    for(int i=0; i<workers; i++)
+   	    {
+   	        Eigen::MatrixXf JtJ;
+            JtJ.setZero(size * 3 + 3, size * 3 + 3);
+   	        Eigen::VectorXf Jte;
+   	        Jte.setZero(size * 3 + 3);
+   	        
+    	    rm_multi_mapper::Vector rosJte = ac_list[i]->getResult()->Jte;
+    	    rm_multi_mapper::Matrix rosJtJ = ac_list[i]->getResult()->JtJ;
+    	   	
+            vector2eigen(rosJte, Jte);
+            matrix2eigen(rosJtJ, JtJ);
+            
+            acc_JtJ += JtJ;
+            acc_Jte += Jte;
+        }
         
     }
     else 
@@ -152,7 +169,7 @@ int main(int argc, char **argv) {
         std::exit(0);
     }
     
-    Eigen::VectorXf update = -JtJ.ldlt().solve(Jte);
+    Eigen::VectorXf update = -acc_JtJ.ldlt().solve(acc_Jte);
 
     float iteration_max_update = std::max(std::abs(update.maxCoeff()),
             std::abs(update.minCoeff()));
