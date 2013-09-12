@@ -35,7 +35,8 @@ find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
 rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_slam.cpp
-src/reduce_jacobian_slam_3d.cpp src/robot_mapper.cpp src/util.cpp )
+src/reduce_jacobian_slam_3d.cpp src/reduce_jacobian_ros.cpp 
+src/robot_mapper.cpp src/util.cpp )
 target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn PocoFoundation PocoNet)
 
 #rosbuild_add_executable(test_keyframe_extraction src/test_keyframe_extraction.cpp)
@@ -66,13 +67,16 @@ target_link_libraries(multi_mapper ${PROJECT_NAME})
 #rosbuild_add_executable(test_merge src/test_merge.cpp)
 #target_link_libraries(test_merge ${VTK_LIBRARIES} ${PROJECT_NAME})
 
-#rosbuild_add_executable(test_show src/test_show.cpp)
-#target_link_libraries(test_show ${VTK_LIBRARIES} ${PROJECT_NAME})
+rosbuild_add_executable(test_show src/test_show.cpp)
+target_link_libraries(test_show ${VTK_LIBRARIES} ${PROJECT_NAME})
 
 #rosbuild_add_executable(test_rgbd src/test_rgbd.cpp)
 
-#rosbuild_add_executable(test_panorama src/test_panorama.cpp)
-#target_link_libraries(test_panorama ${PROJECT_NAME})
+rosbuild_add_executable(test_panorama src/test_panorama.cpp)
+target_link_libraries(test_panorama ${PROJECT_NAME})
+
+rosbuild_add_executable(worker src/worker.cpp)
+target_link_libraries(worker ${PROJECT_NAME} mysqlcppconn)
 
 rosbuild_add_executable(slam src/slam.cpp)
 target_link_libraries(slam ${PROJECT_NAME} mysqlcppconn)

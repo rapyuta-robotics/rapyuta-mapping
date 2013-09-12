@@ -5,7 +5,7 @@
 #include <fstream>
 #include <reduce_jacobian_rgb.h>
 #include <reduce_jacobian_slam_3d.h>
-
+#include <util.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
@@ -781,7 +781,7 @@ void keyframe_map::load(const std::string & dir_name) {
 
 	std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
 
-	std::ifstream f((dir_name + "/positions.txt").c_str(),
+	/*std::ifstream f((dir_name + "/positions.txt").c_str(),
 			std::ios_base::binary);
 	while (f) {
 		Eigen::Quaternionf q;
@@ -795,7 +795,9 @@ void keyframe_map::load(const std::string & dir_name) {
         positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
 	}
 
-	positions.pop_back();
+	positions.pop_back();*/
+	util U;
+	U.load_mysql(positions);
 	std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
 
 	for (size_t i = 0; i < positions.size(); i++) {
