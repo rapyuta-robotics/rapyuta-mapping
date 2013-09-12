@@ -198,7 +198,7 @@ void reduce_jacobian_ros::compute_frame_jacobian(const Eigen::Vector3f & i,
 
 void reduce_jacobian_ros::reduce(const rm_multi_mapper::WorkerGoalConstPtr &goal) {
 
-	for (int k=0;k<goal->Overlap.size();k++) {
+	for (int k=0; k<goal->Overlap.size(); k++) {
 		int i = goal->Overlap[k].first;
 		int j = goal->Overlap[k].second;
 

@@ -38,14 +38,6 @@
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
 
-/*MySQL includes */
-#include "mysql_connection.h"
-#include <cppconn/driver.h>
-#include <cppconn/exception.h>
-#include <cppconn/resultset.h>
-#include <cppconn/statement.h>
-#include <cppconn/prepared_statement.h>
-
 void init_feature_detector(cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,
 		cv::Ptr<cv::DescriptorMatcher> & dm) {
@@ -314,14 +306,12 @@ float keyframe_map::optimize_panorama(int level) {
 								frames[j]->get_pos().unit_quaternion());
 
 				if (angle < M_PI / 6) {
-				    std::cout<<i<<" "<<j<<std::endl;
 					overlaping_keyframes.push_back(std::make_pair(i, j));
 					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
 				}
 			}
 		}
 	}
-	std::cout<<std::endl;
 
 	reduce_jacobian_rgb rj(frames, size, level);
 
@@ -787,62 +777,11 @@ void keyframe_map::save(const std::string & dir_name) {
 
 }
 
-void keyframe_map::load_mysql(std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > & positions) {
-
-    try {
-            sql::Driver *driver;
-            sql::Connection *con;
-            sql::PreparedStatement *pstmt;
-            sql::ResultSet *res;
-
-            /* Create a connection */
-            driver = get_driver_instance();
-            con = driver->connect("tcp://127.0.0.1:3306", "root", "123456");
-            /* Connect to the MySQL test database */
-            con->setSchema("panorama");
-
-            /* Select in ascending order */
-            pstmt = con->prepareStatement("SELECT * FROM positions");
-            res = pstmt->executeQuery();
-
-            while (res->next())
-            {
-                Eigen::Quaternionf q;
-		        Eigen::Vector3f t;
-        		Eigen::Vector3f intrinsics;
-                q.coeffs()[0] = res->getDouble("q0");
-                q.coeffs()[1] = res->getDouble("q1");
-                q.coeffs()[2] = res->getDouble("q2");
-                q.coeffs()[3] = res->getDouble("q3");
-                t[0] = res->getDouble("t0");
-                t[1] = res->getDouble("t1");
-                t[2] = res->getDouble("t2");
-                intrinsics[0] = res->getDouble("int0");
-                intrinsics[1] = res->getDouble("int1");
-                intrinsics[2] = res->getDouble("int2");
-                positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
-            }
-
-            delete res;
-            delete pstmt;
-            delete con;
-
-        } catch (sql::SQLException &e) {
-            cout << "# ERR: SQLException in " << __FILE__;
-            cout << "(" << __FUNCTION__ << ") on line " 
-            << __LINE__ << endl;
-            cout << "# ERR: " << e.what();
-            cout << " (MySQL error code: " << e.getErrorCode();
-            cout << ", SQLState: " << e.getSQLState() << " )" << endl;
-        }
-
-}
-
 void keyframe_map::load(const std::string & dir_name) {
 
 	std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
 
-	/*std::ifstream f((dir_name + "/positions.txt").c_str(),
+	std::ifstream f((dir_name + "/positions.txt").c_str(),
 			std::ios_base::binary);
 	while (f) {
 		Eigen::Quaternionf q;
@@ -854,8 +793,7 @@ void keyframe_map::load(const std::string & dir_name) {
 		f.read((char *) intrinsics.data(), sizeof(float) * 3);
 
         positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
-	}*/
-	load_mysql(positions);
+	}
 
 	positions.pop_back();
 	std::cerr << "Loaded " << positions.size() << " positions" << std::endl;

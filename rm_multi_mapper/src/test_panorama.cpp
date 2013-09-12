@@ -22,10 +22,7 @@
 int main(int argc, char **argv) {
 
 	keyframe_map map;
-	ros::init(argc, argv, "panorama");
-	ros::NodeHandle n;
-	ros::Publisher optimize_panorama = n.advertise<std_msgs::Int32>("level", 1000);
-    	
+   	
 	map.load(argv[1]);
 
 	cv::imshow("img", map.get_panorama_image());
@@ -35,8 +32,6 @@ int main(int argc, char **argv) {
 	for (int level = 2; level >= 0; level--) {
 		for (int i = 0; i < (level + 1) * (level + 1) * 10; i++) {
 	        float max_update = map.optimize_panorama(level);
-            //optimize_panorama.publish(level);
-            //std_msgs::Float32::ConstPtr max_update = ros::topic::waitForMessage<std_msgs::Float32>("max_update");
 			cv::imshow("img", map.get_panorama_image());
 			cv::waitKey(3);
 

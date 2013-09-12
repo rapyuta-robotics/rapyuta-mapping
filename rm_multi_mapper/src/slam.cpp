@@ -1,7 +1,7 @@
 /*
- * panorama.cpp
+ * slam.cpp
  *
- *  Created on: Sept 10, 2013
+ *  Created on: Sept 12, 2013
  *      Author: mayanks43
  */
 
@@ -22,15 +22,12 @@
 #include "std_msgs/Int32.h"
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
-#include "rm_multi_mapper/WorkerAction.h"
+#include "rm_multi_mapper/WorkerSlamAction.h"
 #include "rm_multi_mapper/Matrix.h"
 
 /*MySQL includes */
 #include "mysql_connection.h"
-#include <cppconn/driver.h>
-#include <cppconn/exception.h>
 #include <cppconn/resultset.h>
-#include <cppconn/prepared_statement.h>
 
 void get_pairs(std::vector<std::pair<int, int> > & overlapping_keyframes) {
         sql::ResultSet *res;
@@ -73,11 +70,11 @@ int main(int argc, char **argv) {
     int workers = argc-1;
     ros::init(argc, argv, "panorama");
 	
-    std::vector<actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>* > ac_list;
+    std::vector<actionlib::SimpleActionClient<rm_multi_mapper::WorkerSlamAction>* > ac_list;
     for(int i=0; i<workers; i++)
     {
-        actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>* ac = 
-            new actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>(std::string(argv[i+1]),true);
+        actionlib::SimpleActionClient<rm_multi_mapper::WorkerSlamAction>* ac = 
+            new actionlib::SimpleActionClient<rm_multi_mapper::WorkerSlamAction>(std::string(argv[i+1]),true);
         ac_list.push_back(ac);
     }
 
@@ -87,12 +84,12 @@ int main(int argc, char **argv) {
     U.load("http://localhost/keyframe_map", frames);
     size = frames.size();
 	get_pairs(overlapping_keyframes);
-	std::vector<rm_multi_mapper::WorkerGoal> goals;
+	std::vector<rm_multi_mapper::WorkerSlamGoal> goals;
     int keyframes_size = (int)overlapping_keyframes.size();	
 
 	for(int k=0; k<workers; k++)
 	{
-        rm_multi_mapper::WorkerGoal goal;
+        rm_multi_mapper::WorkerSlamGoal goal;
 
         int last_elem = (keyframes_size/workers)*(k+1);
         if (k == workers-1) last_elem = keyframes_size;
@@ -138,28 +135,30 @@ int main(int argc, char **argv) {
     }
     
     Eigen::MatrixXf acc_JtJ;
-    acc_JtJ.setZero(size * 3 + 3, size * 3 + 3);
+    acc_JtJ.setZero(size * 6, size * 6);
     Eigen::VectorXf acc_Jte;
-    acc_Jte.setZero(size * 3 + 3);
-    
+    acc_Jte.setZero(size * 6);
+    	
     if (success)
     {
 
    	    for(int i=0; i<workers; i++)
    	    {
    	        Eigen::MatrixXf JtJ;
-            JtJ.setZero(size * 3 + 3, size * 3 + 3);
+            JtJ.setZero(size * 6, size * 6);
    	        Eigen::VectorXf Jte;
-   	        Jte.setZero(size * 3 + 3);
+   	        Jte.setZero(size * 6);
    	        
     	    rm_multi_mapper::Vector rosJte = ac_list[i]->getResult()->Jte;
     	    rm_multi_mapper::Matrix rosJtJ = ac_list[i]->getResult()->JtJ;
-    	   	
+
             vector2eigen(rosJte, Jte);
-            matrix2eigen(rosJtJ, JtJ);
             
+            matrix2eigen(rosJtJ, JtJ);
+    
             acc_JtJ += JtJ;
             acc_Jte += Jte;
+
         }
         
     }
