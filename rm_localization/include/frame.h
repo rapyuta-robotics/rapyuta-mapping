@@ -138,31 +138,30 @@ struct parallel_warp {
 		float u1 = 1 - u0;
 		float v1 = 1 - v0;
 		uint16_t z_p_eps = z * 1000 - 50;
-		uint16_t z_m_eps = z * 1000 + 50;
 
 		float val = 0;
 		float sum = 0;
 
 		size_t p00 = v * cols + u;
-		if (depth[p00] != 0 && depth[p00] > z_p_eps && depth[p00] < z_m_eps) {
+		if (depth[p00] != 0 && depth[p00] > z_p_eps) {
 			val += u0 * v0 * intencity[p00];
 			sum += u0 * v0;
 		}
 
 		size_t p01 = p00 + cols;
-		if (depth[p01] != 0 && depth[p01] > z_p_eps && depth[p01] < z_m_eps) {
+		if (depth[p01] != 0 && depth[p01] > z_p_eps) {
 			val += u0 * v1 * intencity[p01];
 			sum += u0 * v1;
 		}
 
 		size_t p10 = p00 + 1;
-		if (depth[p10] != 0 && depth[p10] > z_p_eps && depth[p10] < z_m_eps) {
+		if (depth[p10] != 0 && depth[p10] > z_p_eps) {
 			val += u1 * v0 * intencity[p10];
 			sum += u1 * v0;
 		}
 
 		size_t p11 = p01 + 1;
-		if (depth[p11] != 0 && depth[p11] > z_p_eps && depth[p11] < z_m_eps) {
+		if (depth[p11] != 0 && depth[p11] > z_p_eps) {
 			val += u1 * v1 * intencity[p11];
 			sum += u1 * v1;
 		}
