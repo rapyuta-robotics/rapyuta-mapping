@@ -6,68 +6,39 @@ const int robot_offset = 0;
 const int num_robots = 1;
 const std::string prefix = "cloudbot";
 std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
-boost::thread_group tg;
 
-bool maps_initiated = false;
+template<typename F>
+void run_on_all_robots(F f) {
+	boost::thread_group tg;
+
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(boost::bind(f, robot_mappers[i].get()));
+	}
+
+	tg.join_all();
+}
+
+template<typename F, typename P>
+void run_on_all_robots(F f, P p) {
+	boost::thread_group tg;
+
+	for (int i = 0; i < num_robots; i++) {
+		tg.create_thread(boost::bind(f, robot_mappers[i].get(), p));
+	}
+
+	tg.join_all();
+}
 
 bool start_capturing(std_srvs::Empty::Request &req,
 		std_srvs::Empty::Response &res) {
 
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::capture_sphere,
-						robot_mappers[i].get()));
-	}
+	//run_on_all_robots(&robot_mapper::capture_sphere);
+	run_on_all_robots(&robot_mapper::optmize_panorama);
+	//run_on_all_robots(&robot_mapper::start_optimization_loop);
+	//run_on_all_robots(&robot_mapper::save_map, "room_map");
 
-	tg.join_all();
-
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::optmize_panorama,
-						robot_mappers[i].get()));
-	}
-
-	tg.join_all();
-
-	/*	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::turn_to_initial_heading,
-						robot_mappers[i].get()));
-	}
-
-	tg.join_all();
-*/
-
-	for (int i = 0; i < num_robots; i++) {
-		robot_mappers[i]->start_optimization_loop();
-	}
-	/*
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::move_straight,
-						robot_mappers[i].get(), 4.0));
-	}
-
-	tg.join_all();
-
-	sleep(60);
-
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::capture_sphere,
-						robot_mappers[i].get()));
-	}
-
-	tg.join_all();
-
-	for (int i = 0; i < num_robots; i++) {
-		tg.create_thread(
-				boost::bind(&robot_mapper::save_map, robot_mappers[i].get(),
-						"room_corridor_map"));
-	}
-
-	tg.join_all();
-*/
+	//while (!robot_mappers[0]->merge(*robot_mappers[1]))
+	//	;
 
 	return true;
 }
@@ -87,12 +58,7 @@ int main(int argc, char **argv) {
 	ros::AsyncSpinner spinner(4);
 	spinner.start();
 
-	//int iteration = 0;
-	//while (!robot_mappers[0]->merge(*robot_mappers[1])) {
-	//ROS_INFO("Merging iteration %d", iteration);
-	//iteration++;
-	//}
-	//ROS_INFO("Merged maps");
+	run_on_all_robots(&robot_mapper::start_optimization_loop);
 
 	ros::waitForShutdown();
 
