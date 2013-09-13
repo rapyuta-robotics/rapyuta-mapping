@@ -33,20 +33,17 @@ if(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
 	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -msse3 -ftree-vectorizer-verbose=0")
 else(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
 	include_directories(/opt/tbb41_20130116oss/include/)
-	SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O3 -march=armv7-a -mcpu=cortex-a9 -mfpu=neon -funsafe-math-optimizations -mvectorize-with-neon-quad -ftree-vectorize -ftree-vectorizer-verbose=5" )
+	SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O3 -march=armv7-a -mcpu=cortex-a9 -mfpu=neon -funsafe-math-optimizations -mvectorize-with-neon-quad -ftree-vectorize -ftree-vectorizer-verbose=0" )
 endif(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
 
 
-find_package(VTK REQUIRED)
-include_directories(${VTK_INCLUDE_DIRS})
-
 rosbuild_add_library(${PROJECT_NAME} src/frame.cpp src/keyframe.cpp)
-target_link_libraries(${PROJECT_NAME} tbb)
+target_link_libraries(${PROJECT_NAME} tbb boost_chrono)
 
 rosbuild_add_executable(localization src/main.cpp)
 target_link_libraries(localization ${PROJECT_NAME})
 
-rosbuild_add_executable(test_vo src/test_vo.cpp)
-target_link_libraries(test_vo ${PROJECT_NAME} ${VTK_LIBRARIES})
+#rosbuild_add_executable(test_vo src/test_vo.cpp)
+#target_link_libraries(test_vo ${PROJECT_NAME} ${VTK_LIBRARIES})
 
 
