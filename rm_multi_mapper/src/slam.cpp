@@ -61,13 +61,20 @@ void vector2eigen(const rm_multi_mapper::Vector & v1, Eigen::VectorXf & eigen) {
         eigen[i] = v1.vector[i];
     }
 }
+typedef unsigned long long timestamp_t;
 
+static timestamp_t get_timestamp ()
+{
+    struct timeval now;
+    gettimeofday (&now, NULL);
+    return  now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
+}
 int main(int argc, char **argv) {
-    timespec start, end;
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
-	std::vector<std::pair<int, int> > overlapping_keyframes;
-	std::vector<color_keyframe::Ptr> frames;
-	int size;
+    
+    timestamp_t t0 = get_timestamp();    
+    std::vector<std::pair<int, int> > overlapping_keyframes;
+    std::vector<color_keyframe::Ptr> frames;
+    int size;
     int workers = argc-1;
     ros::init(argc, argv, "panorama");
 	
@@ -210,8 +217,10 @@ int main(int argc, char **argv) {
         
 
     }
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
-    std::cout<<start.tv_nsec<<" "<<end.tv_nsec<<" "<<end.tv_nsec-start.tv_nsec<<std::endl;
-    
+    timestamp_t t1 = get_timestamp();
+
+    double secs = (t1 - t0) / 1000000.0L;
+    std::cout<<secs<<std::endl;
+    return 0;    
 
 }
