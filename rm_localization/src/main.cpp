@@ -122,7 +122,7 @@ public:
 		float angle = t1.unit_quaternion().angularDistance(
 				t2.unit_quaternion());
 
-		return angle / (M_PI / 18) + distance;
+		return angle / (M_PI / 18) + distance/0.3;
 
 	}
 
