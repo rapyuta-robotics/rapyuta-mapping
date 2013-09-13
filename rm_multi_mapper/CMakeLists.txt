@@ -84,3 +84,6 @@ target_link_libraries(slam ${PROJECT_NAME} mysqlcppconn)
 rosbuild_add_executable(worker_slam src/worker_slam.cpp)
 target_link_libraries(worker_slam ${PROJECT_NAME} mysqlcppconn)
 
+rosbuild_add_executable(binary2csv src/binary2csv.cpp)
+target_link_libraries(binary2csv ${PROJECT_NAME} )
+

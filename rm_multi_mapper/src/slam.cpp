@@ -4,7 +4,7 @@
  *  Created on: Sept 12, 2013
  *      Author: mayanks43
  */
-
+#include <sys/time.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -32,7 +32,7 @@
 void get_pairs(std::vector<std::pair<int, int> > & overlapping_keyframes) {
         sql::ResultSet *res;
         util U;
-        res = U.sql_query("SELECT f1.id as id1, f2.id as id2 FROM positions f1, positions f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3) >=1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/6) AND f1.id <> f2.id;");
+        res = U.sql_query("SELECT f1.id as id1, f2.id as id2 FROM positions f1, positions f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3) >=1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/6) AND f1.id <> f2.id AND SQRT(POWER((f1.t0 - f2.t0), 2) + POWER((f1.t1 - f2.t1), 2) + POWER((f1.t2 - f2.t2), 2)) < 0.5;");
 
         while (res->next())
         {
@@ -63,7 +63,8 @@ void vector2eigen(const rm_multi_mapper::Vector & v1, Eigen::VectorXf & eigen) {
 }
 
 int main(int argc, char **argv) {
-
+    timespec start, end;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
 	std::vector<std::pair<int, int> > overlapping_keyframes;
 	std::vector<color_keyframe::Ptr> frames;
 	int size;
@@ -81,7 +82,7 @@ int main(int argc, char **argv) {
     sql::ResultSet *res;
 
     util U;
-    U.load("http://localhost/keyframe_map", frames);
+    U.load("http://localhost/corridor_map2", frames);
     size = frames.size();
 	get_pairs(overlapping_keyframes);
 	std::vector<rm_multi_mapper::WorkerSlamGoal> goals;
@@ -177,12 +178,8 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < (int)frames.size(); i++) {
 
-        frames[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
-                * frames[i]->get_pos().so3();
-        frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
-        frames[i]->get_intrinsics().array() =
-                update.segment<3>(size * 3).array().exp()
-		                * frames[i]->get_intrinsics().array();
+        frames[i]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i))
+				* frames[i]->get_pos();
 
         std::string query = "UPDATE `positions` SET `q0` = " + 
         boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[0]) +
@@ -213,6 +210,8 @@ int main(int argc, char **argv) {
         
 
     }
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
+    std::cout<<start.tv_nsec<<" "<<end.tv_nsec<<" "<<end.tv_nsec-start.tv_nsec<<std::endl;
     
 
 }

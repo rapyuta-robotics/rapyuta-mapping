@@ -77,7 +77,7 @@ class WorkerSlamAction
             }
             
             util U;
-            U.load("http://localhost/keyframe_map", frames_); 
+            U.load("http://localhost/corridor_map2", frames_); 
             
             reduce_jacobian_slam rj(frames_, frames_.size());
             
