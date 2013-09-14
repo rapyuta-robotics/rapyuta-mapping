@@ -45,6 +45,8 @@ class WorkerAction
             action_name_(name)
         {
             as_.start();
+            util U;
+            U.load("http://localhost/keyframe_map", frames_); 
         }
 
         ~WorkerAction(void)
@@ -83,8 +85,6 @@ class WorkerAction
                 success = false;
             }
             
-            util U;
-            U.load("http://localhost/keyframe_map", frames_); 
             
             reduce_jacobian_ros rj(frames_, frames_.size(), 0);
             

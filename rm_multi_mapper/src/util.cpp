@@ -141,7 +141,7 @@ void util::load(const std::string & dir_name, std::vector<color_keyframe::Ptr> &
 				        positions[i].second));
         frames.push_back(k);
     }
-
+    std::cout<<"Ready"<<std::endl;
 }
 
 

@@ -70,10 +70,12 @@ static timestamp_t get_timestamp ()
     return  now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
 }
 int main(int argc, char **argv) {
-    
+    std::vector<color_keyframe::Ptr> frames;
+   
+    util U;
+    U.load("http://localhost/corridor_map2", frames);
     timestamp_t t0 = get_timestamp();    
     std::vector<std::pair<int, int> > overlapping_keyframes;
-    std::vector<color_keyframe::Ptr> frames;
     int size;
     int workers = argc-1;
     ros::init(argc, argv, "panorama");
@@ -88,8 +90,6 @@ int main(int argc, char **argv) {
 
     sql::ResultSet *res;
 
-    util U;
-    U.load("http://localhost/corridor_map2", frames);
     size = frames.size();
 	get_pairs(overlapping_keyframes);
 	std::vector<rm_multi_mapper::WorkerSlamGoal> goals;
@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
 
     ROS_INFO("Max update %f", iteration_max_update);
 
-    for (int i = 0; i < (int)frames.size(); i++) {
+    /*for (int i = 0; i < (int)frames.size(); i++) {
 
         frames[i]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i))
 				* frames[i]->get_pos();
@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
         delete res;
         
 
-    }
+    }*/
     timestamp_t t1 = get_timestamp();
 
     double secs = (t1 - t0) / 1000000.0L;

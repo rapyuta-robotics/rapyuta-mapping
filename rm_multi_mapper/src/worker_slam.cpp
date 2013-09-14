@@ -38,6 +38,8 @@ class WorkerSlamAction
             action_name_(name)
         {
             as_.start();
+            util U;
+            U.load("http://localhost/corridor_map2", frames_); 
         }
 
         ~WorkerSlamAction(void)
@@ -76,8 +78,6 @@ class WorkerSlamAction
                 success = false;
             }
             
-            util U;
-            U.load("http://localhost/corridor_map2", frames_); 
             
             reduce_jacobian_slam rj(frames_, frames_.size());
             
