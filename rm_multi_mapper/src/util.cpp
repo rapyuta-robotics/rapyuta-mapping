@@ -65,7 +65,7 @@ sql::ResultSet* util::sql_query(std::string query) {
 
         /* Create a connection */
         driver = get_driver_instance();
-        con = driver->connect("tcp://127.0.0.1:3306", "root", "123456");
+        con = driver->connect("tcp://10.0.0.74:3306", "root", "123456");
         /* Connect to the MySQL test database */
         con->setSchema("panorama");
 
@@ -141,7 +141,7 @@ void util::load(const std::string & dir_name, std::vector<color_keyframe::Ptr> &
 				        positions[i].second));
         frames.push_back(k);
     }
-
+    std::cout<<"Ready"<<std::endl;
 }
 
 

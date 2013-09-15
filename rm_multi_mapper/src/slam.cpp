@@ -4,7 +4,7 @@
  *  Created on: Sept 12, 2013
  *      Author: mayanks43
  */
-
+#include <sys/time.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -32,7 +32,7 @@
 void get_pairs(std::vector<std::pair<int, int> > & overlapping_keyframes) {
         sql::ResultSet *res;
         util U;
-        res = U.sql_query("SELECT f1.id as id1, f2.id as id2 FROM positions f1, positions f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3) >=1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/6) AND f1.id <> f2.id;");
+        res = U.sql_query("SELECT f1.id as id1, f2.id as id2 FROM positions f1, positions f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3) >=1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/6) AND f1.id <> f2.id AND SQRT(POWER((f1.t0 - f2.t0), 2) + POWER((f1.t1 - f2.t1), 2) + POWER((f1.t2 - f2.t2), 2)) < 0.5;");
 
         while (res->next())
         {
@@ -61,12 +61,22 @@ void vector2eigen(const rm_multi_mapper::Vector & v1, Eigen::VectorXf & eigen) {
         eigen[i] = v1.vector[i];
     }
 }
+typedef unsigned long long timestamp_t;
 
+static timestamp_t get_timestamp ()
+{
+    struct timeval now;
+    gettimeofday (&now, NULL);
+    return  now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
+}
 int main(int argc, char **argv) {
-
-	std::vector<std::pair<int, int> > overlapping_keyframes;
-	std::vector<color_keyframe::Ptr> frames;
-	int size;
+    std::vector<color_keyframe::Ptr> frames;
+   
+    util U;
+    U.load("http://localhost/corridor_map2", frames);
+    timestamp_t t0 = get_timestamp();    
+    std::vector<std::pair<int, int> > overlapping_keyframes;
+    int size;
     int workers = argc-1;
     ros::init(argc, argv, "panorama");
 	
@@ -80,8 +90,6 @@ int main(int argc, char **argv) {
 
     sql::ResultSet *res;
 
-    util U;
-    U.load("http://localhost/keyframe_map", frames);
     size = frames.size();
 	get_pairs(overlapping_keyframes);
 	std::vector<rm_multi_mapper::WorkerSlamGoal> goals;
@@ -175,14 +183,10 @@ int main(int argc, char **argv) {
 
     ROS_INFO("Max update %f", iteration_max_update);
 
-    for (int i = 0; i < (int)frames.size(); i++) {
+    /*for (int i = 0; i < (int)frames.size(); i++) {
 
-        frames[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
-                * frames[i]->get_pos().so3();
-        frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
-        frames[i]->get_intrinsics().array() =
-                update.segment<3>(size * 3).array().exp()
-		                * frames[i]->get_intrinsics().array();
+        frames[i]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i))
+				* frames[i]->get_pos();
 
         std::string query = "UPDATE `positions` SET `q0` = " + 
         boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[0]) +
@@ -212,7 +216,11 @@ int main(int argc, char **argv) {
         delete res;
         
 
-    }
-    
+    }*/
+    timestamp_t t1 = get_timestamp();
+
+    double secs = (t1 - t0) / 1000000.0L;
+    std::cout<<secs<<std::endl;
+    return 0;    
 
 }
