@@ -87,3 +87,6 @@ target_link_libraries(worker_slam ${PROJECT_NAME} mysqlcppconn)
 rosbuild_add_executable(panorama src/panorama.cpp)
 target_link_libraries(panorama ${PROJECT_NAME} mysqlcppconn)
 
+rosbuild_add_executable(test_util src/test_util.cpp)
+target_link_libraries(test_util ${PROJECT_NAME} mysqlcppconn)
+

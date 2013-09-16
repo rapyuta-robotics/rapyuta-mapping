@@ -23,11 +23,21 @@ static bool factoryLoaded = false;
 
 class util {
     public :
+
+		util();
+		~util();
+
         cv::Mat loadFromURL(std::string url);
         cv::Mat stringtoMat(std::string file);
         sql::ResultSet* sql_query(std::string query);
         void load_mysql(std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > & positions);
         void load(const std::string & dir_name, std::vector<color_keyframe::Ptr> & frames);
+
+        int get_new_robot_id();
+
+    private:
+        sql::Driver *driver;
+        sql::Connection *con;
 };
 
 
