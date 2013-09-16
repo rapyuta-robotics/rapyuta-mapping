@@ -5,13 +5,12 @@
 #include <fstream>
 #include <reduce_jacobian_rgb.h>
 #include <reduce_jacobian_slam_3d.h>
+
 #include <util.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
 
-
-/*
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/solvers/dense/linear_solver_dense.h>
 #include <g2o/solvers/pcg/linear_solver_pcg.h>
@@ -28,7 +27,6 @@
 #include <g2o/types/slam3d/vertex_se3.h>
 #include <g2o/types/slam3d/edge_se3.h>
 #include <g2o/types/slam3d/edge_se3_offset.h>
-*/
 
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -218,6 +216,38 @@ void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	de->compute(gray, filtered_keypoints, descriptors);
 }
 
+bool find_transform(color_keyframe::Ptr & fi, color_keyframe::Ptr & fj,
+		Sophus::SE3f & t) {
+	cv::Ptr<cv::FeatureDetector> fd;
+	cv::Ptr<cv::DescriptorExtractor> de;
+	cv::Ptr<cv::DescriptorMatcher> dm;
+
+	init_feature_detector(fd, de, dm);
+
+	std::vector<cv::KeyPoint> keypoints_i, keypoints_j;
+	pcl::PointCloud<pcl::PointXYZ> keypoints3d_i, keypoints3d_j;
+	cv::Mat descriptors_i, descriptors_j;
+
+	compute_features(fi->get_i(0), fi->get_d(0), fi->get_intrinsics(0), fd, de,
+			keypoints_i, keypoints3d_i, descriptors_i);
+
+	compute_features(fj->get_i(0), fj->get_d(0), fj->get_intrinsics(0), fd, de,
+			keypoints_j, keypoints3d_j, descriptors_j);
+
+	std::vector<cv::DMatch> matches, matches_filtered;
+	dm->match(descriptors_j, descriptors_i, matches);
+
+	Eigen::Affine3f transform;
+	std::vector<bool> inliers;
+
+	bool res = estimate_transform_ransac(keypoints3d_j, keypoints3d_i, matches,
+			5000, 0.03 * 0.03, 20, transform, inliers);
+
+	t = Sophus::SE3f(transform.rotation(), transform.translation());
+
+	return res;
+}
+
 keyframe_map::keyframe_map() {
 }
 
@@ -227,14 +257,14 @@ void keyframe_map::add_frame(const rm_localization::Keyframe::ConstPtr & k) {
 
 }
 
-
 void keyframe_map::align_z_axis() {
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud(
 			new pcl::PointCloud<pcl::PointXYZ>);
 
 	for (size_t i = 0; i < frames.size(); i++) {
-		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frames[i]->get_pointcloud(8, true, -0.2, 0.2);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frames[i]->get_pointcloud(8,
+				true, -0.2, 0.2);
 
 		*point_cloud += *cloud;
 	}
@@ -328,25 +358,26 @@ float keyframe_map::optimize_panorama(int level) {
 	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
 	 */
 
-	Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
-	//Eigen::VectorXf update =
-	//			-rj.JtJ.block(0, 0, size * 3, size* 3).ldlt().solve(
-	//					rj.Jte.segment(0, size * 3));
+	//Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
+	Eigen::VectorXf update =
+			-rj.JtJ.block(3, 3, (size - 1) * 3, (size - 1) * 3).ldlt().solve(
+					rj.Jte.segment(3, (size - 1) * 3));
 
 	iteration_max_update = std::max(std::abs(update.maxCoeff()),
 			std::abs(update.minCoeff()));
 
 	ROS_INFO("Max update %f", iteration_max_update);
 
-	for (int i = 0; i < size; i++) {
+	for (int i = 0; i < size - 1; i++) {
 
-		frames[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
-				* frames[i]->get_pos().so3();
-		frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
-        //std::cout<<frames[i]->get_pos();
-		frames[i]->get_intrinsics().array() =
-				update.segment<3>(size * 3).array().exp()
-						* frames[i]->get_intrinsics().array();
+		frames[i + 1]->get_pos().so3() = Sophus::SO3f::exp(
+				update.segment<3>(i * 3)) * frames[i + 1]->get_pos().so3();
+		frames[i + 1]->get_pos().translation() =
+				frames[0]->get_pos().translation();
+		//std::cout<<frames[i]->get_pos();
+		//frames[i]->get_intrinsics().array() =
+		//		update.segment<3>(size * 3).array().exp()
+		//				* frames[i]->get_intrinsics().array();
 		if (i == 0) {
 			Eigen::Vector3f intrinsics = frames[i]->get_intrinsics();
 			ROS_INFO("New intrinsics %f, %f, %f", intrinsics(0), intrinsics(1),
@@ -443,7 +474,7 @@ float keyframe_map::optimize_slam(int skip_n) {
 	float iteration_max_update;
 	int size = frames.size();
 
-	if(size < skip_n + 2)
+	if (size < skip_n + 2)
 		return 0;
 
 	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
@@ -461,7 +492,7 @@ float keyframe_map::optimize_slam(int skip_n) {
 				float distance = (frames[i]->get_pos().translation()
 						- frames[j]->get_pos().translation()).norm();
 
-				if (angle < M_PI / 6 && distance < 0.5) {
+				if (angle < M_PI / 4 && distance < 1) {
 					overlaping_keyframes.push_back(std::make_pair(i, j));
 					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
 				}
@@ -472,21 +503,18 @@ float keyframe_map::optimize_slam(int skip_n) {
 	}
 
 	reduce_jacobian_slam_3d rj(frames, size);
-
-
-	tbb::parallel_reduce(
-			tbb::blocked_range<
-					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-					overlaping_keyframes.begin(), overlaping_keyframes.end()),
-			rj);
-
-
-	 /*
-	 rj(
+	/*
+	 tbb::parallel_reduce(
 	 tbb::blocked_range<
 	 tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
+	 overlaping_keyframes.begin(), overlaping_keyframes.end()),
+	 rj);
+
 	 */
+	rj(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()));
 
 	int begin = skip_n * 6;
 	int length = (size - skip_n) * 6;
@@ -501,18 +529,54 @@ float keyframe_map::optimize_slam(int skip_n) {
 	ROS_INFO("Max update %f", iteration_max_update);
 
 	for (int i = 0; i < size - skip_n; i++) {
-		frames[i + skip_n]->get_pos() = Sophus::SE3f::exp(update.segment<6>(i * 6))
-				* frames[i + skip_n]->get_pos();
+		frames[i + skip_n]->get_pos() = Sophus::SE3f::exp(
+				update.segment<6>(i * 6)) * frames[i + skip_n]->get_pos();
 	}
 
 	return iteration_max_update;
 
 }
 
-/*
 void keyframe_map::optimize_g2o() {
 
 	size_t size = frames.size();
+
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			if (i != j) {
+				float angle =
+						frames[i]->get_pos().unit_quaternion().angularDistance(
+								frames[j]->get_pos().unit_quaternion());
+
+				//float centroid_distance = (frames[i]->get_centroid()
+				//		- frames[j]->get_centroid()).norm();
+
+				float distance = (frames[i]->get_pos().translation()
+						- frames[j]->get_pos().translation()).norm();
+
+				if (distance < 3) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
+				}
+			}
+		}
+	}
+
+	reduce_measurement_g2o rm(frames, measurements, size);
+
+
+	tbb::parallel_reduce(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rm);
+
+
+	//for(int i=0; i<rm.m.size(); i++) {
+	//	measurements.push_back(rm.m[i]);
+	//}
 
 	g2o::SparseOptimizer optimizer;
 	optimizer.setVerbose(true);
@@ -541,88 +605,56 @@ void keyframe_map::optimize_g2o() {
 		optimizer.addVertex(v_se3);
 	}
 
-	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+	for (size_t it = 0; it < rm.m.size(); it++) {
+		int i = rm.m[it].i;
+		int j = rm.m[it].j;
 
-	for (int i = 0; i < size; i++) {
-		for (int j = 0; j < size; j++) {
-			if (i != j) {
-				float angle =
-						frames[i]->get_pos().unit_quaternion().angularDistance(
-								frames[j]->get_pos().unit_quaternion());
+		Sophus::SE3f Mij = rm.m[it].transform;
 
-				//float centroid_distance = (frames[i]->get_centroid()
-				//		- frames[j]->get_centroid()).norm();
+		g2o::EdgeSE3 * e = new g2o::EdgeSE3();
 
-				float distance = (frames[i]->get_pos().translation()
-						- frames[j]->get_pos().translation()).norm();
+		e->setVertex(0,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						i)->second));
+		e->setVertex(1,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						j)->second));
+		e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
+		e->information() = Sophus::Matrix6d::Identity();
 
-				if (angle < M_PI / 6 && distance < 0.5) {
-					overlaping_keyframes.push_back(std::make_pair(i, j));
-					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
-				}
-			}
-		}
-	}
-
-	pcl::IterativeClosestPoint<pcl::PointNormal, pcl::PointNormal> icp;
-	icp.setMaxCorrespondenceDistance(0.2);
-	pcl::PointCloud<pcl::PointNormal> Final;
-
-	typedef pcl::registration::TransformationEstimationPointToPlane<
-			pcl::PointNormal, pcl::PointNormal> PointToPlane;
-	boost::shared_ptr<PointToPlane> point_to_plane(new PointToPlane);
-	icp.setTransformationEstimation(point_to_plane);
-
-	for (size_t it = 0; it < overlaping_keyframes.size(); it++) {
-		int i = overlaping_keyframes[it].first;
-		int j = overlaping_keyframes[it].second;
-
-		Sophus::SE3f Mij;
-
-		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_j =
-				frames[j]->get_pointcloud_with_normals(4, false);
-		pcl::PointCloud<pcl::PointNormal>::Ptr cloud_i =
-				frames[i]->get_pointcloud_with_normals(4, false);
-
-		pcl::transformPointCloudWithNormals(*cloud_j, *cloud_j,
-				(frames[i]->get_pos().inverse() * frames[j]->get_pos()).matrix());
-
-		icp.setInputCloud(cloud_j);
-		icp.setInputTarget(cloud_i);
-
-		icp.align(Final);
-
-		if (icp.hasConverged()) {
-
-			Eigen::Affine3f tm(icp.getFinalTransformation());
-			Mij = Sophus::SE3f(tm.rotation(), tm.translation());
-
-			//if (frames[i]->estimate_relative_position(*frames[j], Mij)) {
-
-			g2o::EdgeSE3 * e = new g2o::EdgeSE3();
-
-			e->setVertex(0,
-					dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
-							j)->second));
-			e->setVertex(1,
-					dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
-							i)->second));
-			e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
-			e->information() = Sophus::Matrix6d::Identity();
-
-			optimizer.addEdge(e);
-		}
+		optimizer.addEdge(e);
 
 	}
 
-	//optimizer.save("debug.txt");
+	for (size_t it = 1; it < frames.size(); it++) {
+		int i = it-1;
+		int j = it;
+
+		Sophus::SE3f Mij = frames[i]->get_pos().inverse() * frames[j]->get_pos();
+
+		g2o::EdgeSE3 * e = new g2o::EdgeSE3();
+
+		e->setVertex(0,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						i)->second));
+		e->setVertex(1,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						j)->second));
+		e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
+		e->information() = 0.01 * Sophus::Matrix6d::Identity();
+
+		optimizer.addEdge(e);
+
+	}
+
+	optimizer.save("debug.txt");
 
 	optimizer.initializeOptimization();
 	optimizer.setVerbose(true);
 
 	std::cout << std::endl;
 	std::cout << "Performing full BA:" << std::endl;
-	optimizer.optimize(10);
+	optimizer.optimize(20);
 	std::cout << std::endl;
 
 	for (int i = 0; i < size; i++) {
@@ -652,7 +684,6 @@ void keyframe_map::optimize_g2o() {
 	}
 
 }
-*/
 
 cv::Mat keyframe_map::get_panorama_image() {
 	cv::Mat res = cv::Mat::zeros(512, 1024, CV_32F);
@@ -781,23 +812,23 @@ void keyframe_map::load(const std::string & dir_name) {
 
 	std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
 
-	/*std::ifstream f((dir_name + "/positions.txt").c_str(),
+	std::ifstream f((dir_name + "/positions.txt").c_str(),
 			std::ios_base::binary);
 	while (f) {
 		Eigen::Quaternionf q;
 		Eigen::Vector3f t;
 		Eigen::Vector3f intrinsics;
-                
+
 		f.read((char *) q.coeffs().data(), sizeof(float) * 4);
 		f.read((char *) t.data(), sizeof(float) * 3);
 		f.read((char *) intrinsics.data(), sizeof(float) * 3);
 
-        positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
+		positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
 	}
 
-	positions.pop_back();*/
-	util U;
-	U.load_mysql(positions);
+	positions.pop_back();
+	//util U;
+	//U.load_mysql(positions);
 	std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
 
 	for (size_t i = 0; i < positions.size(); i++) {

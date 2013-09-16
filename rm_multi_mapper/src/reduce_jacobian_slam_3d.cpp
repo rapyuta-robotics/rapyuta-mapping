@@ -6,6 +6,8 @@
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
 
+#include <keyframe_map.h>
+
 reduce_jacobian_slam_3d::reduce_jacobian_slam_3d(
 		tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size) :
 		size(size), frames(frames) {
@@ -227,7 +229,7 @@ void reduce_jacobian_slam_3d::add_floor_measurement(int i) {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frames[i]->get_pointcloud(8,
 			true, -0.2, 0.2);
 
-	if(cloud->size() < 30)
+	if (cloud->size() < 30)
 		return;
 
 	pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
@@ -247,7 +249,7 @@ void reduce_jacobian_slam_3d::add_floor_measurement(int i) {
 	seg.setInputCloud(cloud);
 	seg.segment(*inliers, *coefficients);
 
-	if(inliers->indices.size() < 100)
+	if (inliers->indices.size() < 100)
 		return;
 
 	//std::cerr << "Model coefficients: " << coefficients->values[0] << " "
@@ -255,7 +257,7 @@ void reduce_jacobian_slam_3d::add_floor_measurement(int i) {
 	//		<< coefficients->values[3] << " Num inliers "
 	//		<< inliers->indices.size() << std::endl;
 
-	if(coefficients->values[2]  < 0.9)
+	if (coefficients->values[2] < 0.9)
 		return;
 
 	Eigen::Matrix<float, 3, 6> Ji;
@@ -284,8 +286,9 @@ void reduce_jacobian_slam_3d::operator()(
 		if (j >= 0) {
 			//add_icp_measurement(i, j);
 			add_rgbd_measurement(i, j);
+			//add_ransac_measurement(i,j);
 		} else {
-			add_floor_measurement(i);
+			//add_floor_measurement(i);
 		}
 
 		//ROS_INFO_STREAM(

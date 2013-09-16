@@ -12,6 +12,7 @@
 #include <tbb/parallel_reduce.h>
 
 #include <rm_localization/Keyframe.h>
+#include <reduce_measurement_g2o.h>
 
 class keyframe_map {
 public:
@@ -23,7 +24,7 @@ public:
 	float optimize_slam(int skip_n = 1);
 	void align_z_axis();
 
-	//void optimize_g2o();
+	void optimize_g2o();
 
 	cv::Mat get_panorama_image();
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr get_map_pointcloud();
@@ -35,6 +36,7 @@ public:
 	void load(const std::string & dir_name);
 
 	tbb::concurrent_vector<color_keyframe::Ptr> frames;
+	tbb::concurrent_vector<reduce_measurement_g2o::measurement> measurements;
 	tbb::concurrent_vector<int> idx;
 };
 

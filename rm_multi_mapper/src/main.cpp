@@ -3,7 +3,7 @@
 #include <robot_mapper.h>
 
 const int robot_offset = 0;
-const int num_robots = 1;
+const int num_robots = 2;
 const std::string prefix = "cloudbot";
 std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
 
@@ -33,12 +33,14 @@ bool start_capturing(std_srvs::Empty::Request &req,
 		std_srvs::Empty::Response &res) {
 
 	//run_on_all_robots(&robot_mapper::capture_sphere);
-	run_on_all_robots(&robot_mapper::optmize_panorama);
+	//run_on_all_robots(&robot_mapper::optmize_panorama);
+	run_on_all_robots(&robot_mapper::move_straight, 5);
+	//run_on_all_robots(&robot_mapper::capture_sphere);
 	//run_on_all_robots(&robot_mapper::start_optimization_loop);
-	//run_on_all_robots(&robot_mapper::save_map, "room_map");
+	//run_on_all_robots(&robot_mapper::save_map, "room");
 
-	//while (!robot_mappers[0]->merge(*robot_mappers[1]))
-	//	;
+	while (!robot_mappers[0]->merge(*robot_mappers[1]))
+		;
 
 	return true;
 }
@@ -58,7 +60,7 @@ int main(int argc, char **argv) {
 	ros::AsyncSpinner spinner(4);
 	spinner.start();
 
-	run_on_all_robots(&robot_mapper::start_optimization_loop);
+	//run_on_all_robots(&robot_mapper::start_optimization_loop);
 
 	ros::waitForShutdown();
 

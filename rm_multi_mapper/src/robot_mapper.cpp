@@ -77,6 +77,11 @@ void robot_mapper::move_straight(float distance) {
 
 	ROS_INFO_STREAM("Received move command for " << prefix);
 
+	std_msgs::Float32 angle_msg;
+	angle_msg.data = 1 * M_PI / 18;
+	servo_pub.publish(angle_msg);
+	sleep(3);
+
 	turtlebot_actions::TurtlebotMoveGoal goal;
 	goal.forward_distance = distance;
 	goal.turn_distance = 0;

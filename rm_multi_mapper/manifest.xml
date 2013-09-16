@@ -18,6 +18,7 @@
   <depend package="sophus"/>
   <depend package="rostime"/>
   <depend package="pcl_ros"/>
+  <depend package="g2o"/>
   
 </package>
 

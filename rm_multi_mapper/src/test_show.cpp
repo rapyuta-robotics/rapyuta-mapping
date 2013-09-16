@@ -23,6 +23,8 @@ int main(int argc, char **argv) {
 
 	pcl::visualization::PCLVisualizer vis;
 
+	vis.setBackgroundColor(1,1,1);
+
 	vis.removeAllPointClouds();
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
 	pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(
