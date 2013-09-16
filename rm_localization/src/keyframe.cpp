@@ -65,7 +65,7 @@ bool keyframe::estimate_position(frame & f) {
 
 bool keyframe::estimate_relative_position(frame & f, Sophus::SE3f & Mrc) {
 
-	int level_iterations[] = { 1, 2, 3 };
+	int level_iterations[] = { 2, 4, 6 };
 
 	Mrc = position.inverse() * f.position;
 
