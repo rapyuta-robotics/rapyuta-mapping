@@ -148,7 +148,8 @@ struct reduce_jacobian {
 			Eigen::Vector4f p = cloud.col(i);
 			if (p(3) && depth_warped[i] != 0) {
 
-				float error = (float) intencity[i] - (float) intencity_warped[i];
+				float error = (float) intencity[i]
+						- (float) intencity_warped[i];
 
 				Eigen::Matrix<float, 1, 2> Ji;
 				Eigen::Matrix<float, 2, 6> Jw;
@@ -164,7 +165,7 @@ struct reduce_jacobian {
 				Jte += J.transpose() * error;
 
 				num_points++;
-				error_sum += error*error;
+				error_sum += error * error;
 
 			}
 
@@ -211,7 +212,18 @@ public:
 	rm_localization::Keyframe::Ptr to_msg(
 			const cv_bridge::CvImageConstPtr & yuv2, int idx);
 
+	inline long int get_id() {
+		return id;
+	}
+
+	inline void set_id(long int id) {
+		this->id = id;
+	}
+
 protected:
+
+	long int id;
+
 	int16_t ** intencity_pyr_dx;
 	int16_t ** intencity_pyr_dy;
 
