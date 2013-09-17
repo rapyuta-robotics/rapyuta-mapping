@@ -541,38 +541,10 @@ void keyframe_map::optimize_g2o() {
 
 	size_t size = frames.size();
 
-	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
+	reduce_measurement_g2o rm(frames, measurements, descriptors_vector,
+			keypoints_vector, size);
 
-	for (int i = 0; i < size; i++) {
-		for (int j = 0; j < size; j++) {
-			if (i != j) {
-				float angle =
-						frames[i]->get_pos().unit_quaternion().angularDistance(
-								frames[j]->get_pos().unit_quaternion());
-
-				//float centroid_distance = (frames[i]->get_centroid()
-				//		- frames[j]->get_centroid()).norm();
-
-				float distance = (frames[i]->get_pos().translation()
-						- frames[j]->get_pos().translation()).norm();
-
-				if (distance < 3) {
-					overlaping_keyframes.push_back(std::make_pair(i, j));
-					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
-				}
-			}
-		}
-	}
-
-	reduce_measurement_g2o rm(frames, measurements, size);
-
-
-	tbb::parallel_reduce(
-			tbb::blocked_range<
-					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
-					overlaping_keyframes.begin(), overlaping_keyframes.end()),
-			rm);
-
+	//tbb::parallel_reduce(tbb::blocked_range<int>(0, size), rm);
 
 	//for(int i=0; i<rm.m.size(); i++) {
 	//	measurements.push_back(rm.m[i]);
@@ -627,10 +599,11 @@ void keyframe_map::optimize_g2o() {
 	}
 
 	for (size_t it = 1; it < frames.size(); it++) {
-		int i = it-1;
+		int i = it - 1;
 		int j = it;
 
-		Sophus::SE3f Mij = frames[i]->get_pos().inverse() * frames[j]->get_pos();
+		Sophus::SE3f Mij = frames[i]->get_pos().inverse()
+				* frames[j]->get_pos();
 
 		g2o::EdgeSE3 * e = new g2o::EdgeSE3();
 
@@ -641,10 +614,29 @@ void keyframe_map::optimize_g2o() {
 				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
 						j)->second));
 		e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
-		e->information() = 0.01 * Sophus::Matrix6d::Identity();
+		e->information() =  Sophus::Matrix6d::Identity();
 
 		optimizer.addEdge(e);
 
+	}
+
+	{
+
+		int i = 0;
+		int j = size - 1;
+
+		g2o::EdgeSE3 * e = new g2o::EdgeSE3();
+
+		e->setVertex(0,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						i)->second));
+		e->setVertex(1,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						j)->second));
+		e->setMeasurement(Eigen::Isometry3d::Identity());
+		e->information() = 0.01 * Sophus::Matrix6d::Identity();
+
+		optimizer.addEdge(e);
 	}
 
 	optimizer.save("debug.txt");
@@ -772,6 +764,30 @@ cv::Mat keyframe_map::get_panorama_image() {
 	return res / w;
 }
 
+void keyframe_map::add_keypoints() {
+
+	cv::Ptr<cv::FeatureDetector> fd;
+	cv::Ptr<cv::DescriptorExtractor> de;
+	cv::Ptr<cv::DescriptorMatcher> dm;
+
+	init_feature_detector(fd, de, dm);
+
+	for (int i = 0; i < frames.size(); i++) {
+
+		std::vector<cv::KeyPoint> keypoints;
+		pcl::PointCloud<pcl::PointXYZ> keypoints3d;
+		cv::Mat descriptors;
+
+		compute_features(frames[i]->get_i(0), frames[i]->get_d(0),
+				frames[i]->get_intrinsics(0), fd, de, keypoints, keypoints3d,
+				descriptors);
+
+		descriptors_vector.push_back(descriptors);
+		keypoints_vector.push_back(keypoints3d);
+
+	}
+}
+
 void keyframe_map::save(const std::string & dir_name) {
 
 	if (boost::filesystem::exists(dir_name)) {
@@ -847,6 +863,8 @@ void keyframe_map::load(const std::string & dir_name) {
 						positions[i].second));
 		frames.push_back(k);
 	}
+
+	//add_keypoints();
 
 }
 

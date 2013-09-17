@@ -31,9 +31,9 @@ try {
 
   /* Create a connection */
   driver = get_driver_instance();
-  con = driver->connect("tcp://127.0.0.1:3306", "root", "123456");
+  con = driver->connect("tcp://127.0.0.1:3306", "mapping", "123456");
   /* Connect to the MySQL test database */
-  con->setSchema("panorama");
+  con->setSchema("mapping");
 
   /* Select in ascending order */
   pstmt = con->prepareStatement("SELECT * FROM positions");

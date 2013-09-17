@@ -21,6 +21,14 @@
 
 static bool factoryLoaded = false;
 
+class DataBuf : public streambuf
+{
+public:
+   DataBuf(char * d, size_t s) {
+      setg(d, d, d + s);
+   }
+};
+
 class util {
     public :
 
@@ -34,6 +42,8 @@ class util {
         void load(const std::string & dir_name, std::vector<color_keyframe::Ptr> & frames);
 
         int get_new_robot_id();
+        void add_keyframe(int robot_id, const color_keyframe::Ptr & k);
+        color_keyframe::Ptr get_keyframe(long frame_id);
 
     private:
         sql::Driver *driver;
