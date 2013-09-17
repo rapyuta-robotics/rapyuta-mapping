@@ -64,6 +64,8 @@ protected:
 	ros::ServiceServer send_all_keyframes_service;
 	ros::ServiceServer clear_keyframes_service;
 
+	std::string base_frame;
+
 public:
 
 	CaptureServer() :
@@ -99,8 +101,10 @@ public:
 		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
 		info_sub.subscribe(nh_, "rgb/camera_info", queue_size_);
 
+		base_frame = "base_footprint";
+
 		rgb_tf_sub = new tf::MessageFilter<sensor_msgs::Image>(rgb_sub, lr,
-				"base_footprint", queue_size_);
+				base_frame, queue_size_);
 
 		// Synchronize inputs.
 		sync.reset(
@@ -148,7 +152,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			lr.lookupTransform(frame, "base_footprint", time, transform);
+			lr.lookupTransform(frame, base_frame, time, transform);
 
 			Eigen::Quaterniond q;
 			Eigen::Vector3d t;
@@ -179,7 +183,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			lr.lookupTransform(frame, "base_footprint", time, transform);
+			lr.lookupTransform(frame, base_frame, time, transform);
 
 			Eigen::Quaterniond q;
 			Eigen::Vector3d t;
@@ -200,7 +204,7 @@ public:
 
 			tr.header.frame_id = "odom_combined";
 			tr.header.stamp = time;
-			tr.child_frame_id = "base_footprint";
+			tr.child_frame_id = base_frame;
 
 			br.sendTransform(tr);
 
@@ -289,7 +293,7 @@ public:
 
 		tf::StampedTransform transform;
 		try {
-			lr.lookupTransform("base_footprint", frame, time, transform);
+			lr.lookupTransform(base_frame, frame, time, transform);
 
 			Eigen::Quaterniond q;
 			Eigen::Vector3d t;
