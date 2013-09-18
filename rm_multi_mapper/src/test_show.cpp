@@ -18,19 +18,25 @@
 
 int main(int argc, char **argv) {
 
+	ros::init(argc, argv, "multi_mapper");
+	ros::NodeHandle nh;
+
+	ros::Publisher pointcloud_pub = nh.advertise<
+			pcl::PointCloud<pcl::PointXYZRGB> >("/pointcloud", 1);
+
 	keyframe_map map;
 	map.load(argv[1]);
 
-	pcl::visualization::PCLVisualizer vis;
+	std::cerr << map.frames.size() << std::endl;
 
-	vis.setBackgroundColor(1,1,1);
-
-	vis.removeAllPointClouds();
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
-	pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(
-			cloud);
-	vis.addPointCloud<pcl::PointXYZRGB>(cloud, rgb);
-	vis.spin();
+
+	cloud->header.frame_id = "/world";
+	cloud->header.stamp = ros::Time::now();
+	cloud->header.seq = 0;
+	pointcloud_pub.publish(cloud);
+
+	ros::spin();
 
 	return 0;
 

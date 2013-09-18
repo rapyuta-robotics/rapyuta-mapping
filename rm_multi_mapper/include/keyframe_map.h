@@ -38,9 +38,6 @@ public:
 	void add_keypoints();
 
 	tbb::concurrent_vector<color_keyframe::Ptr> frames;
-	tbb::concurrent_vector<reduce_measurement_g2o::measurement> measurements;
-	std::vector<cv::Mat> descriptors_vector;
-	std::vector<pcl::PointCloud<pcl::PointXYZ> > keypoints_vector;
 	tbb::concurrent_vector<int> idx;
 };
 

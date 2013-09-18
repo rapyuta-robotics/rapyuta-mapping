@@ -223,6 +223,11 @@ color_keyframe::Ptr util::get_keyframe(long frame_id) {
 			"SELECT * FROM keyframe WHERE id = "
 					+ boost::lexical_cast<std::string>(frame_id));
 	res->next();
+	return get_keyframe(res);
+
+}
+
+color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
 	Eigen::Quaternionf q;
 	Eigen::Vector3f t;
 	Eigen::Vector3f intrinsics;
@@ -263,12 +268,29 @@ color_keyframe::Ptr util::get_keyframe(long frame_id) {
 	cv::Mat gray;
 	cv::cvtColor(rgb, gray, CV_RGB2GRAY);
 
-
 	color_keyframe::Ptr k(
-					new color_keyframe(rgb, gray, depth, Sophus::SE3f(q,t),
-							intrinsics));
+			new color_keyframe(rgb, gray, depth, Sophus::SE3f(q, t),
+					intrinsics));
+
+	k->set_id(res->getDouble("id"));
 
 	return k;
+}
 
+boost::shared_ptr<keyframe_map> util::get_robot_map(int robot_id) {
+	sql::ResultSet *res;
+	res =
+			sql_query(
+					"SELECT * FROM keyframe WHERE map_id = ( SELECT map_id FROM robot WHERE id = "
+							+ boost::lexical_cast<std::string>(robot_id)
+							+ " )");
+
+	boost::shared_ptr<keyframe_map> map(new keyframe_map);
+
+	while (res->next()) {
+		map->frames.push_back(get_keyframe(res));
+	}
+
+	return map;
 }
 

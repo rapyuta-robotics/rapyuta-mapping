@@ -47,11 +47,10 @@ int main(int argc, char **argv) {
 	//map.frames.resize(150);
 	//map.align_z_axis();
 
-	print_map_positions(map);
+	//print_map_positions(map);
 
 
 	std::cerr << map.frames.size() << std::endl;
-	for (int i = 0; i < 100; i++) {
 		map.optimize_g2o();
 
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
@@ -62,9 +61,10 @@ int main(int argc, char **argv) {
 		pointcloud_pub.publish(cloud);
 
 
-	}
+		map.save(std::string(argv[1]) + "_optimized");
 
-	print_map_positions(map);
+
+	//print_map_positions(map);
 
 	return 0;
 

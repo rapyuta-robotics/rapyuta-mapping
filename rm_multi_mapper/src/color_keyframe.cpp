@@ -89,7 +89,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr color_keyframe::get_colored_pointcloud(
 		for (int u = 0; u < cols; u += subsample) {
 			int i = v * cols + u;
 			Eigen::Vector4f vec = clouds[0].col(i);
-			if (vec(3) > 0) {
+			if (vec(3) > 0 && vec(2) < 4) {
 
 				cv::Vec3b color = rgb.at<cv::Vec3b>(v, u);
 

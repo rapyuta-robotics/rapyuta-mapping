@@ -358,26 +358,25 @@ float keyframe_map::optimize_panorama(int level) {
 	 overlaping_keyframes.begin(), overlaping_keyframes.end()));
 	 */
 
-	//Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
-	Eigen::VectorXf update =
-			-rj.JtJ.block(3, 3, (size - 1) * 3, (size - 1) * 3).ldlt().solve(
-					rj.Jte.segment(3, (size - 1) * 3));
+	Eigen::VectorXf update = -rj.JtJ.ldlt().solve(rj.Jte);
+	//Eigen::VectorXf update =
+	///		-rj.JtJ.block(3, 3, (size - 1) * 3, (size - 1) * 3).ldlt().solve(
+	//				rj.Jte.segment(3, (size - 1) * 3));
 
 	iteration_max_update = std::max(std::abs(update.maxCoeff()),
 			std::abs(update.minCoeff()));
 
 	ROS_INFO("Max update %f", iteration_max_update);
 
-	for (int i = 0; i < size - 1; i++) {
+	for (int i = 0; i < size; i++) {
 
-		frames[i + 1]->get_pos().so3() = Sophus::SO3f::exp(
-				update.segment<3>(i * 3)) * frames[i + 1]->get_pos().so3();
-		frames[i + 1]->get_pos().translation() =
-				frames[0]->get_pos().translation();
+		frames[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
+				* frames[i]->get_pos().so3();
+		frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
 		//std::cout<<frames[i]->get_pos();
-		//frames[i]->get_intrinsics().array() =
-		//		update.segment<3>(size * 3).array().exp()
-		//				* frames[i]->get_intrinsics().array();
+		frames[i]->get_intrinsics().array() =
+				update.segment<3>(size * 3).array().exp()
+						* frames[i]->get_intrinsics().array();
 		if (i == 0) {
 			Eigen::Vector3f intrinsics = frames[i]->get_intrinsics();
 			ROS_INFO("New intrinsics %f, %f, %f", intrinsics(0), intrinsics(1),
@@ -541,10 +540,39 @@ void keyframe_map::optimize_g2o() {
 
 	size_t size = frames.size();
 
-	reduce_measurement_g2o rm(frames, measurements, descriptors_vector,
-			keypoints_vector, size);
+	tbb::concurrent_vector<std::pair<int, int> > overlaping_keyframes;
 
-	//tbb::parallel_reduce(tbb::blocked_range<int>(0, size), rm);
+
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			if (i != j) {
+				float angle =
+						frames[i]->get_pos().unit_quaternion().angularDistance(
+								frames[j]->get_pos().unit_quaternion());
+
+				float distance = (frames[i]->get_pos().translation()
+						- frames[j]->get_pos().translation()).norm();
+
+				if (angle < M_PI / 4 && distance < 3) {
+					overlaping_keyframes.push_back(std::make_pair(i, j));
+					ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
+				}
+			}
+		}
+
+	}
+
+	reduce_measurement_g2o rm(frames, size);
+
+	tbb::parallel_reduce(
+			tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+					overlaping_keyframes.begin(), overlaping_keyframes.end()),
+			rm);
+
+	//rm(tbb::blocked_range<
+	//				tbb::concurrent_vector<std::pair<int, int> >::iterator>(
+	//				overlaping_keyframes.begin(), overlaping_keyframes.end()));
 
 	//for(int i=0; i<rm.m.size(); i++) {
 	//	measurements.push_back(rm.m[i]);
@@ -614,29 +642,10 @@ void keyframe_map::optimize_g2o() {
 				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
 						j)->second));
 		e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
-		e->information() =  Sophus::Matrix6d::Identity();
+		e->information() = Sophus::Matrix6d::Identity();
 
 		optimizer.addEdge(e);
 
-	}
-
-	{
-
-		int i = 0;
-		int j = size - 1;
-
-		g2o::EdgeSE3 * e = new g2o::EdgeSE3();
-
-		e->setVertex(0,
-				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
-						i)->second));
-		e->setVertex(1,
-				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
-						j)->second));
-		e->setMeasurement(Eigen::Isometry3d::Identity());
-		e->information() = 0.01 * Sophus::Matrix6d::Identity();
-
-		optimizer.addEdge(e);
 	}
 
 	optimizer.save("debug.txt");
@@ -762,30 +771,6 @@ cv::Mat keyframe_map::get_panorama_image() {
 	}
 
 	return res / w;
-}
-
-void keyframe_map::add_keypoints() {
-
-	cv::Ptr<cv::FeatureDetector> fd;
-	cv::Ptr<cv::DescriptorExtractor> de;
-	cv::Ptr<cv::DescriptorMatcher> dm;
-
-	init_feature_detector(fd, de, dm);
-
-	for (int i = 0; i < frames.size(); i++) {
-
-		std::vector<cv::KeyPoint> keypoints;
-		pcl::PointCloud<pcl::PointXYZ> keypoints3d;
-		cv::Mat descriptors;
-
-		compute_features(frames[i]->get_i(0), frames[i]->get_d(0),
-				frames[i]->get_intrinsics(0), fd, de, keypoints, keypoints3d,
-				descriptors);
-
-		descriptors_vector.push_back(descriptors);
-		keypoints_vector.push_back(keypoints3d);
-
-	}
 }
 
 void keyframe_map::save(const std::string & dir_name) {

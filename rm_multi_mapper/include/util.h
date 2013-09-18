@@ -45,9 +45,13 @@ class util {
         void add_keyframe(int robot_id, const color_keyframe::Ptr & k);
         color_keyframe::Ptr get_keyframe(long frame_id);
 
+        boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
+
     private:
         sql::Driver *driver;
         sql::Connection *con;
+
+        color_keyframe::Ptr get_keyframe(sql::ResultSet * res);
 };
 
 
