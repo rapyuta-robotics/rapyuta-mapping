@@ -1,5 +1,6 @@
 #include <frame.h>
 #include <cassert>
+#include <tbb/parallel_for.h>
 //#include <opencv2/highgui/highgui.hpp>
 
 frame::frame(const cv::Mat & yuv, const cv::Mat & depth,

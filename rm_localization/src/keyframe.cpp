@@ -1,6 +1,7 @@
 #include <keyframe.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <tbb/parallel_for.h>
 
 keyframe::keyframe(const cv::Mat & yuv, const cv::Mat & depth,
 		const Sophus::SE3f & position, const Eigen::Vector3f & intrinsics,

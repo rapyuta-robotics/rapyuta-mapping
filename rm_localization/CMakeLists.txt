@@ -37,7 +37,7 @@ else(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
 endif(NOT ${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "armv7l")
 
 
-rosbuild_add_library(${PROJECT_NAME} src/frame.cpp src/keyframe.cpp)
+rosbuild_add_library(${PROJECT_NAME} src/frame.cpp src/keyframe.cpp src/reduce_jacobian_generated.cpp  src/reduce_jacobian.cpp)
 target_link_libraries(${PROJECT_NAME} tbb)
 
 rosbuild_add_executable(localization src/main.cpp)
