@@ -9,7 +9,7 @@ def repl1(m):
     return 'M' + m.group(1) + m.group(2) + '(' + m.group(3) + ',' + m.group(4) + ')'
     
 def repl2(m):                                                                  
-    return 'p' + m.group(1) + ' * p' + m.group(1)
+    return '( p' + m.group(1) + ' * p' + m.group(1) + ' )'
     
 def repl3(m):                                                                  
     return 'p(' + m.group(1) + ')'
