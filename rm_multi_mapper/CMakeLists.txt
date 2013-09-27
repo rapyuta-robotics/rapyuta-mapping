@@ -34,46 +34,31 @@ rosbuild_genmsg()
 find_package(VTK REQUIRED)
 include_directories(${VTK_INCLUDE_DIRS})
 
+############################## Library ###########################
+
 rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_slam.cpp
 src/reduce_jacobian_slam_3d.cpp src/reduce_jacobian_ros.cpp src/reduce_measurement_g2o.cpp 
 src/robot_mapper.cpp src/util.cpp )
 target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn PocoFoundation PocoNet g2o_types_slam3d g2o_solver_cholmod cholmod)
 
-#rosbuild_add_executable(test_keyframe_extraction src/test_keyframe_extraction.cpp)
-#target_link_libraries(test_keyframe_extraction ${PROJECT_NAME})
+############################## Local ###########################
 
+rosbuild_add_executable(merge_maps src/merge_maps.cpp)
+target_link_libraries(merge_maps ${PROJECT_NAME})
 
-#rosbuild_add_library(${PROJECT_NAME} src/robot_mapper.cpp src/icp_map.cpp src/color_keyframe.cpp
-# src/reduce_jacobian_icp.cpp src/reduce_jacobian_rgb.cpp src/reduce_jacobian_icp_p2p.cpp src/reduce_jacobian_rgb_3d.cpp
-# src/panorama_map.cpp)
-#target_link_libraries(${PROJECT_NAME} tbb rm_localization_util)
+rosbuild_add_executable(optimize_map src/optimize_map.cpp)
+target_link_libraries(optimize_map ${PROJECT_NAME})
+
+rosbuild_add_executable(show_map src/show_map.cpp)
+target_link_libraries(show_map ${VTK_LIBRARIES} ${PROJECT_NAME})
+
+rosbuild_add_executable(optimize_panorama_map src/optimize_panorama_map.cpp)
+target_link_libraries(optimize_panorama_map ${PROJECT_NAME})
 
 rosbuild_add_executable(multi_mapper src/main.cpp)
 target_link_libraries(multi_mapper ${PROJECT_NAME})
 
-#rosbuild_add_executable(ransac_test src/test.cpp src/robot_mapper.cpp src/keypoint_map.cpp)
-#target_link_libraries(ransac_test cholmod vtkCommon vtkFiltering rm_localization_util)
-
-#rosbuild_add_executable(test2 src/test2.cpp)
-
-#rosbuild_add_executable(ba_demo src/ba_demo.cpp)
-#target_link_libraries(ba_demo cholmod)
-
-#rosbuild_add_executable(test_lkt src/test_lkt.cpp)
-
-rosbuild_add_executable(test_icp src/test_icp.cpp)
-target_link_libraries(test_icp ${PROJECT_NAME})
-
-rosbuild_add_executable(test_merge src/test_merge.cpp)
-target_link_libraries(test_merge ${VTK_LIBRARIES} ${PROJECT_NAME})
-
-rosbuild_add_executable(test_show src/test_show.cpp)
-target_link_libraries(test_show ${VTK_LIBRARIES} ${PROJECT_NAME})
-
-#rosbuild_add_executable(test_rgbd src/test_rgbd.cpp)
-
-rosbuild_add_executable(test_panorama src/test_panorama.cpp)
-target_link_libraries(test_panorama ${PROJECT_NAME})
+############################## Parallel ###########################
 
 rosbuild_add_executable(worker src/worker.cpp)
 target_link_libraries(worker ${PROJECT_NAME} mysqlcppconn)

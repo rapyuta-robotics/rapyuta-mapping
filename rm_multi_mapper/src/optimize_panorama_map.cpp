@@ -19,31 +19,12 @@
 #include "std_msgs/Float32.h"
 #include "std_msgs/Int32.h"
 
-void print_map_positions(keyframe_map & map) {
-	std::cout << "====================================" << std::endl;
-
-	Eigen::Matrix4f Mbc;
-
-	Mbc << -2.38419e-07,    -0.198669,     0.980067,    0.0391773,
-	          -1, -2.38419e-07,            0,       0.0265,
-	           0,    -0.980067,     -0.19867,     0.620467,
-	           0,            0,            0,            1;
-
-	Eigen::Affine3f Mbcc(Mbc);
-	Sophus::SE3f Mbc_pos(Mbcc.rotation(), Mbcc.translation());
-
-	for(int i=0; i<map.frames.size(); i++) {
-		Sophus::SE3f pos = map.frames[i]->get_pos() * Mbc_pos.inverse();
-		std::cout << i << " " << pos.translation().transpose() << " " << pos.unit_quaternion().coeffs().transpose() << std::endl;
-	}
-}
-
 
 int main(int argc, char **argv) {
 
 	keyframe_map map;
 
-	ros::init(argc, argv, "multi_mapper");
+	ros::init(argc, argv, "optimize_panorama_map");
 	ros::NodeHandle nh;
 
 	ros::Publisher pointcloud_pub = nh.advertise<
@@ -51,12 +32,6 @@ int main(int argc, char **argv) {
    	
 	map.load(argv[1]);
 
-	//cv::imshow("img", map.get_panorama_image());
-	//cv::waitKey(3);
-
-	//map.frames.resize(33);
-
-	print_map_positions(map);
 
 	std::cerr << map.frames.size() << std::endl;
 	for (int level = 2; level >= 0; level--) {
@@ -70,18 +45,10 @@ int main(int argc, char **argv) {
 	        		cloud->header.seq = 0;
 	        		pointcloud_pub.publish(cloud);
 
-			//cv::imshow("img", map.get_panorama_image());
-			//cv::waitKey(3);
-
 			if (max_update < 1e-4)
 			    break;
 		}
 	}
-
-	print_map_positions(map);
-
-	cv::imshow("img", map.get_panorama_image());
-	cv::waitKey();
 
 	map.save(std::string(argv[1]) + "_optimized");
 

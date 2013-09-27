@@ -14,12 +14,8 @@
 int main(int argc, char **argv) {
 	keyframe_map map1, map2;
 
-	map2.load("turn0_optimized");
-	map1.load("corner0");
-
-	//cv::imshow("img1", map1.get_panorama_image());
-	//cv::imshow("img2", map2.get_panorama_image());
-	//cv::waitKey();
+	map1.load(argv[1]);
+	map2.load(argv[2]);
 
 	int iteration = 0;
 	Sophus::SE3f transform;
@@ -29,7 +25,7 @@ int main(int argc, char **argv) {
 	}
 
 	map1.merge(map2, transform);
-	map1.save("corner0_merged");
+	map1.save(std::string(argv[1]) + "_merged");
 
 	return 0;
 

@@ -12,31 +12,31 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
 #include <cmath>
-#include <pcl/visualization/pcl_visualizer.h>
 
 #include <keyframe_map.h>
 
 int main(int argc, char **argv) {
 
-	ros::init(argc, argv, "multi_mapper");
+	ros::init(argc, argv, "optimize_map");
 	ros::NodeHandle nh;
 
 	ros::Publisher pointcloud_pub = nh.advertise<
-			pcl::PointCloud<pcl::PointXYZRGB> >("/pointcloud", 1);
+			pcl::PointCloud<pcl::PointXYZRGB> >("pointcloud", 1);
 
 	keyframe_map map;
 	map.load(argv[1]);
 
 	std::cerr << map.frames.size() << std::endl;
+	map.optimize_g2o();
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
 
-	cloud->header.frame_id = "/world";
+	cloud->header.frame_id = "world";
 	cloud->header.stamp = ros::Time::now();
 	cloud->header.seq = 0;
 	pointcloud_pub.publish(cloud);
 
-	ros::spin();
+	map.save(std::string(argv[1]) + "_optimized");
 
 	return 0;
 
