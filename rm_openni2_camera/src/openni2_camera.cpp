@@ -64,7 +64,7 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh,
 		exit(2);
 	}
 
-	rc = color.getCameraSettings()->setAutoExposureEnabled(false);
+	rc = color.getCameraSettings()->setAutoExposureEnabled(true);
 	if (rc != STATUS_OK) {
 		printf("Couldn't disable auto exposure\n%s\n",
 				OpenNI::getExtendedError());
@@ -112,11 +112,11 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh,
 		exit(2);
 	}
 
-	rc = color.getCameraSettings()->setExposure(10);
-	if (rc != STATUS_OK) {
-		printf("Couldn't set exposure\n%s\n", OpenNI::getExtendedError());
-		exit(2);
-	}
+	//rc = color.getCameraSettings()->setExposure(10);
+	//if (rc != STATUS_OK) {
+	//	printf("Couldn't set exposure\n%s\n", OpenNI::getExtendedError());
+	//	exit(2);
+	//}
 
 	dc.reset(new FrameCallback(nh, nh_private, "depth"));
 	rgbc.reset(new FrameCallback(nh, nh_private, "rgb"));
