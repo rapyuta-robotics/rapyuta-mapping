@@ -29,7 +29,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: PointCloud2
   - Class: rviz/Displays
     Help Height: 78
     Name: Displays
@@ -37,8 +37,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /cloudbot01/PointCloud21
-        - /cloudbot11
-        - /Grid1
       Splitter Ratio: 0.5
     Tree Height: 775
   - Class: rviz/Views
@@ -303,17 +301,17 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 25.1473
+      Distance: 14.8487
       Focal Point:
-        X: -0.616131
-        Y: -3.36871
-        Z: 0.33125
+        X: -4.35602
+        Y: -2.59913
+        Z: -0.275838
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.619797
+      Pitch: 1.4752
       Target Frame: /world
       Value: Orbit (rviz)
-      Yaw: 2.6686
+      Yaw: 0.603598
     Saved:
       - Class: rviz/Orbit
         Distance: 13.1667
@@ -343,5 +341,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1855
-  X: 65
+  X: 58
   Y: 24

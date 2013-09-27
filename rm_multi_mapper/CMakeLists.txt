@@ -55,8 +55,8 @@ target_link_libraries(show_map ${VTK_LIBRARIES} ${PROJECT_NAME})
 rosbuild_add_executable(optimize_panorama_map src/optimize_panorama_map.cpp)
 target_link_libraries(optimize_panorama_map ${PROJECT_NAME})
 
-rosbuild_add_executable(multi_mapper src/main.cpp)
-target_link_libraries(multi_mapper ${PROJECT_NAME})
+rosbuild_add_executable(rotation_demo src/rotation_demo.cpp)
+target_link_libraries(rotation_demo ${PROJECT_NAME})
 
 ############################## Parallel ###########################
 
