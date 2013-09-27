@@ -32,15 +32,15 @@ void run_on_all_robots(F f, P p) {
 bool start_capturing(std_srvs::Empty::Request &req,
 		std_srvs::Empty::Response &res) {
 
-	//run_on_all_robots(&robot_mapper::capture_sphere);
-	//run_on_all_robots(&robot_mapper::optmize_panorama);
+	run_on_all_robots(&robot_mapper::capture_sphere);
+	run_on_all_robots(&robot_mapper::optmize_panorama);
 	//run_on_all_robots(&robot_mapper::move_straight, 5);
 	//run_on_all_robots(&robot_mapper::capture_sphere);
 	//run_on_all_robots(&robot_mapper::start_optimization_loop);
-	run_on_all_robots(&robot_mapper::save_map, "corner");
+	run_on_all_robots(&robot_mapper::save_map, "room_");
 
-	//while (!robot_mappers[0]->merge(*robot_mappers[1]))
-	//	;
+	while (!robot_mappers[0]->merge(*robot_mappers[1]))
+		;
 
 	return true;
 }
