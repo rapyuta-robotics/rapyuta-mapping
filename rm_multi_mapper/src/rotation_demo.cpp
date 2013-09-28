@@ -3,7 +3,7 @@
 #include <robot_mapper.h>
 
 const int robot_offset = 0;
-const int num_robots = 1;
+const int num_robots = 2;
 const std::string prefix = "cloudbot";
 std::vector<robot_mapper::Ptr> robot_mappers(num_robots);
 
