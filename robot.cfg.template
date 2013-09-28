@@ -69,14 +69,14 @@
             "iTag"  : "TurtlebotMoveActionStatusConverter$hostname", 
             "iType" : "SubscriberConverter",
             "iCls"  : "actionlib_msgs/GoalStatusArray", 
-            "addr"  : "/cloudbot0/turtlebot_move/status"
+            "addr"  : "/$hostname/turtlebot_move/status"
         },
 	{
             "eTag"  : "cloud_container",
             "iTag"  : "TurtlebotMoveActionStatusInterface$hostname", 
             "iType" : "PublisherInterface",
             "iCls"  : "actionlib_msgs/GoalStatusArray", 
-            "addr"  : "/cloudbot0/turtlebot_move/status"
+            "addr"  : "/$hostname/turtlebot_move/status"
         },
 
  	
