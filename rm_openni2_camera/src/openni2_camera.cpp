@@ -64,7 +64,7 @@ OpenNI2Camera::OpenNI2Camera(ros::NodeHandle & nh,
 		exit(2);
 	}
 
-	rc = color.getCameraSettings()->setAutoExposureEnabled(true);
+	rc = color.getCameraSettings()->setAutoExposureEnabled(false);
 	if (rc != STATUS_OK) {
 		printf("Couldn't disable auto exposure\n%s\n",
 				OpenNI::getExtendedError());
