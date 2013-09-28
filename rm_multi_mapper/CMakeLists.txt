@@ -58,6 +58,9 @@ target_link_libraries(optimize_panorama_map ${PROJECT_NAME})
 rosbuild_add_executable(rotation_demo src/rotation_demo.cpp)
 target_link_libraries(rotation_demo ${PROJECT_NAME})
 
+rosbuild_add_executable(teleop_demo src/teleop_demo.cpp)
+target_link_libraries(teleop_demo ${PROJECT_NAME})
+
 ############################## Parallel ###########################
 
 rosbuild_add_executable(worker src/worker.cpp)
