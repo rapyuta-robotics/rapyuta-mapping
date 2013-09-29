@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
 
 	int iteration = 0;
 	Sophus::SE3f transform;
-	while(!map1.find_transform(map2, transform)) {
+	while (!map1.find_transform(map2, transform)) {
 		std::cout << iteration << std::endl;
 		iteration++;
 	}

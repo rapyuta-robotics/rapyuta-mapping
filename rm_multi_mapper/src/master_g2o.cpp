@@ -59,126 +59,119 @@ typedef unsigned long long timestamp_t;
 typedef rm_multi_mapper::G2oWorkerAction action_t;
 typedef actionlib::SimpleActionClient<action_t> action_client;
 
-void get_pairs(std::vector<std::pair<int, int> > & overlapping_keyframes, util U) {
-        sql::ResultSet *res;
-        res = U.sql_query("SELECT f1.id as id1, f2.id as id2 FROM keyframe f1, "
-        		"keyframe f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
-        		" + f1.q3*f2.q3) >= 1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 +"
-        		" f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) AND f1.id < f2.id AND"
-        		" SQRT(POWER((f1.t0 - f2.t0), 2) + POWER((f1.t1 - f2.t1), 2) +"
-        		" POWER((f1.t2 - f2.t2), 2)) < 3 ;");
+void get_pairs(std::vector<std::pair<int, int> > & overlapping_keyframes,
+		util U) {
+	sql::ResultSet *res;
+	res = U.sql_query("SELECT f1.id as id1, f2.id as id2 FROM keyframe f1, "
+			"keyframe f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
+			" + f1.q3*f2.q3) >= 1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 +"
+			" f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) AND f1.id < f2.id AND"
+			" SQRT(POWER((f1.t0 - f2.t0), 2) + POWER((f1.t1 - f2.t1), 2) +"
+			" POWER((f1.t2 - f2.t2), 2)) < 3 ;");
 
-        while (res->next())
-        {
-            overlapping_keyframes.push_back(std::make_pair(res->getInt("id1"),
-                                                           res->getInt("id2")));
-        }
-        delete res;
+	while (res->next()) {
+		overlapping_keyframes.push_back(
+				std::make_pair(res->getInt("id1"), res->getInt("id2")));
+	}
+	delete res;
 
 }
 void truncate_measurement(util U) {
-		sql::ResultSet *res;
-		res = U.sql_query("TRUNCATE TABLE measurement");
-		delete res;
+	sql::ResultSet *res;
+	res = U.sql_query("TRUNCATE TABLE measurement");
+	delete res;
 }
 
 /*static timestamp_t get_timestamp ()
-{
-    struct timeval now;
-    gettimeofday (&now, NULL);
-    return  now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
-}*/
+ {
+ struct timeval now;
+ gettimeofday (&now, NULL);
+ return  now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
+ }*/
 
 int main(int argc, char **argv) {
 
 	boost::shared_ptr<keyframe_map> map;
 	std::vector<measurement> m;
-    util U;
+	util U;
 
-    //timestamp_t t0 = get_timestamp();
+	//timestamp_t t0 = get_timestamp();
 
-    std::vector<std::pair<int, int> > overlapping_keyframes;
-    int size;
-    int workers = argc-1;
+	std::vector<std::pair<int, int> > overlapping_keyframes;
+	int size;
+	int workers = argc - 1;
 
-    map = U.get_robot_map(0);
+	map = U.get_robot_map(0);
 
-    ros::init(argc, argv, "multi_map");
+	ros::init(argc, argv, "multi_map");
 	ros::NodeHandle nh;
 	ros::Publisher pointcloud_pub = nh.advertise<
-				pcl::PointCloud<pcl::PointXYZRGB> >("pointcloud", 1);
+			pcl::PointCloud<pcl::PointXYZRGB> >("pointcloud", 1);
 
-    std::vector<action_client* > ac_list;
+	std::vector<action_client*> ac_list;
 
-    for(int i=0; i<workers; i++)
-    {
-        action_client* ac = new action_client(std::string(argv[i+1]), true);
-        ac_list.push_back(ac);
-    }
+	for (int i = 0; i < workers; i++) {
+		action_client* ac = new action_client(std::string(argv[i + 1]), true);
+		ac_list.push_back(ac);
+	}
 
-    sql::ResultSet *res;
+	sql::ResultSet *res;
 
-    size = map->frames.size();
+	size = map->frames.size();
 	get_pairs(overlapping_keyframes, U);
 	truncate_measurement(U);
 	std::vector<rm_multi_mapper::G2oWorkerGoal> goals;
-    int keyframes_size = (int)overlapping_keyframes.size();
+	int keyframes_size = (int) overlapping_keyframes.size();
 
-	for(int k=0; k<workers; k++)
-	{
-        rm_multi_mapper::G2oWorkerGoal goal;
+	for (int k = 0; k < workers; k++) {
+		rm_multi_mapper::G2oWorkerGoal goal;
 
-        int last_elem = (keyframes_size/workers)*(k+1);
-        if (k == workers-1) last_elem = keyframes_size;
+		int last_elem = (keyframes_size / workers) * (k + 1);
+		if (k == workers - 1)
+			last_elem = keyframes_size;
 
-        for(int i=(keyframes_size/workers)*k; i<last_elem; i++)
-        {
-            rm_multi_mapper::KeyframePair keyframe;
+		for (int i = (keyframes_size / workers) * k; i < last_elem; i++) {
+			rm_multi_mapper::KeyframePair keyframe;
 
-            keyframe.first = overlapping_keyframes[i].first;
-            keyframe.second = overlapping_keyframes[i].second;
-            goal.Overlap.push_back(keyframe);
-        }
-        goals.push_back(goal);
-    }
+			keyframe.first = overlapping_keyframes[i].first;
+			keyframe.second = overlapping_keyframes[i].second;
+			goal.Overlap.push_back(keyframe);
+		}
+		goals.push_back(goal);
+	}
 
-    ROS_INFO("Waiting for action server to start.");
-    for(int i=0; i<workers; i++)
-    {
-        ac_list[i]->waitForServer();
-    }
+	ROS_INFO("Waiting for action server to start.");
+	for (int i = 0; i < workers; i++) {
+		ac_list[i]->waitForServer();
+	}
 
-    ROS_INFO("Action server started, sending goal.");
+	ROS_INFO("Action server started, sending goal.");
 
-    // send a goal to the action
-    for(int i=0; i<workers; i++)
-    {
-        ac_list[i]->sendGoal(goals[i]);
-    }
+	// send a goal to the action
+	for (int i = 0; i < workers; i++) {
+		ac_list[i]->sendGoal(goals[i]);
+	}
 
+	//wait for the action to return
+	std::vector<bool> finished;
+	for (int i = 0; i < workers; i++) {
+		bool finished_before_timeout = ac_list[i]->waitForResult(
+				ros::Duration(3600.0));
+		finished.push_back(finished_before_timeout);
+	}
 
-    //wait for the action to return
-    std::vector<bool> finished;
-    for(int i=0; i<workers; i++)
-    {
-        bool finished_before_timeout = ac_list[i]->waitForResult(ros::Duration(3600.0));
-        finished.push_back(finished_before_timeout);
-    }
+	bool success = true;
+	for (int i = 0; i < workers; i++) {
+		success = finished[i] && success;
+	}
 
-    bool success = true;
-    for(int i=0; i<workers; i++)
-    {
-        success = finished[i] && success;
-    }
-
-    if(success)
-    {
-		std::cout<<success<<std::endl;
+	if (success) {
+		std::cout << success << std::endl;
 		U.load_measurements(m);
 
 		map->optimize_g2o_min(m);
 
-    }
+	}
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_map_pointcloud();
 
@@ -187,10 +180,10 @@ int main(int argc, char **argv) {
 	cloud->header.seq = 0;
 	pointcloud_pub.publish(cloud);
 
-    /*timestamp_t t1 = get_timestamp();
+	/*timestamp_t t1 = get_timestamp();
 
-    double secs = (t1 - t0) / 1000000.0L;
-    std::cout<<secs<<std::endl;*/
-    return 0;
+	 double secs = (t1 - t0) / 1000000.0L;
+	 std::cout<<secs<<std::endl;*/
+	return 0;
 
 }

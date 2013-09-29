@@ -28,90 +28,79 @@
 #include <cppconn/resultset.h>
 #include <cppconn/prepared_statement.h>
 
-class WorkerAction
-{
-    protected:
-        ros::NodeHandle nh_;
-        actionlib::SimpleActionServer<rm_multi_mapper::WorkerAction> as_; 
-        std::string action_name_;
-        rm_multi_mapper::WorkerFeedback feedback_;
-        rm_multi_mapper::WorkerResult result_;
-        std::vector<color_keyframe::Ptr> frames_;
+class WorkerAction {
+protected:
+	ros::NodeHandle nh_;
+	actionlib::SimpleActionServer<rm_multi_mapper::WorkerAction> as_;
+	std::string action_name_;
+	rm_multi_mapper::WorkerFeedback feedback_;
+	rm_multi_mapper::WorkerResult result_;
+	std::vector<color_keyframe::Ptr> frames_;
 
-    public:
+public:
 
-        WorkerAction(std::string name) :
-            as_(nh_, name, boost::bind(&WorkerAction::executeCB, this, _1), false),
-            action_name_(name)
-        {
-            as_.start();
-            util U;
-            U.load("http://localhost/keyframe_map", frames_); 
-        }
+	WorkerAction(std::string name) :
+			as_(nh_, name, boost::bind(&WorkerAction::executeCB, this, _1),
+					false), action_name_(name) {
+		as_.start();
+		util U;
+		U.load("http://localhost/keyframe_map", frames_);
+	}
 
-        ~WorkerAction(void)
-        {
-        }
+	~WorkerAction(void) {
+	}
 
-        void eigen2vector(rm_multi_mapper::Vector & v1, const Eigen::VectorXf & Jte) {
-            for(int i=0;i<Jte.size();i++)
-            {
-                v1.vector.push_back(Jte[i]);
-            }    
-        }
-        
-        void eigen2matrix(rm_multi_mapper::Matrix & m1, const Eigen::MatrixXf & JtJ) {
-            for(int i=0;i<JtJ.rows();i++)
-            {
-                rm_multi_mapper::Vector row;
-                for(int j=0;j<JtJ.cols();j++)
-                {
-                    row.vector.push_back(JtJ(i,j));
+	void eigen2vector(rm_multi_mapper::Vector & v1,
+			const Eigen::VectorXf & Jte) {
+		for (int i = 0; i < Jte.size(); i++) {
+			v1.vector.push_back(Jte[i]);
+		}
+	}
 
-                }
-                m1.matrix.push_back(row);
-            }
-        }
+	void eigen2matrix(rm_multi_mapper::Matrix & m1,
+			const Eigen::MatrixXf & JtJ) {
+		for (int i = 0; i < JtJ.rows(); i++) {
+			rm_multi_mapper::Vector row;
+			for (int j = 0; j < JtJ.cols(); j++) {
+				row.vector.push_back(JtJ(i, j));
 
-        void executeCB(const rm_multi_mapper::WorkerGoalConstPtr &goal)
-        {
-            ros::Rate r(1);
-            bool success = true;
+			}
+			m1.matrix.push_back(row);
+		}
+	}
 
-            if (as_.isPreemptRequested() || !ros::ok())
-            {
-                ROS_INFO("%s: Preempted", action_name_.c_str());
-                as_.setPreempted();
-                success = false;
-            }
-            
-            
-            reduce_jacobian_ros rj(frames_, frames_.size(), 0);
-            
-            rj.reduce(goal);
-            
-            if(success)
-            {
-            
-                eigen2vector(result_.Jte, rj.Jte);
+	void executeCB(const rm_multi_mapper::WorkerGoalConstPtr &goal) {
+		ros::Rate r(1);
+		bool success = true;
 
-                eigen2matrix(result_.JtJ, rj.JtJ);
+		if (as_.isPreemptRequested() || !ros::ok()) {
+			ROS_INFO("%s: Preempted", action_name_.c_str());
+			as_.setPreempted();
+			success = false;
+		}
 
-                ROS_INFO("%s: Succeeded", action_name_.c_str());
-                as_.setSucceeded(result_);
-            }
-        }
+		reduce_jacobian_ros rj(frames_, frames_.size(), 0);
 
+		rj.reduce(goal);
+
+		if (success) {
+
+			eigen2vector(result_.Jte, rj.Jte);
+
+			eigen2matrix(result_.JtJ, rj.JtJ);
+
+			ROS_INFO("%s: Succeeded", action_name_.c_str());
+			as_.setSucceeded(result_);
+		}
+	}
 
 };
 
+int main(int argc, char** argv) {
+	ros::init(argc, argv, argv[1]);
+	WorkerAction worker(ros::this_node::getName());
+	ros::spin();
 
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, argv[1]);
-    WorkerAction worker(ros::this_node::getName());
-    ros::spin();
-
-    return 0;
+	return 0;
 }
 

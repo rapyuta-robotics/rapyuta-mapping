@@ -211,8 +211,7 @@ bool reduce_measurement_g2o::find_transform(const color_keyframe::Ptr & fi,
 }
 
 reduce_measurement_g2o::reduce_measurement_g2o(
-		const tbb::concurrent_vector<color_keyframe::Ptr> & frames,
-		int size) :
+		const tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size) :
 		size(size), frames(frames) {
 
 	init_feature_detector();
@@ -233,7 +232,6 @@ reduce_measurement_g2o::reduce_measurement_g2o(reduce_measurement_g2o& rb,
 	boost::shared_ptr<PointToPlane> point_to_plane(new PointToPlane);
 	icp.setTransformationEstimation(point_to_plane);
 }
-
 
 void reduce_measurement_g2o::add_icp_measurement(int i, int j) {
 
@@ -315,7 +313,7 @@ void reduce_measurement_g2o::operator()(
 		int i = it->first;
 		int j = it->second;
 
-		add_ransac_measurement(i,j);
+		add_ransac_measurement(i, j);
 
 	}
 

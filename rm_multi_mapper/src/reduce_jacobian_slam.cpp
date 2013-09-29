@@ -20,9 +20,8 @@ reduce_jacobian_slam::reduce_jacobian_slam(
 }
 
 // Miw = Mij * Mjw
-void reduce_jacobian_slam::compute_frame_jacobian(
-		const Eigen::Matrix4f & Mwi, const Eigen::Matrix4f & Miw,
-		Eigen::Matrix<float, 6, 6> & Ji) {
+void reduce_jacobian_slam::compute_frame_jacobian(const Eigen::Matrix4f & Mwi,
+		const Eigen::Matrix4f & Miw, Eigen::Matrix<float, 6, 6> & Ji) {
 
 	Ji(0, 0) = Miw(0, 0);
 	Ji(0, 1) = Miw(0, 1);
@@ -189,8 +188,8 @@ void reduce_jacobian_slam::add_rgbd_measurement(int i, int j) {
 
 }
 
-void reduce_jacobian_slam::compute_floor_jacobian(float nx, float ny, float nz, float y, float x,
-		Eigen::Matrix<float, 3, 6> & Ji) {
+void reduce_jacobian_slam::compute_floor_jacobian(float nx, float ny, float nz,
+		float y, float x, Eigen::Matrix<float, 3, 6> & Ji) {
 	Ji(0, 0) = 0;
 	Ji(0, 1) = 0;
 	Ji(0, 2) = 0;
@@ -216,7 +215,7 @@ void reduce_jacobian_slam::add_floor_measurement(int i) {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud = frames[i]->get_pointcloud(8,
 			true, -0.2, 0.2);
 
-	if(cloud->size() < 30)
+	if (cloud->size() < 30)
 		return;
 
 	pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
@@ -236,7 +235,7 @@ void reduce_jacobian_slam::add_floor_measurement(int i) {
 	seg.setInputCloud(cloud);
 	seg.segment(*inliers, *coefficients);
 
-	if(inliers->indices.size() < 100)
+	if (inliers->indices.size() < 100)
 		return;
 
 	//std::cerr << "Model coefficients: " << coefficients->values[0] << " "
@@ -244,7 +243,7 @@ void reduce_jacobian_slam::add_floor_measurement(int i) {
 	//		<< coefficients->values[3] << " Num inliers "
 	//		<< inliers->indices.size() << std::endl;
 
-	if(coefficients->values[2]  < 0.9)
+	if (coefficients->values[2] < 0.9)
 		return;
 
 	Eigen::Matrix<float, 3, 6> Ji;
@@ -262,9 +261,10 @@ void reduce_jacobian_slam::add_floor_measurement(int i) {
 
 }
 
-void reduce_jacobian_slam::reduce(const rm_multi_mapper::WorkerSlamGoalConstPtr &goal) {
+void reduce_jacobian_slam::reduce(
+		const rm_multi_mapper::WorkerSlamGoalConstPtr &goal) {
 
-	for (int k=0; k<(int)goal->Overlap.size(); k++) {
+	for (int k = 0; k < (int) goal->Overlap.size(); k++) {
 		int i = goal->Overlap[k].first;
 		int j = goal->Overlap[k].second;
 

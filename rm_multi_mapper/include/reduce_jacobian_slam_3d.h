@@ -25,19 +25,19 @@ struct reduce_jacobian_slam_3d {
 	Eigen::VectorXf Jte;
 	int size;
 
-	typedef pcl::registration::TransformationEstimationPointToPlane<pcl::PointNormal, pcl::PointNormal> PointToPlane;
+	typedef pcl::registration::TransformationEstimationPointToPlane<
+			pcl::PointNormal, pcl::PointNormal> PointToPlane;
 	pcl::IterativeClosestPoint<pcl::PointNormal, pcl::PointNormal> icp;
 
 	tbb::concurrent_vector<color_keyframe::Ptr> & frames;
 
-	reduce_jacobian_slam_3d(tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size);
+	reduce_jacobian_slam_3d(
+			tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size);
 
 	reduce_jacobian_slam_3d(reduce_jacobian_slam_3d & rb, tbb::split);
 
-	void compute_frame_jacobian(
-			const Eigen::Matrix4f & Mwi,
-			const Eigen::Matrix4f & Miw,
-			Eigen::Matrix<float, 6, 6> & Ji);
+	void compute_frame_jacobian(const Eigen::Matrix4f & Mwi,
+			const Eigen::Matrix4f & Miw, Eigen::Matrix<float, 6, 6> & Ji);
 
 	void add_icp_measurement(int i, int j);
 	void add_rgbd_measurement(int i, int j);

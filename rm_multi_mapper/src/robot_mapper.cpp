@@ -112,11 +112,13 @@ void robot_mapper::turn_to_initial_heading() {
 	tf::StampedTransform transform;
 	try {
 		ros::Time t = ros::Time::now();
-		lr.waitForTransform(prefix + "/base_footprint", prefix + "/odom_combined", t, ros::Duration(5));
-		lr.lookupTransform(prefix + "/base_footprint", prefix + "/odom_combined", t, transform);
+		lr.waitForTransform(prefix + "/base_footprint",
+				prefix + "/odom_combined", t, ros::Duration(5));
+		lr.lookupTransform(prefix + "/base_footprint",
+				prefix + "/odom_combined", t, transform);
 
 		tf::Quaternion q;
-		q.setEuler(0,0,0);
+		q.setEuler(0, 0, 0);
 		float angle = transform.getRotation().angle(q);
 		turn(angle);
 
@@ -297,16 +299,21 @@ void robot_mapper::update_map(bool with_intrinsics) {
 
 		Sophus::SE3f position = map->frames[i]->get_pos();
 
+		update_map_msg.request.transform[i].unit_quaternion[0] =
+				position.unit_quaternion().coeffs()[0];
+		update_map_msg.request.transform[i].unit_quaternion[1] =
+				position.unit_quaternion().coeffs()[1];
+		update_map_msg.request.transform[i].unit_quaternion[2] =
+				position.unit_quaternion().coeffs()[2];
+		update_map_msg.request.transform[i].unit_quaternion[3] =
+				position.unit_quaternion().coeffs()[3];
 
-		update_map_msg.request.transform[i].unit_quaternion[0] = position.unit_quaternion().coeffs()[0];
-		update_map_msg.request.transform[i].unit_quaternion[1] = position.unit_quaternion().coeffs()[1];
-		update_map_msg.request.transform[i].unit_quaternion[2] = position.unit_quaternion().coeffs()[2];
-		update_map_msg.request.transform[i].unit_quaternion[3] = position.unit_quaternion().coeffs()[3];
-
-		update_map_msg.request.transform[i].position[0] = position.translation()[0];
-		update_map_msg.request.transform[i].position[1] = position.translation()[1];
-		update_map_msg.request.transform[i].position[2] = position.translation()[2];
-
+		update_map_msg.request.transform[i].position[0] =
+				position.translation()[0];
+		update_map_msg.request.transform[i].position[1] =
+				position.translation()[1];
+		update_map_msg.request.transform[i].position[2] =
+				position.translation()[2];
 
 	}
 

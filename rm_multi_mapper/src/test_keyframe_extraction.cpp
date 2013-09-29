@@ -93,15 +93,15 @@ public:
 		float desired_angle = 0;
 
 		/*
-		if (map->frames.size() > 0) {
-			Sophus::SE3f position =
-					map->frames[map->frames.size() - 1]->get_pos();
-			Eigen::Vector3f current_heading = position.unit_quaternion()
-					* Eigen::Vector3f::UnitZ();
+		 if (map->frames.size() > 0) {
+		 Sophus::SE3f position =
+		 map->frames[map->frames.size() - 1]->get_pos();
+		 Eigen::Vector3f current_heading = position.unit_quaternion()
+		 * Eigen::Vector3f::UnitZ();
 
-			current_angle = std::atan2(-current_heading(1), current_heading(0));
-			desired_angle = std::asin(position.translation()(1)/10.0);
-		}*/
+		 current_angle = std::atan2(-current_heading(1), current_heading(0));
+		 desired_angle = std::asin(position.translation()(1)/10.0);
+		 }*/
 
 		turtlebot_actions::TurtlebotMoveGoal goal;
 		goal.forward_distance = 25.0;
@@ -119,7 +119,6 @@ public:
 			ROS_INFO("Action finished: %s", state.toString().c_str());
 		} else
 			ROS_INFO("Action did not finish before the time out.");
-
 
 		map->save("corridor_map");
 
@@ -204,35 +203,37 @@ public:
 
 			Eigen::Vector3f intrinsics = map->frames[0]->get_intrinsics();
 
+			sensor_msgs::SetCameraInfo s;
+			s.request.camera_info.width = map->frames[0]->get_i(0).cols;
+			s.request.camera_info.height = map->frames[0]->get_i(0).rows;
 
-			 sensor_msgs::SetCameraInfo s;
-			 s.request.camera_info.width = map->frames[0]->get_i(0).cols;
-			 s.request.camera_info.height = map->frames[0]->get_i(0).rows;
+			// No distortion
+			s.request.camera_info.D.resize(5, 0.0);
+			s.request.camera_info.distortion_model =
+					sensor_msgs::distortion_models::PLUMB_BOB;
 
-			 // No distortion
-			 s.request.camera_info.D.resize(5, 0.0);
-			 s.request.camera_info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+			// Simple camera matrix: square pixels (fx = fy), principal point at center
+			s.request.camera_info.K.assign(0.0);
+			s.request.camera_info.K[0] = s.request.camera_info.K[4] =
+					intrinsics[0];
+			s.request.camera_info.K[2] = intrinsics[1];
+			s.request.camera_info.K[5] = intrinsics[2];
+			s.request.camera_info.K[8] = 1.0;
 
-			 // Simple camera matrix: square pixels (fx = fy), principal point at center
-			 s.request.camera_info.K.assign(0.0);
-			 s.request.camera_info.K[0] = s.request.camera_info.K[4] = intrinsics[0];
-			 s.request.camera_info.K[2] = intrinsics[1];
-			 s.request.camera_info.K[5] = intrinsics[2];
-			 s.request.camera_info.K[8] = 1.0;
+			// No separate rectified image plane, so R = I
+			s.request.camera_info.R.assign(0.0);
+			s.request.camera_info.R[0] = s.request.camera_info.R[4] =
+					s.request.camera_info.R[8] = 1.0;
 
-			 // No separate rectified image plane, so R = I
-			 s.request.camera_info.R.assign(0.0);
-			 s.request.camera_info.R[0] = s.request.camera_info.R[4] = s.request.camera_info.R[8] = 1.0;
+			// Then P=K(I|0) = (K|0)
+			s.request.camera_info.P.assign(0.0);
+			s.request.camera_info.P[0] = s.request.camera_info.P[5] =
+					s.request.camera_info.K[0]; // fx, fy
+			s.request.camera_info.P[2] = s.request.camera_info.K[2]; // cx
+			s.request.camera_info.P[6] = s.request.camera_info.K[5]; // cy
+			s.request.camera_info.P[10] = 1.0;
 
-			 // Then P=K(I|0) = (K|0)
-			 s.request.camera_info.P.assign(0.0);
-			 s.request.camera_info.P[0] = s.request.camera_info.P[5] = s.request.camera_info.K[0]; // fx, fy
-			 s.request.camera_info.P[2] = s.request.camera_info.K[2]; // cx
-			 s.request.camera_info.P[6] = s.request.camera_info.K[5]; // cy
-			 s.request.camera_info.P[10] = 1.0;
-
-			 set_camera_info_service.call(s);
-
+			set_camera_info_service.call(s);
 
 			memcpy(update_map_msg.request.intrinsics.data(), intrinsics.data(),
 					3 * sizeof(float));

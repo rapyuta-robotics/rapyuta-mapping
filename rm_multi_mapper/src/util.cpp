@@ -63,7 +63,7 @@ cv::Mat util::stringtoMat(string file) {
 sql::ResultSet* util::sql_query(std::string query) {
 	try {
 		driver = get_driver_instance();
-		if(driver != NULL) {
+		if (driver != NULL) {
 			con = driver->connect("tcp://localhost:3306", "root", "123456");
 			con->setSchema("multimap");
 			sql::PreparedStatement *pstmt;
@@ -75,10 +75,8 @@ sql::ResultSet* util::sql_query(std::string query) {
 
 			delete pstmt;
 			return res;
-		}
-		else
-		{
-			std::cout<<"Driver NULL\n";
+		} else {
+			std::cout << "Driver NULL\n";
 		}
 
 	} catch (sql::SQLException &e) {
@@ -322,17 +320,16 @@ void util::load_measurements(std::vector<measurement> &m) {
 		t[2] = res->getDouble("t2");
 
 		m[i].transform = Sophus::SE3f(q, t);
-		m[i].mt = (measurement_type)res->getInt64("type");
+		m[i].mt = (measurement_type) res->getInt64("type");
 		i++;
 
 	}
 }
 void util::save_measurements(const std::vector<measurement> &m) {
-	for(int i=0; i<m.size(); i++) {
+	for (int i = 0; i < m.size(); i++) {
 		try {
-			sql::PreparedStatement *pstmt =
-					con->prepareStatement(
-							"INSERT INTO measurement (`one`, `two`, `q0`, `q1`, "
+			sql::PreparedStatement *pstmt = con->prepareStatement(
+					"INSERT INTO measurement (`one`, `two`, `q0`, `q1`, "
 							"`q2`, `q3`, `t0`, `t1`, `t2`, `type`) VALUES "
 							"(?,?,?,?,?,?,?,?,?,?)");
 
@@ -365,41 +362,41 @@ void util::save_measurements(const std::vector<measurement> &m) {
 
 void util::add2DB(const std::string & dir_name, int robot_id) {
 
-		std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
+	std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
 
-		std::ifstream f((dir_name + "/positions.txt").c_str(),
-				std::ios_base::binary);
-		while (f) {
-			Eigen::Quaternionf q;
-			Eigen::Vector3f t;
-			Eigen::Vector3f intrinsics;
+	std::ifstream f((dir_name + "/positions.txt").c_str(),
+			std::ios_base::binary);
+	while (f) {
+		Eigen::Quaternionf q;
+		Eigen::Vector3f t;
+		Eigen::Vector3f intrinsics;
 
-			f.read((char *) q.coeffs().data(), sizeof(float) * 4);
-			f.read((char *) t.data(), sizeof(float) * 3);
-			f.read((char *) intrinsics.data(), sizeof(float) * 3);
+		f.read((char *) q.coeffs().data(), sizeof(float) * 4);
+		f.read((char *) t.data(), sizeof(float) * 3);
+		f.read((char *) intrinsics.data(), sizeof(float) * 3);
 
-			positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
-		}
+		positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
+	}
 
-		positions.pop_back();
+	positions.pop_back();
 
-		std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
+	std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
 
-		for (size_t i = 0; i < positions.size(); i++) {
-			cv::Mat rgb = cv::imread(
-					dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
-							+ ".png", CV_LOAD_IMAGE_UNCHANGED);
-			cv::Mat depth = cv::imread(
-					dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
-							+ ".png", CV_LOAD_IMAGE_UNCHANGED);
+	for (size_t i = 0; i < positions.size(); i++) {
+		cv::Mat rgb = cv::imread(
+				dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
+						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
+		cv::Mat depth = cv::imread(
+				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
+						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
 
-			cv::Mat gray;
-			cv::cvtColor(rgb, gray, CV_RGB2GRAY);
+		cv::Mat gray;
+		cv::cvtColor(rgb, gray, CV_RGB2GRAY);
 
-			color_keyframe::Ptr k(
-					new color_keyframe(rgb, gray, depth, positions[i].first,
-							positions[i].second));
-			k->set_id(robot_id*4294967296 + i);
-			add_keyframe(robot_id, k);
-		}
+		color_keyframe::Ptr k(
+				new color_keyframe(rgb, gray, depth, positions[i].first,
+						positions[i].second));
+		k->set_id(robot_id * 4294967296 + i);
+		add_keyframe(robot_id, k);
+	}
 }

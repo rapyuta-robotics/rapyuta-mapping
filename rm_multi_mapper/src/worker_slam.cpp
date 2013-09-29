@@ -21,90 +21,79 @@
 #include <actionlib/server/simple_action_server.h>
 #include "rm_multi_mapper/WorkerSlamAction.h"
 
-class WorkerSlamAction
-{
-    protected:
-        ros::NodeHandle nh_;
-        actionlib::SimpleActionServer<rm_multi_mapper::WorkerSlamAction> as_; 
-        std::string action_name_;
-        rm_multi_mapper::WorkerSlamFeedback feedback_;
-        rm_multi_mapper::WorkerSlamResult result_;
-        std::vector<color_keyframe::Ptr> frames_;
+class WorkerSlamAction {
+protected:
+	ros::NodeHandle nh_;
+	actionlib::SimpleActionServer<rm_multi_mapper::WorkerSlamAction> as_;
+	std::string action_name_;
+	rm_multi_mapper::WorkerSlamFeedback feedback_;
+	rm_multi_mapper::WorkerSlamResult result_;
+	std::vector<color_keyframe::Ptr> frames_;
 
-    public:
+public:
 
-        WorkerSlamAction(std::string name) :
-            as_(nh_, name, boost::bind(&WorkerSlamAction::executeCB, this, _1), false),
-            action_name_(name)
-        {
-            as_.start();
-            util U;
-            U.load("http://localhost/corridor_map2", frames_); 
-        }
+	WorkerSlamAction(std::string name) :
+			as_(nh_, name, boost::bind(&WorkerSlamAction::executeCB, this, _1),
+					false), action_name_(name) {
+		as_.start();
+		util U;
+		U.load("http://localhost/corridor_map2", frames_);
+	}
 
-        ~WorkerSlamAction(void)
-        {
-        }
+	~WorkerSlamAction(void) {
+	}
 
-        void eigen2vector(rm_multi_mapper::Vector & v1, const Eigen::VectorXf & Jte) {
-            for(int i=0;i<Jte.size();i++)
-            {
-                v1.vector.push_back(Jte[i]);
-            }    
-        }
-        
-        void eigen2matrix(rm_multi_mapper::Matrix & m1, const Eigen::MatrixXf & JtJ) {
-            for(int i=0;i<JtJ.rows();i++)
-            {
-                rm_multi_mapper::Vector row;
-                for(int j=0;j<JtJ.cols();j++)
-                {
-                    row.vector.push_back(JtJ(i,j));
+	void eigen2vector(rm_multi_mapper::Vector & v1,
+			const Eigen::VectorXf & Jte) {
+		for (int i = 0; i < Jte.size(); i++) {
+			v1.vector.push_back(Jte[i]);
+		}
+	}
 
-                }
-                m1.matrix.push_back(row);
-            }
-        }
+	void eigen2matrix(rm_multi_mapper::Matrix & m1,
+			const Eigen::MatrixXf & JtJ) {
+		for (int i = 0; i < JtJ.rows(); i++) {
+			rm_multi_mapper::Vector row;
+			for (int j = 0; j < JtJ.cols(); j++) {
+				row.vector.push_back(JtJ(i, j));
 
-        void executeCB(const rm_multi_mapper::WorkerSlamGoalConstPtr &goal)
-        {
-            ros::Rate r(1);
-            bool success = true;
+			}
+			m1.matrix.push_back(row);
+		}
+	}
 
-            if (as_.isPreemptRequested() || !ros::ok())
-            {
-                ROS_INFO("%s: Preempted", action_name_.c_str());
-                as_.setPreempted();
-                success = false;
-            }
-            
-            
-            reduce_jacobian_slam rj(frames_, frames_.size());
-            
-            rj.reduce(goal);
-            
-            if(success)
-            {
-            
-                eigen2vector(result_.Jte, rj.Jte);
+	void executeCB(const rm_multi_mapper::WorkerSlamGoalConstPtr &goal) {
+		ros::Rate r(1);
+		bool success = true;
 
-                eigen2matrix(result_.JtJ, rj.JtJ);
+		if (as_.isPreemptRequested() || !ros::ok()) {
+			ROS_INFO("%s: Preempted", action_name_.c_str());
+			as_.setPreempted();
+			success = false;
+		}
 
-                ROS_INFO("%s: Succeeded", action_name_.c_str());
-                as_.setSucceeded(result_);
-            }
-        }
+		reduce_jacobian_slam rj(frames_, frames_.size());
 
+		rj.reduce(goal);
+
+		if (success) {
+
+			eigen2vector(result_.Jte, rj.Jte);
+
+			eigen2matrix(result_.JtJ, rj.JtJ);
+
+			ROS_INFO("%s: Succeeded", action_name_.c_str());
+			as_.setSucceeded(result_);
+		}
+	}
 
 };
 
+int main(int argc, char** argv) {
+	ros::init(argc, argv, argv[1]);
+	WorkerSlamAction worker(ros::this_node::getName());
+	ros::spin();
 
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, argv[1]);
-    WorkerSlamAction worker(ros::this_node::getName());
-    ros::spin();
-
-    return 0;
+	return 0;
 }
 

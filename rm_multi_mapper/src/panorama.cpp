@@ -34,201 +34,189 @@
 #include <cppconn/prepared_statement.h>
 
 void get_pairs(std::vector<std::pair<int, int> > & overlapping_keyframes) {
-        sql::ResultSet *res;
-        util U;
-        res = U.sql_query("SELECT f1.id as id1, f2.id as id2 FROM positions f1, positions f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3) >=1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/6) AND f1.id <> f2.id;");
+	sql::ResultSet *res;
+	util U;
+	res =
+			U.sql_query(
+					"SELECT f1.id as id1, f2.id as id2 FROM positions f1, positions f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3) >=1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/6) AND f1.id <> f2.id;");
 
-        while (res->next())
-        {
-            overlapping_keyframes.push_back(std::make_pair(res->getInt("id1"), 
-                                                           res->getInt("id2")));
-        }
-        delete res;
+	while (res->next()) {
+		overlapping_keyframes.push_back(
+				std::make_pair(res->getInt("id1"), res->getInt("id2")));
+	}
+	delete res;
 
 }
 
 void matrix2eigen(const rm_multi_mapper::Matrix & m1, Eigen::MatrixXf & eigen) {
 
-    for(int i=0;i<(int)m1.matrix.size();i++)
-    {
-        for(int j=0;j<(int)m1.matrix[0].vector.size();j++)
-        {
-            eigen(i,j) = m1.matrix[i].vector[j];
-            
-        }
-    }    
+	for (int i = 0; i < (int) m1.matrix.size(); i++) {
+		for (int j = 0; j < (int) m1.matrix[0].vector.size(); j++) {
+			eigen(i, j) = m1.matrix[i].vector[j];
+
+		}
+	}
 }
 
 void vector2eigen(const rm_multi_mapper::Vector & v1, Eigen::VectorXf & eigen) {
-    for(int i=0;i<(int)v1.vector.size();i++)
-    {
-        eigen[i] = v1.vector[i];
-    }
+	for (int i = 0; i < (int) v1.vector.size(); i++) {
+		eigen[i] = v1.vector[i];
+	}
 }
 
 typedef unsigned long long timestamp_t;
 
-static timestamp_t get_timestamp ()
-{
-    struct timeval now;
-    gettimeofday (&now, NULL);
-    return  now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
+static timestamp_t get_timestamp() {
+	struct timeval now;
+	gettimeofday(&now, NULL);
+	return now.tv_usec + (timestamp_t) now.tv_sec * 1000000;
 }
 
 int main(int argc, char **argv) {
 
-    std::vector<color_keyframe::Ptr> frames;
-    util U;
-    U.load("http://localhost/keyframe_map", frames);
-    timestamp_t t0 = get_timestamp();
-    std::vector<std::pair<int, int> > overlapping_keyframes;
-    int size;
-    int workers = argc-1;
-    ros::init(argc, argv, "panorama");
-	
-    std::vector<actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>* > ac_list;
-    for(int i=0; i<workers; i++)
-    {
-        actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>* ac = 
-            new actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>(std::string(argv[i+1]),true);
-        ac_list.push_back(ac);
-    }
+	std::vector<color_keyframe::Ptr> frames;
+	util U;
+	U.load("http://localhost/keyframe_map", frames);
+	timestamp_t t0 = get_timestamp();
+	std::vector<std::pair<int, int> > overlapping_keyframes;
+	int size;
+	int workers = argc - 1;
+	ros::init(argc, argv, "panorama");
 
-    sql::ResultSet *res;
+	std::vector<actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>*> ac_list;
+	for (int i = 0; i < workers; i++) {
+		actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>* ac =
+				new actionlib::SimpleActionClient<rm_multi_mapper::WorkerAction>(
+						std::string(argv[i + 1]), true);
+		ac_list.push_back(ac);
+	}
 
-    size = frames.size();
+	sql::ResultSet *res;
+
+	size = frames.size();
 	get_pairs(overlapping_keyframes);
 	std::vector<rm_multi_mapper::WorkerGoal> goals;
-    int keyframes_size = (int)overlapping_keyframes.size();	
+	int keyframes_size = (int) overlapping_keyframes.size();
 
-	for(int k=0; k<workers; k++)
-	{
-        rm_multi_mapper::WorkerGoal goal;
+	for (int k = 0; k < workers; k++) {
+		rm_multi_mapper::WorkerGoal goal;
 
-        int last_elem = (keyframes_size/workers)*(k+1);
-        if (k == workers-1) last_elem = keyframes_size;
+		int last_elem = (keyframes_size / workers) * (k + 1);
+		if (k == workers - 1)
+			last_elem = keyframes_size;
 
-        for(int i=(keyframes_size/workers)*k; i<last_elem; i++)
-        {
-            rm_multi_mapper::KeyframePair keyframe;
+		for (int i = (keyframes_size / workers) * k; i < last_elem; i++) {
+			rm_multi_mapper::KeyframePair keyframe;
 
-            keyframe.first = overlapping_keyframes[i].first;
-            keyframe.second = overlapping_keyframes[i].second;
-            goal.Overlap.push_back(keyframe);
-        }
-        goals.push_back(goal);
-    }
-    
-    ROS_INFO("Waiting for action server to start.");
-    for(int i=0; i<workers; i++)
-    {
-        ac_list[i]->waitForServer(); 
-    }
+			keyframe.first = overlapping_keyframes[i].first;
+			keyframe.second = overlapping_keyframes[i].second;
+			goal.Overlap.push_back(keyframe);
+		}
+		goals.push_back(goal);
+	}
 
-    ROS_INFO("Action server started, sending goal.");
-    
-    // send a goal to the action
-    for(int i=0; i<workers; i++)
-    {
-        ac_list[i]->sendGoal(goals[i]); 
-    }
-    
+	ROS_INFO("Waiting for action server to start.");
+	for (int i = 0; i < workers; i++) {
+		ac_list[i]->waitForServer();
+	}
 
-    //wait for the action to return
-    std::vector<bool> finished;
-    for(int i=0; i<workers; i++)
-    {
-        bool finished_before_timeout = ac_list[i]->waitForResult(ros::Duration(30.0));
-        finished.push_back(finished_before_timeout);
-    }
-    
-    bool success = true;
-    for(int i=0; i<workers; i++)
-    {
-        success = finished[i] && success;
-    }
-    
-    Eigen::MatrixXf acc_JtJ;
-    acc_JtJ.setZero(size * 3 + 3, size * 3 + 3);
-    Eigen::VectorXf acc_Jte;
-    acc_Jte.setZero(size * 3 + 3);
-    
-    if (success)
-    {
+	ROS_INFO("Action server started, sending goal.");
 
-   	    for(int i=0; i<workers; i++)
-   	    {
-   	        Eigen::MatrixXf JtJ;
-            JtJ.setZero(size * 3 + 3, size * 3 + 3);
-   	        Eigen::VectorXf Jte;
-   	        Jte.setZero(size * 3 + 3);
-   	        
-    	    rm_multi_mapper::Vector rosJte = ac_list[i]->getResult()->Jte;
-    	    rm_multi_mapper::Matrix rosJtJ = ac_list[i]->getResult()->JtJ;
-    	   	
-            vector2eigen(rosJte, Jte);
-            matrix2eigen(rosJtJ, JtJ);
-            
-            acc_JtJ += JtJ;
-            acc_Jte += Jte;
-        }
-        
-    }
-    else 
-    {
-        ROS_INFO("Action did not finish before the time out.");
-        std::exit(0);
-    }
-    
-    Eigen::VectorXf update = -acc_JtJ.ldlt().solve(acc_Jte);
+	// send a goal to the action
+	for (int i = 0; i < workers; i++) {
+		ac_list[i]->sendGoal(goals[i]);
+	}
 
-    float iteration_max_update = std::max(std::abs(update.maxCoeff()),
-            std::abs(update.minCoeff()));
+	//wait for the action to return
+	std::vector<bool> finished;
+	for (int i = 0; i < workers; i++) {
+		bool finished_before_timeout = ac_list[i]->waitForResult(
+				ros::Duration(30.0));
+		finished.push_back(finished_before_timeout);
+	}
 
-    ROS_INFO("Max update %f", iteration_max_update);
+	bool success = true;
+	for (int i = 0; i < workers; i++) {
+		success = finished[i] && success;
+	}
 
-    /*for (int i = 0; i < (int)frames.size(); i++) {
+	Eigen::MatrixXf acc_JtJ;
+	acc_JtJ.setZero(size * 3 + 3, size * 3 + 3);
+	Eigen::VectorXf acc_Jte;
+	acc_Jte.setZero(size * 3 + 3);
 
-        frames[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
-                * frames[i]->get_pos().so3();
-        frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
-        frames[i]->get_intrinsics().array() =
-                update.segment<3>(size * 3).array().exp()
-		                * frames[i]->get_intrinsics().array();
+	if (success) {
 
-        std::string query = "UPDATE `positions` SET `q0` = " + 
-        boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[0]) +
-        ", `q1` = " +
-        boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[1]) +
-        ", `q2` = " +
-        boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[2]) +
-        ", `q3` = " +
-        boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[3]) +
-        ", `t0` = " +
-		boost::lexical_cast<std::string>(frames[i]->get_pos().translation()[0]) +
-		", `t1` = " +
-		boost::lexical_cast<std::string>(frames[i]->get_pos().translation()[1]) +
-		", `t2` = " +
-		boost::lexical_cast<std::string>(frames[i]->get_pos().translation()[2]) +
-        ", `int0` = " +
-       	boost::lexical_cast<std::string>(frames[i]->get_intrinsics().array()[0]) +
-       	", `int1` = " +
-       	boost::lexical_cast<std::string>(frames[i]->get_intrinsics().array()[1]) +
-       	", `int2` = " +
-       	boost::lexical_cast<std::string>(frames[i]->get_intrinsics().array()[2]) +
-       	" WHERE `id` = " +
-       	boost::lexical_cast<std::string>(i) +
-       	";";
+		for (int i = 0; i < workers; i++) {
+			Eigen::MatrixXf JtJ;
+			JtJ.setZero(size * 3 + 3, size * 3 + 3);
+			Eigen::VectorXf Jte;
+			Jte.setZero(size * 3 + 3);
 
-        res = U.sql_query(query);
-        delete res;
-        
+			rm_multi_mapper::Vector rosJte = ac_list[i]->getResult()->Jte;
+			rm_multi_mapper::Matrix rosJtJ = ac_list[i]->getResult()->JtJ;
 
-    }*/
-    timestamp_t t1 = get_timestamp();
+			vector2eigen(rosJte, Jte);
+			matrix2eigen(rosJtJ, JtJ);
 
-    double secs = (t1 - t0) / 1000000.0L;
-    std::cout<<secs<<std::endl;
-    return 0;
+			acc_JtJ += JtJ;
+			acc_Jte += Jte;
+		}
+
+	} else {
+		ROS_INFO("Action did not finish before the time out.");
+		std::exit(0);
+	}
+
+	Eigen::VectorXf update = -acc_JtJ.ldlt().solve(acc_Jte);
+
+	float iteration_max_update = std::max(std::abs(update.maxCoeff()),
+			std::abs(update.minCoeff()));
+
+	ROS_INFO("Max update %f", iteration_max_update);
+
+	/*for (int i = 0; i < (int)frames.size(); i++) {
+
+	 frames[i]->get_pos().so3() = Sophus::SO3f::exp(update.segment<3>(i * 3))
+	 * frames[i]->get_pos().so3();
+	 frames[i]->get_pos().translation() = frames[0]->get_pos().translation();
+	 frames[i]->get_intrinsics().array() =
+	 update.segment<3>(size * 3).array().exp()
+	 * frames[i]->get_intrinsics().array();
+
+	 std::string query = "UPDATE `positions` SET `q0` = " + 
+	 boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[0]) +
+	 ", `q1` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[1]) +
+	 ", `q2` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[2]) +
+	 ", `q3` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_pos().so3().data()[3]) +
+	 ", `t0` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_pos().translation()[0]) +
+	 ", `t1` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_pos().translation()[1]) +
+	 ", `t2` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_pos().translation()[2]) +
+	 ", `int0` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_intrinsics().array()[0]) +
+	 ", `int1` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_intrinsics().array()[1]) +
+	 ", `int2` = " +
+	 boost::lexical_cast<std::string>(frames[i]->get_intrinsics().array()[2]) +
+	 " WHERE `id` = " +
+	 boost::lexical_cast<std::string>(i) +
+	 ";";
+
+	 res = U.sql_query(query);
+	 delete res;
+	 
+
+	 }*/
+	timestamp_t t1 = get_timestamp();
+
+	double secs = (t1 - t0) / 1000000.0L;
+	std::cout << secs << std::endl;
+	return 0;
 
 }

@@ -44,7 +44,6 @@ public:
 	void start_optimization_loop();
 	void stop_optimization_loop();
 
-
 protected:
 
 	void keyframeCallback(const rm_localization::Keyframe::ConstPtr& msg);
@@ -54,8 +53,6 @@ protected:
 	void publish_cloud();
 
 	void optimization_loop();
-
-
 
 	int robot_num;
 	std::string prefix;
