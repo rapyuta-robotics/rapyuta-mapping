@@ -18,7 +18,7 @@
 #include <cppconn/prepared_statement.h>
 
 #include <keyframe_map.h>
-
+#include <reduce_measurement_g2o_dist.h>
 static bool factoryLoaded = false;
 
 class DataBuf : public streambuf
@@ -40,16 +40,20 @@ class util {
         sql::ResultSet* sql_query(std::string query);
         void load_mysql(std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > & positions);
         void load(const std::string & dir_name, std::vector<color_keyframe::Ptr> & frames);
+        void add2DB(const std::string & dir_name, int robot_id);
+        void save_measurements(const std::vector<measurement> &m);
+        void load_measurements(std::vector<measurement> &m);
 
         int get_new_robot_id();
         void add_keyframe(int robot_id, const color_keyframe::Ptr & k);
         color_keyframe::Ptr get_keyframe(long frame_id);
 
         boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
+        sql::Connection *con;
 
     private:
         sql::Driver *driver;
-        sql::Connection *con;
+
 
         color_keyframe::Ptr get_keyframe(sql::ResultSet * res);
 };

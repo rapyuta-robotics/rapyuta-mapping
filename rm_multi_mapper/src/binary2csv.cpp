@@ -15,10 +15,13 @@
 #include <pcl/visualization/pcl_visualizer.h>
 
 #include <keyframe_map.h>
+#include <util.h>
 
 int main(int argc, char **argv) {
 
-	std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
+	util U;
+	U.add2DB((std::string)argv[1], 0);
+	/*std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
 
 	std::ifstream f(((std::string)argv[1] + "/positions.txt").c_str(),
 			std::ios_base::binary);
@@ -37,7 +40,7 @@ int main(int argc, char **argv) {
         std::cout<<","<<t[0]<<","<<t[1]<<","<<t[2]<<","<<intrinsics[0];
         std::cout<<","<<intrinsics[1]<<","<<intrinsics[2]<<std::endl;
         i++;
-	}
+	}*/
 
 }
 
