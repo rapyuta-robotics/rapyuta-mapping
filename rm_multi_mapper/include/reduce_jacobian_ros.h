@@ -22,16 +22,16 @@ struct reduce_jacobian_ros {
 
 	std::vector<color_keyframe::Ptr> & frames;
 
-    reduce_jacobian_ros(std::vector<color_keyframe::Ptr> & frames,
-			int size, int subsample_level);
+	reduce_jacobian_ros(std::vector<color_keyframe::Ptr> & frames, int size,
+			int subsample_level);
 
 	void compute_frame_jacobian(const Eigen::Vector3f & i,
 			const Eigen::Matrix3f & Rwi, const Eigen::Matrix3f & Rwj,
-			Eigen::Matrix<float, 9, 3> & Ji, Eigen::Matrix<float, 9, 3> & Jj, Eigen::Matrix<float, 9, 3> & Jk);
+			Eigen::Matrix<float, 9, 3> & Ji, Eigen::Matrix<float, 9, 3> & Jj,
+			Eigen::Matrix<float, 9, 3> & Jk);
 
 	void reduce(const rm_multi_mapper::WorkerGoalConstPtr &goal);
 
 };
-
 
 #endif /* REDUCE_JACOBIAN_ROS_H_ */

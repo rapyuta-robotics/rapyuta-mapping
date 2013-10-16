@@ -5,9 +5,6 @@
  *      Author: vsu
  */
 
-
-
-
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -104,7 +101,6 @@ public:
 		sync->registerCallback(
 				boost::bind(&CaptureServer::RGBDCallback, this, _1, _2, _3));
 
-
 		tracked_points.reset(new std::vector<cv::Vec2f>);
 
 	}
@@ -112,41 +108,38 @@ public:
 	~CaptureServer(void) {
 	}
 
-
-
 	void RGBDCallback(const sensor_msgs::Image::ConstPtr& yuv2_msg,
 			const sensor_msgs::Image::ConstPtr& depth_msg,
 			const sensor_msgs::CameraInfo::ConstPtr& info_msg) {
 
-
 		cv_bridge::CvImagePtr gray = cv_bridge::toCvCopy(yuv2_msg,
 				sensor_msgs::image_encodings::MONO8);
 
-
-		if(tracked_points->size() == 0) {
-			cv::goodFeaturesToTrack(gray->image, *tracked_points, 400, 0.01, 10);
+		if (tracked_points->size() == 0) {
+			cv::goodFeaturesToTrack(gray->image, *tracked_points, 400, 0.01,
+					10);
 
 			prev_img = gray->image;
 
 		} else {
 
-
-			boost::shared_ptr<std::vector<cv::Vec2f> > current_tracked_points(new std::vector<cv::Vec2f>);
+			boost::shared_ptr<std::vector<cv::Vec2f> > current_tracked_points(
+					new std::vector<cv::Vec2f>);
 			std::vector<unsigned char> status;
 			std::vector<float> error;
 
 			current_img = gray->image;
-			cv::calcOpticalFlowPyrLK(prev_img, current_img, *tracked_points, *current_tracked_points, status, error);
-
+			cv::calcOpticalFlowPyrLK(prev_img, current_img, *tracked_points,
+					*current_tracked_points, status, error);
 
 			cv::Mat rgb;
 			cv::cvtColor(gray->image, rgb, CV_GRAY2BGR);
 
-			for(size_t i=0; i<tracked_points->size(); i++) {
+			for (size_t i = 0; i < tracked_points->size(); i++) {
 				cv::Point2f p = tracked_points->at(i);
-				cv::circle(rgb, cv::Point2i(p.x, p.y), 3, cv::Scalar(255,0,0));
+				cv::circle(rgb, cv::Point2i(p.x, p.y), 3,
+						cv::Scalar(255, 0, 0));
 			}
-
 
 			cv::imshow("Tracked features", rgb);
 			cv::waitKey(2);
@@ -156,9 +149,7 @@ public:
 
 		}
 
-
 	}
-
 
 };
 

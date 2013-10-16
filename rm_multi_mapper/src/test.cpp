@@ -41,7 +41,6 @@ int main() {
 
 	std::vector<cv::Vec2f> vec1, vec2;
 
-
 	cv::Mat res;
 	cv::drawMatches(rgb1, keypoints1, rgb2, keypoints2, matched_filtered, res,
 			cv::Scalar(0, 255, 0));

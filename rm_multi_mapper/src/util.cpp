@@ -9,9 +9,7 @@ using Poco::Net::HTTPStreamFactory;
 using namespace std;
 
 util::util() {
-	driver = get_driver_instance();
-	con = driver->connect("tcp://localhost:3306", "mapping", "123456");
-	con->setSchema("mapping");
+
 }
 
 util::~util() {
@@ -64,16 +62,22 @@ cv::Mat util::stringtoMat(string file) {
 
 sql::ResultSet* util::sql_query(std::string query) {
 	try {
+		driver = get_driver_instance();
+		if (driver != NULL) {
+			con = driver->connect("tcp://localhost:3306", "root", "123456");
+			con->setSchema("multimap");
+			sql::PreparedStatement *pstmt;
+			sql::ResultSet *res;
 
-		sql::PreparedStatement *pstmt;
-		sql::ResultSet *res;
+			/* Select in ascending order */
+			pstmt = con->prepareStatement(query);
+			res = pstmt->executeQuery();
 
-		/* Select in ascending order */
-		pstmt = con->prepareStatement(query);
-		res = pstmt->executeQuery();
-
-		delete pstmt;
-		return res;
+			delete pstmt;
+			return res;
+		} else {
+			std::cout << "Driver NULL\n";
+		}
 
 	} catch (sql::SQLException &e) {
 		std::cout << "# ERR: SQLException in " << __FILE__;
@@ -294,3 +298,105 @@ boost::shared_ptr<keyframe_map> util::get_robot_map(int robot_id) {
 	return map;
 }
 
+void util::load_measurements(std::vector<measurement> &m) {
+
+	sql::ResultSet *res;
+	res = sql_query("SELECT * FROM measurement");
+	int i = 0;
+	while (res->next()) {
+		m.push_back(measurement());
+		Eigen::Quaternionf q;
+		Eigen::Vector3f t;
+
+		m[i].i = res->getInt64("one");
+		m[i].j = res->getInt64("two");
+
+		q.coeffs()[0] = res->getDouble("q0");
+		q.coeffs()[1] = res->getDouble("q1");
+		q.coeffs()[2] = res->getDouble("q2");
+		q.coeffs()[3] = res->getDouble("q3");
+		t[0] = res->getDouble("t0");
+		t[1] = res->getDouble("t1");
+		t[2] = res->getDouble("t2");
+
+		m[i].transform = Sophus::SE3f(q, t);
+		m[i].mt = (measurement_type) res->getInt64("type");
+		i++;
+
+	}
+}
+void util::save_measurements(const std::vector<measurement> &m) {
+	for (int i = 0; i < m.size(); i++) {
+		try {
+			sql::PreparedStatement *pstmt = con->prepareStatement(
+					"INSERT INTO measurement (`one`, `two`, `q0`, `q1`, "
+							"`q2`, `q3`, `t0`, `t1`, `t2`, `type`) VALUES "
+							"(?,?,?,?,?,?,?,?,?,?)");
+
+			pstmt->setInt64(1, m[i].i);
+			pstmt->setDouble(2, m[i].j);
+			pstmt->setDouble(3, m[i].transform.so3().data()[0]);
+			pstmt->setDouble(4, m[i].transform.so3().data()[1]);
+			pstmt->setDouble(5, m[i].transform.so3().data()[2]);
+			pstmt->setDouble(6, m[i].transform.so3().data()[3]);
+			pstmt->setDouble(7, m[i].transform.translation()[0]);
+			pstmt->setDouble(8, m[i].transform.translation()[1]);
+
+			pstmt->setDouble(9, m[i].transform.translation()[2]);
+			pstmt->setInt64(10, m[i].mt);
+
+			pstmt->executeUpdate();
+
+			delete pstmt;
+
+		} catch (sql::SQLException &e) {
+			std::cout << "# ERR: SQLException in " << __FILE__;
+			std::cout << "(" << __FUNCTION__ << ") on line " << __LINE__
+					<< std::endl;
+			std::cout << "# ERR: " << e.what();
+			std::cout << " (MySQL error code: " << e.getErrorCode();
+			std::cout << ", SQLState: " << e.getSQLState() << " )" << std::endl;
+		}
+	}
+}
+
+void util::add2DB(const std::string & dir_name, int robot_id) {
+
+	std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
+
+	std::ifstream f((dir_name + "/positions.txt").c_str(),
+			std::ios_base::binary);
+	while (f) {
+		Eigen::Quaternionf q;
+		Eigen::Vector3f t;
+		Eigen::Vector3f intrinsics;
+
+		f.read((char *) q.coeffs().data(), sizeof(float) * 4);
+		f.read((char *) t.data(), sizeof(float) * 3);
+		f.read((char *) intrinsics.data(), sizeof(float) * 3);
+
+		positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
+	}
+
+	positions.pop_back();
+
+	std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
+
+	for (size_t i = 0; i < positions.size(); i++) {
+		cv::Mat rgb = cv::imread(
+				dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
+						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
+		cv::Mat depth = cv::imread(
+				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
+						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
+
+		cv::Mat gray;
+		cv::cvtColor(rgb, gray, CV_RGB2GRAY);
+
+		color_keyframe::Ptr k(
+				new color_keyframe(rgb, gray, depth, positions[i].first,
+						positions[i].second));
+		k->set_id(robot_id * 4294967296 + i);
+		add_keyframe(robot_id, k);
+	}
+}

@@ -1,4 +1,4 @@
-#include <reduce_measurement_g2o.h>
+#include <reduce_measurement_g2o_dist.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/nonfree/features2d.hpp>
 
@@ -7,7 +7,7 @@
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
 
-void reduce_measurement_g2o::init_feature_detector() {
+void reduce_measurement_g2o_dist::init_feature_detector() {
 	de = new cv::SurfDescriptorExtractor;
 	dm = new cv::FlannBasedMatcher;
 	fd = new cv::SurfFeatureDetector;
@@ -21,7 +21,7 @@ void reduce_measurement_g2o::init_feature_detector() {
 
 }
 
-bool reduce_measurement_g2o::estimate_transform_ransac(
+bool reduce_measurement_g2o_dist::estimate_transform_ransac(
 		const pcl::PointCloud<pcl::PointXYZ> & src,
 		const pcl::PointCloud<pcl::PointXYZ> & dst,
 		const std::vector<cv::DMatch> matches, int num_iter,
@@ -117,7 +117,7 @@ bool reduce_measurement_g2o::estimate_transform_ransac(
 	return true;
 
 }
-void reduce_measurement_g2o::compute_features(const cv::Mat & rgb,
+void reduce_measurement_g2o_dist::compute_features(const cv::Mat & rgb,
 		const cv::Mat & depth, const Eigen::Vector3f & intrinsics,
 		cv::Ptr<cv::FeatureDetector> & fd,
 		cv::Ptr<cv::DescriptorExtractor> & de,
@@ -183,7 +183,7 @@ void reduce_measurement_g2o::compute_features(const cv::Mat & rgb,
 	de->compute(gray, filtered_keypoints, descriptors);
 }
 
-bool reduce_measurement_g2o::find_transform(const color_keyframe::Ptr & fi,
+bool reduce_measurement_g2o_dist::find_transform(const color_keyframe::Ptr & fi,
 		const color_keyframe::Ptr & fj, Sophus::SE3f & t) {
 
 	std::vector<cv::KeyPoint> keypoints_i, keypoints_j;
@@ -210,8 +210,9 @@ bool reduce_measurement_g2o::find_transform(const color_keyframe::Ptr & fi,
 	return res;
 }
 
-reduce_measurement_g2o::reduce_measurement_g2o(
-		const tbb::concurrent_vector<color_keyframe::Ptr> & frames, int size) :
+reduce_measurement_g2o_dist::reduce_measurement_g2o_dist(
+		const tbb::concurrent_vector<color_keyframe::Ptr> & frames,
+		int size) :
 		size(size), frames(frames) {
 
 	init_feature_detector();
@@ -222,18 +223,7 @@ reduce_measurement_g2o::reduce_measurement_g2o(
 
 }
 
-reduce_measurement_g2o::reduce_measurement_g2o(reduce_measurement_g2o& rb,
-		tbb::split) :
-		size(rb.size), frames(rb.frames) {
-
-	init_feature_detector();
-
-	icp.setMaxCorrespondenceDistance(0.5);
-	boost::shared_ptr<PointToPlane> point_to_plane(new PointToPlane);
-	icp.setTransformationEstimation(point_to_plane);
-}
-
-void reduce_measurement_g2o::add_icp_measurement(int i, int j) {
+void reduce_measurement_g2o_dist::add_icp_measurement(int i, int j) {
 
 	Sophus::SE3f Mij = frames[i]->get_pos().inverse() * frames[j]->get_pos();
 
@@ -267,7 +257,7 @@ void reduce_measurement_g2o::add_icp_measurement(int i, int j) {
 
 }
 
-void reduce_measurement_g2o::add_rgbd_measurement(int i, int j) {
+void reduce_measurement_g2o_dist::add_rgbd_measurement(int i, int j) {
 
 	Sophus::SE3f Mij;
 
@@ -285,13 +275,13 @@ void reduce_measurement_g2o::add_rgbd_measurement(int i, int j) {
 
 }
 
-void reduce_measurement_g2o::add_ransac_measurement(int i, int j) {
+void reduce_measurement_g2o_dist::add_ransac_measurement(int i, int j) {
 
 	Sophus::SE3f Mij;
 
 	if (find_transform(frames[i], frames[j], Mij)) {
 
-		ROS_INFO("Found correspondances between %d and %d", i, j);
+		ROS_INFO("Found correspondences between %d and %d", i, j);
 
 		measurement meas;
 		meas.i = i;
@@ -305,20 +295,14 @@ void reduce_measurement_g2o::add_ransac_measurement(int i, int j) {
 
 }
 
-void reduce_measurement_g2o::operator()(
-		const tbb::blocked_range<
-				tbb::concurrent_vector<std::pair<int, int> >::iterator>& r) {
-	for (tbb::concurrent_vector<std::pair<int, int> >::iterator it = r.begin();
-			it != r.end(); it++) {
-		int i = it->first;
-		int j = it->second;
+void reduce_measurement_g2o_dist::reduce(const rm_multi_mapper::G2oWorkerGoalConstPtr &goal) {
 
-		add_ransac_measurement(i, j);
+	for (int k=0; k<(int)goal->Overlap.size(); k++) {
+		int i = goal->Overlap[k].first;
+		int j = goal->Overlap[k].second;
+
+		add_ransac_measurement(i,j);
 
 	}
 
-}
-
-void reduce_measurement_g2o::join(reduce_measurement_g2o& rb) {
-	m.insert(m.end(), rb.m.begin(), rb.m.end());
 }

@@ -13,6 +13,7 @@
 
 #include <rm_localization/Keyframe.h>
 #include <reduce_measurement_g2o.h>
+#include <reduce_measurement_g2o_dist.h>
 
 class keyframe_map {
 public:
@@ -24,6 +25,7 @@ public:
 	float optimize_slam(int skip_n = 1);
 	void align_z_axis();
 
+	void optimize_g2o_min(const std::vector<measurement> & m);
 	void optimize_g2o();
 
 	cv::Mat get_panorama_image();
