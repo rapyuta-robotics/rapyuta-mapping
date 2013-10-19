@@ -1,83 +1,36 @@
 #include <util.h>
 
-using Poco::URIStreamOpener;
-using Poco::StreamCopier;
-using Poco::Path;
-using Poco::URI;
-using Poco::Exception;
-using Poco::Net::HTTPStreamFactory;
 using namespace std;
 
 util::util() {
+	// TODO make arguments
+	server = "localhost";
+	user = "mapping";
+	password = "mapping";
+	database = "mapping";
+
+	driver = get_driver_instance();
+	con = driver->connect("tcp://" + server + ":3306", user, password);
+	con->setSchema(database);
 
 }
 
 util::~util() {
 	delete con;
-
 }
 
-cv::Mat util::loadFromURL(string url) {
-	//Don't register the factory more than once
-	if (!factoryLoaded) {
-		HTTPStreamFactory::registerFactory();
-		factoryLoaded = true;
-	}
-
-	//Specify URL and open input stream
-	URI uri(url);
-	std::auto_ptr<std::istream> pStr(
-			URIStreamOpener::defaultOpener().open(uri));
-
-	//Copy image to our string and convert to cv::Mat
-	string str;
-	StreamCopier::copyToString(*pStr.get(), str);
-	vector<char> data(str.begin(), str.end());
-	cv::Mat data_mat(data);
-	cv::Mat image(cv::imdecode(data_mat, 1));
-	return image;
-}
-
-cv::Mat util::stringtoMat(string file) {
-	cv::Mat image;
-
-	if (file.compare(file.size() - 4, 4, ".gif") == 0) {
-		cerr << "UNSUPPORTED_IMAGE_FORMAT";
-		return image;
-	}
-
-	else if (file.compare(0, 7, "http://") == 0) // Valid URL only if it starts with "http://"
-			{
-		image = loadFromURL(file);
-		if (!image.data)
-			cerr << "INVALID_IMAGE_URL";
-		return image;
-	} else {
-		image = cv::imread(file, 1); // Try if the image path is in the local machine
-		if (!image.data)
-			cerr << "IMAGE_DOESNT_EXIST";
-		return image;
-	}
-}
 
 sql::ResultSet* util::sql_query(std::string query) {
 	try {
-		driver = get_driver_instance();
-		if (driver != NULL) {
-			con = driver->connect("tcp://localhost:3306", "root", "123456");
-			con->setSchema("multimap");
-			sql::PreparedStatement *pstmt;
-			sql::ResultSet *res;
+		sql::PreparedStatement *pstmt;
+		sql::ResultSet *res;
 
-			/* Select in ascending order */
-			pstmt = con->prepareStatement(query);
-			res = pstmt->executeQuery();
+		/* Select in ascending order */
+		pstmt = con->prepareStatement(query);
+		res = pstmt->executeQuery();
 
-			delete pstmt;
-			return res;
-		} else {
-			std::cout << "Driver NULL\n";
-		}
+		delete pstmt;
+		return res;
 
 	} catch (sql::SQLException &e) {
 		std::cout << "# ERR: SQLException in " << __FILE__;
@@ -90,60 +43,6 @@ sql::ResultSet* util::sql_query(std::string query) {
 	}
 }
 
-void util::load_mysql(
-		std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > & positions) {
-
-	sql::ResultSet *res;
-	res = sql_query("SELECT * FROM positions");
-
-	while (res->next()) {
-		Eigen::Quaternionf q;
-		Eigen::Vector3f t;
-		Eigen::Vector3f intrinsics;
-		q.coeffs()[0] = res->getDouble("q0");
-		q.coeffs()[1] = res->getDouble("q1");
-		q.coeffs()[2] = res->getDouble("q2");
-		q.coeffs()[3] = res->getDouble("q3");
-		t[0] = res->getDouble("t0");
-		t[1] = res->getDouble("t1");
-		t[2] = res->getDouble("t2");
-		intrinsics[0] = res->getDouble("int0");
-		intrinsics[1] = res->getDouble("int1");
-		intrinsics[2] = res->getDouble("int2");
-		positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
-	}
-
-	delete res;
-
-}
-
-void util::load(const std::string & dir_name,
-		std::vector<color_keyframe::Ptr> & frames) {
-
-	std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
-
-	load_mysql(positions);
-
-	std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
-
-	for (size_t i = 0; i < positions.size(); i++) {
-		cv::Mat rgb = stringtoMat(
-				dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
-						+ ".png");
-		cv::Mat depth = stringtoMat(
-				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
-						+ ".png");
-
-		cv::Mat gray;
-		cv::cvtColor(rgb, gray, CV_RGB2GRAY);
-
-		color_keyframe::Ptr k(
-				new color_keyframe(rgb, gray, depth, positions[i].first,
-						positions[i].second));
-		frames.push_back(k);
-	}
-	std::cout << "Ready" << std::endl;
-}
 
 int util::get_new_robot_id() {
 	sql::ResultSet *res;
@@ -360,43 +259,4 @@ void util::save_measurements(const std::vector<measurement> &m) {
 	}
 }
 
-void util::add2DB(const std::string & dir_name, int robot_id) {
 
-	std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > positions;
-
-	std::ifstream f((dir_name + "/positions.txt").c_str(),
-			std::ios_base::binary);
-	while (f) {
-		Eigen::Quaternionf q;
-		Eigen::Vector3f t;
-		Eigen::Vector3f intrinsics;
-
-		f.read((char *) q.coeffs().data(), sizeof(float) * 4);
-		f.read((char *) t.data(), sizeof(float) * 3);
-		f.read((char *) intrinsics.data(), sizeof(float) * 3);
-
-		positions.push_back(std::make_pair(Sophus::SE3f(q, t), intrinsics));
-	}
-
-	positions.pop_back();
-
-	std::cerr << "Loaded " << positions.size() << " positions" << std::endl;
-
-	for (size_t i = 0; i < positions.size(); i++) {
-		cv::Mat rgb = cv::imread(
-				dir_name + "/rgb/" + boost::lexical_cast<std::string>(i)
-						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
-		cv::Mat depth = cv::imread(
-				dir_name + "/depth/" + boost::lexical_cast<std::string>(i)
-						+ ".png", CV_LOAD_IMAGE_UNCHANGED);
-
-		cv::Mat gray;
-		cv::cvtColor(rgb, gray, CV_RGB2GRAY);
-
-		color_keyframe::Ptr k(
-				new color_keyframe(rgb, gray, depth, positions[i].first,
-						positions[i].second));
-		k->set_id(robot_id * 4294967296 + i);
-		add_keyframe(robot_id, k);
-	}
-}

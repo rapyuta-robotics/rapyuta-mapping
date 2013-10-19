@@ -66,6 +66,16 @@ target_link_libraries(rotation_demo ${PROJECT_NAME})
 rosbuild_add_executable(teleop_demo src/teleop_demo.cpp)
 target_link_libraries(teleop_demo ${PROJECT_NAME})
 
+
+################ Helper functions to work with database ###########
+
+rosbuild_add_executable(load_map_db src/load_map_db.cpp)
+target_link_libraries(load_map_db ${PROJECT_NAME} mysqlcppconn)
+
+rosbuild_add_executable(show_map_db src/show_map_db.cpp)
+target_link_libraries(show_map_db ${PROJECT_NAME} mysqlcppconn)
+
+
 ############################## Parallel ###########################
 
 #rosbuild_add_executable(worker src/worker.cpp)

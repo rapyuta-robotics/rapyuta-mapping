@@ -35,12 +35,7 @@ class util {
 		util();
 		~util();
 
-        cv::Mat loadFromURL(std::string url);
-        cv::Mat stringtoMat(std::string file);
         sql::ResultSet* sql_query(std::string query);
-        void load_mysql(std::vector<std::pair<Sophus::SE3f, Eigen::Vector3f> > & positions);
-        void load(const std::string & dir_name, std::vector<color_keyframe::Ptr> & frames);
-        void add2DB(const std::string & dir_name, int robot_id);
         void save_measurements(const std::vector<measurement> &m);
         void load_measurements(std::vector<measurement> &m);
 
@@ -49,11 +44,17 @@ class util {
         color_keyframe::Ptr get_keyframe(long frame_id);
 
         boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
-        sql::Connection *con;
+
 
     private:
-        sql::Driver *driver;
 
+        std::string server;
+        std::string user;
+        std::string password;
+        std::string database;
+
+        sql::Driver *driver;
+        sql::Connection *con;
 
         color_keyframe::Ptr get_keyframe(sql::ResultSet * res);
 };
