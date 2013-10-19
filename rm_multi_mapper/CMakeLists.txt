@@ -41,30 +41,30 @@ src/reduce_jacobian_rgb.cpp src/reduce_jacobian_slam.cpp
 src/reduce_jacobian_slam_3d.cpp src/reduce_jacobian_ros.cpp 
 src/reduce_measurement_g2o.cpp 
 src/reduce_measurement_g2o_dist.cpp  
-#src/robot_mapper.cpp 
+src/robot_mapper.cpp 
 src/util.cpp )
 target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn 
 PocoFoundation PocoNet g2o_types_slam3d g2o_solver_cholmod cholmod)
 
 ############################## Local ###########################
 
-#rosbuild_add_executable(merge_maps src/merge_maps.cpp)
-#target_link_libraries(merge_maps ${PROJECT_NAME})
+rosbuild_add_executable(merge_maps src/merge_maps.cpp)
+target_link_libraries(merge_maps ${PROJECT_NAME})
 
-#rosbuild_add_executable(optimize_map src/optimize_map.cpp)
-#target_link_libraries(optimize_map ${PROJECT_NAME})
+rosbuild_add_executable(optimize_map src/optimize_map.cpp)
+target_link_libraries(optimize_map ${PROJECT_NAME})
 
-#rosbuild_add_executable(show_map src/show_map.cpp)
-#target_link_libraries(show_map ${VTK_LIBRARIES} ${PROJECT_NAME})
+rosbuild_add_executable(show_map src/show_map.cpp)
+target_link_libraries(show_map ${VTK_LIBRARIES} ${PROJECT_NAME})
 
-#rosbuild_add_executable(optimize_panorama_map src/optimize_panorama_map.cpp)
-#target_link_libraries(optimize_panorama_map ${PROJECT_NAME})
+rosbuild_add_executable(optimize_panorama_map src/optimize_panorama_map.cpp)
+target_link_libraries(optimize_panorama_map ${PROJECT_NAME})
 
-#rosbuild_add_executable(rotation_demo src/rotation_demo.cpp)
-#target_link_libraries(rotation_demo ${PROJECT_NAME})
+rosbuild_add_executable(rotation_demo src/rotation_demo.cpp)
+target_link_libraries(rotation_demo ${PROJECT_NAME})
 
-#rosbuild_add_executable(teleop_demo src/teleop_demo.cpp)
-#target_link_libraries(teleop_demo ${PROJECT_NAME})
+rosbuild_add_executable(teleop_demo src/teleop_demo.cpp)
+target_link_libraries(teleop_demo ${PROJECT_NAME})
 
 ############################## Parallel ###########################
 
