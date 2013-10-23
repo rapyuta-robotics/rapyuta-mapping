@@ -41,8 +41,7 @@ src/reduce_jacobian_rgb.cpp src/reduce_jacobian_slam.cpp
 src/reduce_jacobian_slam_3d.cpp src/reduce_jacobian_ros.cpp 
 src/reduce_measurement_g2o.cpp 
 src/reduce_measurement_g2o_dist.cpp  
-src/robot_mapper.cpp 
-src/util.cpp )
+src/robot_mapper.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
 
 ############################## Local ###########################
@@ -65,16 +64,6 @@ target_link_libraries(rotation_demo ${PROJECT_NAME})
 rosbuild_add_executable(teleop_demo src/teleop_demo.cpp)
 target_link_libraries(teleop_demo ${PROJECT_NAME})
 
-
-################ Helper functions to work with database ###########
-
-rosbuild_add_executable(load_map_db src/load_map_db.cpp)
-target_link_libraries(load_map_db ${PROJECT_NAME} mysqlcppconn)
-
-rosbuild_add_executable(show_map_db src/show_map_db.cpp)
-target_link_libraries(show_map_db ${PROJECT_NAME} mysqlcppconn)
-
-
 ############################## Parallel ###########################
 
 #rosbuild_add_executable(worker src/worker.cpp)
@@ -95,9 +84,9 @@ target_link_libraries(show_map_db ${PROJECT_NAME} mysqlcppconn)
 #rosbuild_add_executable(binary2csv src/binary2csv.cpp)
 #target_link_libraries(binary2csv ${PROJECT_NAME})
 
-rosbuild_add_executable(worker_g2o src/worker_g2o.cpp)
-target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
+#rosbuild_add_executable(worker_g2o src/worker_g2o.cpp)
+#target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
 
-rosbuild_add_executable(master_g2o src/master_g2o.cpp)
-target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
+#rosbuild_add_executable(master_g2o src/master_g2o.cpp)
+#target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
 
