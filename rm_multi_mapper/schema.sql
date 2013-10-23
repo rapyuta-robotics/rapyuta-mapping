@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS `robot` (
 
 
 CREATE TABLE IF NOT EXISTS `measurement` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `one` int(11) NOT NULL,
-  `two` int(11) NOT NULL,
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `one` BIGINT NOT NULL,
+  `two` BIGINT NOT NULL,
   `q0` FLOAT NOT NULL,
   `q1` FLOAT NOT NULL,
   `q2` FLOAT NOT NULL,

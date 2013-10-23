@@ -33,8 +33,6 @@ int main(int argc, char **argv) {
 	cloud->header.seq = 0;
 	pointcloud_pub.publish(cloud);
 
-	ros::spin();
-
 	return 0;
 
 }

@@ -13,9 +13,15 @@ int main(int argc, char **argv) {
 
 	long shift = robot_id * (1l << 32);
 
-	for (int i = 0; i < map.frames.size(); i++) {
+	for (size_t i = 0; i < map.frames.size(); i++) {
 		map.frames[i]->set_id(shift + i);
 		U.add_keyframe(robot_id, map.frames[i]);
+		if (i != 0) {
+			std::cerr << map.frames[i - 1]->get_id() << " " << map.frames[i]->get_id() << std::endl;
+			U.add_measurement(map.frames[i - 1]->get_id(), map.frames[i]->get_id(),
+					map.frames[i - 1]->get_pos().inverse()
+							* map.frames[i]->get_pos(), "VO");
+		}
 	}
 
 	return 0;

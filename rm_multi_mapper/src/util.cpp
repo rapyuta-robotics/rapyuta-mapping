@@ -13,12 +13,24 @@ util::util() {
 	con = driver->connect("tcp://" + server + ":3306", user, password);
 	con->setSchema(database);
 
+
+	// Classes for feature extraction
+	de = new cv::SurfDescriptorExtractor;
+	fd = new cv::SurfFeatureDetector;
+
+	fd->setInt("hessianThreshold", 400);
+	fd->setInt("extended", 1);
+	fd->setInt("upright", 1);
+
+	de->setInt("hessianThreshold", 400);
+	de->setInt("extended", 1);
+	de->setInt("upright", 1);
+
 }
 
 util::~util() {
 	delete con;
 }
-
 
 sql::ResultSet* util::sql_query(std::string query) {
 	try {
@@ -42,7 +54,6 @@ sql::ResultSet* util::sql_query(std::string query) {
 		return NULL;
 	}
 }
-
 
 int util::get_new_robot_id() {
 	sql::ResultSet *res;
@@ -118,6 +129,45 @@ void util::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
 		std::cout << ", SQLState: " << e.getSQLState() << " )" << std::endl;
 	}
 
+}
+
+void util::add_measurement(long int first, long int second,
+		const Sophus::SE3f & transform, const std::string & type) {
+	try {
+
+		sql::PreparedStatement *pstmt =
+				con->prepareStatement(
+						"INSERT INTO measurement"
+						" (`id`, `one`, `two`, `q0`, `q1`, `q2`, `q3`, `t0`, `t1`, `t2`, `type`)"
+						" VALUES"
+						" (NULL,?,?,?,?,?,?,?,?,?,?)");
+
+		pstmt->setInt64(1, first);
+		pstmt->setInt64(2, second);
+
+		pstmt->setDouble(3, transform.unit_quaternion().x());
+		pstmt->setDouble(4, transform.unit_quaternion().y());
+		pstmt->setDouble(5, transform.unit_quaternion().z());
+		pstmt->setDouble(6, transform.unit_quaternion().w());
+
+		pstmt->setDouble(7, transform.translation().x());
+		pstmt->setDouble(8, transform.translation().y());
+		pstmt->setDouble(9, transform.translation().z());
+
+		pstmt->setString(10, type);
+
+		pstmt->executeUpdate();
+
+		delete pstmt;
+
+	} catch (sql::SQLException &e) {
+		std::cout << "# ERR: SQLException in " << __FILE__;
+		std::cout << "(" << __FUNCTION__ << ") on line " << __LINE__
+				<< std::endl;
+		std::cout << "# ERR: " << e.what();
+		std::cout << " (MySQL error code: " << e.getErrorCode();
+		std::cout << ", SQLState: " << e.getSQLState() << " )" << std::endl;
+	}
 }
 
 color_keyframe::Ptr util::get_keyframe(long frame_id) {
@@ -258,5 +308,72 @@ void util::save_measurements(const std::vector<measurement> &m) {
 		}
 	}
 }
+
+
+
+void util::compute_features(const cv::Mat & rgb,
+		const cv::Mat & depth, const Eigen::Vector3f & intrinsics,
+		std::vector<cv::KeyPoint> & filtered_keypoints,
+		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
+	cv::Mat gray;
+
+	if (rgb.channels() != 1) {
+		cv::cvtColor(rgb, gray, cv::COLOR_BGR2GRAY);
+	} else {
+		gray = rgb;
+	}
+
+	cv::GaussianBlur(gray, gray, cv::Size(3, 3), 3);
+
+	int threshold = 400;
+	fd->setInt("hessianThreshold", threshold);
+
+	//int threshold = 100;
+	//fd->setInt("thres", threshold);
+
+	std::vector<cv::KeyPoint> keypoints;
+
+	cv::Mat mask(depth.size(), CV_8UC1);
+	depth.convertTo(mask, CV_8U);
+
+	fd->detect(gray, keypoints, mask);
+
+	for (int i = 0; i < 5; i++) {
+		if (keypoints.size() < 300) {
+			threshold = threshold / 2;
+			fd->setInt("hessianThreshold", threshold);
+			//fd->setInt("thres", threshold);
+			keypoints.clear();
+			fd->detect(gray, keypoints, mask);
+		} else {
+			break;
+		}
+	}
+
+	if (keypoints.size() > 400)
+		keypoints.resize(400);
+
+	filtered_keypoints.clear();
+	keypoints3d.clear();
+
+	for (size_t i = 0; i < keypoints.size(); i++) {
+		if (depth.at<unsigned short>(keypoints[i].pt) != 0) {
+			filtered_keypoints.push_back(keypoints[i]);
+
+			pcl::PointXYZ p;
+			p.z = depth.at<unsigned short>(keypoints[i].pt) / 1000.0f;
+			p.x = (keypoints[i].pt.x - intrinsics[1]) * p.z / intrinsics[0];
+			p.y = (keypoints[i].pt.y - intrinsics[2]) * p.z / intrinsics[0];
+
+			//ROS_INFO("Point %f %f %f from  %f %f ", p.x, p.y, p.z, keypoints[i].pt.x, keypoints[i].pt.y);
+
+			keypoints3d.push_back(p);
+
+		}
+	}
+
+	de->compute(gray, filtered_keypoints, descriptors);
+}
+
 
 
