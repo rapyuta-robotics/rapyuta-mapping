@@ -3,7 +3,8 @@
 #include <iostream>
 #include <stdio.h>
 #include <malloc.h>
-#include "opencv2/opencv.hpp"
+#include <opencv2/opencv.hpp>
+#include <opencv2/nonfree/features2d.hpp>
 
 /*MySQL includes */
 #include "mysql_connection.h"
@@ -40,6 +41,11 @@ public:
 	color_keyframe::Ptr get_keyframe(long frame_id);
 
 	boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
+
+	void compute_features(const cv::Mat & rgb,
+			const cv::Mat & depth, const Eigen::Vector3f & intrinsics,
+			std::vector<cv::KeyPoint> & filtered_keypoints,
+			pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors);
 
 private:
 

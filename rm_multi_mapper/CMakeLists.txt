@@ -43,8 +43,7 @@ src/reduce_measurement_g2o.cpp
 src/reduce_measurement_g2o_dist.cpp  
 src/robot_mapper.cpp 
 src/util.cpp )
-target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn 
-PocoFoundation PocoNet g2o_types_slam3d g2o_solver_cholmod cholmod)
+target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
 
 ############################## Local ###########################
 
