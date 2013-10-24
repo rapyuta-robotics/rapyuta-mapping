@@ -175,11 +175,11 @@ int main(int argc, char **argv) {
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_map_pointcloud();
 
-	cloud->header.frame_id = "world";
+	cloud->header.frame_id = "/world";
 	cloud->header.stamp = ros::Time::now();
 	cloud->header.seq = 0;
 	pointcloud_pub.publish(cloud);
-
+	ros::spin();
 	/*timestamp_t t1 = get_timestamp();
 
 	 double secs = (t1 - t0) / 1000000.0L;
