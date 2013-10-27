@@ -38,9 +38,8 @@ include_directories(${VTK_INCLUDE_DIRS})
 
 rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp
 src/reduce_jacobian_rgb.cpp src/reduce_jacobian_slam.cpp 
-src/reduce_jacobian_slam_3d.cpp src/reduce_jacobian_ros.cpp 
+src/reduce_jacobian_slam_3d.cpp
 src/reduce_measurement_g2o.cpp 
-src/reduce_measurement_g2o_dist.cpp  
 src/robot_mapper.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
 

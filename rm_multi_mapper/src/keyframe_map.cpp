@@ -6,7 +6,6 @@
 #include <reduce_jacobian_rgb.h>
 #include <reduce_jacobian_slam_3d.h>
 
-#include <util.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
@@ -536,6 +535,7 @@ float keyframe_map::optimize_slam(int skip_n) {
 
 }
 
+/*
 void keyframe_map::optimize_g2o_min(const std::vector<measurement> &m){
 
 	g2o::SparseOptimizer optimizer;
@@ -644,6 +644,7 @@ void keyframe_map::optimize_g2o_min(const std::vector<measurement> &m){
 		frames[i]->get_pos() = t;
 	}
 }
+*/
 
 void keyframe_map::optimize_g2o() {
 

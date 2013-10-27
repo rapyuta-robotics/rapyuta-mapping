@@ -61,11 +61,11 @@ class G2oWorkerAction
             }
 
 
-            reduce_measurement_g2o_dist rj(map->frames, map->frames.size());
+            //reduce_measurement_g2o_dist rj(map->frames, map->frames.size());
 
-            rj.reduce(goal);
+            //rj.reduce(goal);
 
-            U.save_measurements(rj.m);
+            //U.save_measurements(rj.m);
 
             std::cout<<"Done";
             if(success)

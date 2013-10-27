@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
 		std::cout << success << std::endl;
 		U.load_measurements(m);
 
-		map->optimize_g2o_min(m);
+		//map->optimize_g2o_min(m);
 
 	}
 
