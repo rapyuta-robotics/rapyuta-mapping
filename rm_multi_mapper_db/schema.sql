@@ -35,7 +35,10 @@ CREATE TABLE IF NOT EXISTS `keyframe` (
   `int2` FLOAT NOT NULL,
   `rgb` MEDIUMBLOB NOT NULL,
   `depth` MEDIUMBLOB NOT NULL,
+  `num_keypoints` INT NOT NULL,
   `keypoints` MEDIUMBLOB NOT NULL,
+  `descriptor_size` INT NOT NULL,
+  `descriptor_type` INT NOT NULL,
   `descriptors` MEDIUMBLOB NOT NULL,
    PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

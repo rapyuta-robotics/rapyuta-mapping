@@ -38,6 +38,9 @@ public:
 	void add_measurement(long first, long second,
 			const Sophus::SE3f & transform, const std::string & type);
 
+	void get_keypoints(long frame_id,
+			pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & desctriptors);
+
 	color_keyframe::Ptr get_keyframe(long frame_id);
 
 	boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
