@@ -19,6 +19,19 @@ void check_equal(const cv::Mat & m1, const cv::Mat & m2) {
 	}
 }
 
+void check_equal_pointclouds(const pcl::PointCloud<pcl::PointXYZ> & p1,
+		const pcl::PointCloud<pcl::PointXYZ> & p2) {
+	EXPECT_EQ(p1.size(), p2.size());
+
+	for (int i = 0; i < p1.size(); i++) {
+		if (p1[i].x != p2[i].x || p1[i].y != p2[i].y || p1[i].z != p2[i].z) {
+			ADD_FAILURE()<< "Point value mismatch at (" << i << ") values " << p1[i].getVector3fMap().transpose() <<
+			" != " << p2[i].getVector3fMap().transpose();
+		}
+
+	}
+}
+
 TEST(UtilTest, keyframeSaveTest) {
 	util U;
 	int robot_id = U.get_new_robot_id();
@@ -60,7 +73,6 @@ TEST(UtilTest, keyframeSaveTest) {
 
 }
 
-
 TEST(UtilTest, keypointsSaveTest) {
 	util U;
 	int robot_id = U.get_new_robot_id();
@@ -80,17 +92,14 @@ TEST(UtilTest, keypointsSaveTest) {
 	std::vector<cv::KeyPoint> keypoints1;
 	pcl::PointCloud<pcl::PointXYZ> keypoints3d1, keypoints3d2;
 	cv::Mat descriptors1, descriptors2;
-	U.compute_features(k->get_i(0), k->get_d(0), k->get_intrinsics(0), keypoints1,
-			keypoints3d1, descriptors1);
+	U.compute_features(k->get_i(0), k->get_d(0), k->get_intrinsics(0),
+			keypoints1, keypoints3d1, descriptors1);
 
 	U.get_keypoints(shift, keypoints3d2, descriptors2);
-	EXPECT_EQ(descriptors1.cols, descriptors2.cols);
-	EXPECT_EQ(descriptors1.rows, descriptors2.rows);
-	EXPECT_EQ(descriptors1.type(), descriptors2.type());
 	check_equal<float>(descriptors1, descriptors2);
+	check_equal_pointclouds(keypoints3d1, keypoints3d2);
 
 }
-
 
 int main(int argc, char **argv) {
 	testing::InitGoogleTest(&argc, argv);
