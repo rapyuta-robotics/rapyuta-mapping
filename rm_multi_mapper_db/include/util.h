@@ -38,6 +38,7 @@ public:
 	void add_measurement(long first, long second,
 			const Sophus::SE3f & transform, const std::string & type);
 
+	void add_keypoints(const color_keyframe::Ptr & k);
 	void get_keypoints(long frame_id,
 			pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & desctriptors);
 

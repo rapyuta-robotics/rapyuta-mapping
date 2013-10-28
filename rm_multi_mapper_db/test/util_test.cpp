@@ -60,7 +60,7 @@ TEST(UtilTest, keyframeSaveTest) {
 
 }
 
-/*
+
 TEST(UtilTest, keypointsSaveTest) {
 	util U;
 	int robot_id = U.get_new_robot_id();
@@ -73,6 +73,7 @@ TEST(UtilTest, keypointsSaveTest) {
 
 	map.frames[0]->set_id(shift);
 	U.add_keyframe(robot_id, map.frames[0]);
+	U.add_keypoints(map.frames[0]);
 
 	keyframe::Ptr k = map.frames[0];
 
@@ -83,13 +84,13 @@ TEST(UtilTest, keypointsSaveTest) {
 			keypoints3d1, descriptors1);
 
 	U.get_keypoints(shift, keypoints3d2, descriptors2);
-	//EXPECT_EQ(descriptors1.cols, descriptors2.cols);
-	//EXPECT_EQ(descriptors1.rows, descriptors2.rows);
-	//EXPECT_EQ(descriptors1.type(), descriptors2.type());
-	//check_equal<float>(descriptors1, descriptors2);
+	EXPECT_EQ(descriptors1.cols, descriptors2.cols);
+	EXPECT_EQ(descriptors1.rows, descriptors2.rows);
+	EXPECT_EQ(descriptors1.type(), descriptors2.type());
+	check_equal<float>(descriptors1, descriptors2);
 
 }
-*/
+
 
 int main(int argc, char **argv) {
 	testing::InitGoogleTest(&argc, argv);

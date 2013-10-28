@@ -81,20 +81,15 @@ void util::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
 		res->next();
 		int map_id = res->getInt("map_id");
 
-		sql::PreparedStatement *pstmt =
-				con->prepareStatement(
-						"INSERT INTO keyframe "
-								"(`id`, `q0`, `q1`, `q2`, `q3`,"
-								" `t0`, `t1`, `t2`, `int0`, `int1`,"
-								" `int2`, `rgb`, `depth`, `map_id`,"
-								" `num_keypoints`, `descriptor_size`, `descriptor_type`,"
-								" `keypoints`, `descriptors`) "
-								"VALUES "
-								"(?,?,?,?,?"
-								",?,?,?,?,?"
-								",?,?,?,?"
-								",?,?,?"
-								",?,?)");
+		sql::PreparedStatement *pstmt = con->prepareStatement(
+				"INSERT INTO keyframe "
+						"(`id`, `q0`, `q1`, `q2`, `q3`,"
+						" `t0`, `t1`, `t2`, `int0`, `int1`,"
+						" `int2`, `rgb`, `depth`, `map_id`) "
+						"VALUES "
+						"(?,?,?,?,?"
+						",?,?,?,?,?"
+						",?,?,?,?)");
 
 		pstmt->setInt64(1, k->get_id());
 		pstmt->setDouble(2, k->get_pos().unit_quaternion().x());
@@ -126,32 +121,6 @@ void util::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
 		pstmt->setBlob(13, &depth_stream);
 		pstmt->setInt(14, map_id);
 
-		///////////////// Add keypoints //////////////////
-		std::vector<cv::KeyPoint> keypoints;
-		pcl::PointCloud<pcl::PointXYZ> keypoints3d;
-		cv::Mat descriptors;
-		compute_features(k->get_i(0), k->get_d(0), k->get_intrinsics(0),
-				keypoints, keypoints3d, descriptors);
-
-		pstmt->setInt(15, keypoints3d.size());
-		pstmt->setInt(16, descriptors.cols);
-		pstmt->setInt(17, descriptors.type());
-
-		assert(descriptors.type() == CV_32F);
-		std::cerr << "Keypoints size " << keypoints3d.size() << " "
-				<< descriptors.cols << std::endl;
-
-		DataBuf keypoints_buffer((char*) keypoints3d.points.data(),
-				keypoints3d.points.size() * sizeof(pcl::PointXYZ));
-		std::istream keypoints_stream(&keypoints_buffer);
-
-		DataBuf descriptors_buffer((char*) descriptors.data,
-				descriptors.cols * descriptors.rows * sizeof(float));
-		std::istream descriptors_stream(&descriptors_buffer);
-
-		pstmt->setBlob(18, &keypoints_stream);
-		pstmt->setBlob(19, &descriptors_stream);
-
 		pstmt->executeUpdate();
 
 		delete pstmt;
@@ -165,6 +134,58 @@ void util::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
 		std::cout << ", SQLState: " << e.getSQLState() << " )" << std::endl;
 	}
 
+}
+
+void util::add_keypoints(const color_keyframe::Ptr & k) {
+	try {
+
+		sql::PreparedStatement *pstmt =
+				con->prepareStatement(
+						"UPDATE keyframe SET"
+								" `num_keypoints`=? , `descriptor_size`= ?, `descriptor_type`=?,"
+								" `keypoints`= ?, `descriptors`=? "
+								" WHERE `id` = ? ");
+
+		std::vector<cv::KeyPoint> keypoints;
+		pcl::PointCloud<pcl::PointXYZ> keypoints3d;
+		cv::Mat descriptors;
+		compute_features(k->get_i(0), k->get_d(0), k->get_intrinsics(0),
+				keypoints, keypoints3d, descriptors);
+
+		pstmt->setInt(1, keypoints3d.size());
+		pstmt->setInt(2, descriptors.cols);
+		pstmt->setInt(3, descriptors.type());
+
+		assert(descriptors.type() == CV_32F);
+		std::cerr << "Keypoints size " << keypoints3d.size() << " "
+				<< descriptors.size() << std::endl;
+
+		DataBuf keypoints_buffer((char*) keypoints3d.points.data(),
+				keypoints3d.points.size() * sizeof(pcl::PointXYZ));
+		std::istream keypoints_stream(&keypoints_buffer);
+
+		DataBuf descriptors_buffer((char*) descriptors.data,
+				descriptors.cols * descriptors.rows * sizeof(float));
+		std::istream descriptors_stream(&descriptors_buffer);
+
+		//std::cerr << "Decriptors size " << descriptors.cols * descriptors.rows * sizeof(float) << std::endl;
+
+		pstmt->setBlob(4, &keypoints_stream);
+		pstmt->setBlob(5, &descriptors_stream);
+		pstmt->setInt64(6, k->get_id());
+
+		pstmt->executeUpdate();
+
+		delete pstmt;
+
+	} catch (sql::SQLException &e) {
+		std::cout << "# ERR: SQLException in " << __FILE__;
+		std::cout << "(" << __FUNCTION__ << ") on line " << __LINE__
+				<< std::endl;
+		std::cout << "# ERR: " << e.what();
+		std::cout << " (MySQL error code: " << e.getErrorCode();
+		std::cout << ", SQLState: " << e.getSQLState() << " )" << std::endl;
+	}
 }
 
 void util::add_measurement(long int first, long int second,
@@ -281,23 +302,32 @@ void util::get_keypoints(long frame_id,
 		keypoints_in->read((char*) &tmp, sizeof(tmp));
 		keypoints3d.push_back(tmp);
 	}
+	keypoints3d.resize(keypoints3d.size() - 1);
 
 	std::istream * descriptors_in = res->getBlob("descriptors");
-	std::vector<uchar> descriptors_data;
+	std::vector<uint8_t> descriptors_data;
 
 	while (*descriptors_in) {
-		uchar tmp;
+		uint8_t tmp;
 		descriptors_in->read((char*) &tmp, sizeof(tmp));
 		descriptors_data.push_back(tmp);
 	}
 
+	descriptors_data.resize(descriptors_data.size() - 1);
+
 	int cols = res->getDouble("descriptor_size");
 	int rows = res->getDouble("num_keypoints");
 	int type = res->getDouble("descriptor_type");
-	descriptors = cv::Mat(rows, cols, type, descriptors_data.data(), true);
 
+	std::cerr << "Creating matrix " << cols << " " << rows << " " << type << " "
+			<< descriptors_data.size() << std::endl;
 
+	cv::Mat tmp_mat = cv::Mat(rows, cols, type,
+			(void *) descriptors_data.data());
 
+	std::cerr << "Matrix size " << tmp_mat.size() << std::endl;
+
+	tmp_mat.copyTo(descriptors);
 
 }
 
@@ -389,7 +419,7 @@ void util::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	if (rgb.channels() != 1) {
 		cv::cvtColor(rgb, gray, cv::COLOR_BGR2GRAY);
 	} else {
-		gray = rgb;
+		gray = rgb.clone();
 	}
 
 	cv::GaussianBlur(gray, gray, cv::Size(3, 3), 3);
