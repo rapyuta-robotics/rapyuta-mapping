@@ -474,3 +474,20 @@ void util::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	de->compute(gray, filtered_keypoints, descriptors);
 }
 
+void util::get_overlapping_pairs(std::vector<std::pair<long, long> > & overlapping_keyframes) {
+	sql::ResultSet *res;
+	res = sql_query("SELECT f1.id as id1, f2.id as id2 FROM keyframe f1, "
+			"keyframe f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
+			" + f1.q3*f2.q3) >= 1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 +"
+			" f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) AND f1.id < f2.id AND"
+			" SQRT(POWER((f1.t0 - f2.t0), 2) + POWER((f1.t1 - f2.t1), 2) +"
+			" POWER((f1.t2 - f2.t2), 2)) < 3 ;");
+
+	while (res->next()) {
+		overlapping_keyframes.push_back(
+				std::make_pair(res->getInt("long"), res->getInt("long")));
+	}
+	delete res;
+
+}
+

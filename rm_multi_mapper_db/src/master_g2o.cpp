@@ -59,35 +59,12 @@ typedef unsigned long long timestamp_t;
 typedef rm_multi_mapper::G2oWorkerAction action_t;
 typedef actionlib::SimpleActionClient<action_t> action_client;
 
-void get_pairs(std::vector<std::pair<int, int> > & overlapping_keyframes,
-		util U) {
-	sql::ResultSet *res;
-	res = U.sql_query("SELECT f1.id as id1, f2.id as id2 FROM keyframe f1, "
-			"keyframe f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
-			" + f1.q3*f2.q3) >= 1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 +"
-			" f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) AND f1.id < f2.id AND"
-			" SQRT(POWER((f1.t0 - f2.t0), 2) + POWER((f1.t1 - f2.t1), 2) +"
-			" POWER((f1.t2 - f2.t2), 2)) < 3 ;");
 
-	while (res->next()) {
-		overlapping_keyframes.push_back(
-				std::make_pair(res->getInt("id1"), res->getInt("id2")));
-	}
-	delete res;
-
-}
 void truncate_measurement(util U) {
 	sql::ResultSet *res;
 	res = U.sql_query("TRUNCATE TABLE measurement");
 	delete res;
 }
-
-/*static timestamp_t get_timestamp ()
- {
- struct timeval now;
- gettimeofday (&now, NULL);
- return  now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
- }*/
 
 int main(int argc, char **argv) {
 
@@ -97,7 +74,7 @@ int main(int argc, char **argv) {
 
 	//timestamp_t t0 = get_timestamp();
 
-	std::vector<std::pair<int, int> > overlapping_keyframes;
+	std::vector<std::pair<long, long> > overlapping_keyframes;
 	int size;
 	int workers = argc - 1;
 
@@ -115,10 +92,8 @@ int main(int argc, char **argv) {
 		ac_list.push_back(ac);
 	}
 
-	sql::ResultSet *res;
-
 	size = map->frames.size();
-	get_pairs(overlapping_keyframes, U);
+	U.get_overlapping_pairs(overlapping_keyframes);
 	truncate_measurement(U);
 	std::vector<rm_multi_mapper::G2oWorkerGoal> goals;
 	int keyframes_size = (int) overlapping_keyframes.size();

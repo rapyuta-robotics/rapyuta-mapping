@@ -1,4 +1,3 @@
-
 #include <memory>
 #include <iostream>
 #include <stdio.h>
@@ -40,16 +39,21 @@ public:
 
 	void add_keypoints(const color_keyframe::Ptr & k);
 	void get_keypoints(long frame_id,
-			pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & desctriptors);
+			pcl::PointCloud<pcl::PointXYZ> & keypoints3d,
+			cv::Mat & desctriptors);
 
 	color_keyframe::Ptr get_keyframe(long frame_id);
 
 	boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
 
-	void compute_features(const cv::Mat & rgb,
-			const cv::Mat & depth, const Eigen::Vector3f & intrinsics,
+	void get_overlapping_pairs(
+			std::vector<std::pair<long, long> > & overlapping_keyframes);
+
+	void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
+			const Eigen::Vector3f & intrinsics,
 			std::vector<cv::KeyPoint> & filtered_keypoints,
-			pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors);
+			pcl::PointCloud<pcl::PointXYZ> & keypoints3d,
+			cv::Mat & descriptors);
 
 private:
 
