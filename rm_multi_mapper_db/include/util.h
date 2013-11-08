@@ -46,7 +46,7 @@ public:
 
 	boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
 
-	void get_overlapping_pairs(
+	void get_overlapping_pairs(int map_id,
 			std::vector<std::pair<long, long> > & overlapping_keyframes);
 
 	void compute_features(const cv::Mat & rgb, const cv::Mat & depth,

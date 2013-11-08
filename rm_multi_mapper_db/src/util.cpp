@@ -259,6 +259,7 @@ color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
 		rgb_in->read((char*) &tmp, sizeof(tmp));
 		rgb_data.push_back(tmp);
 	}
+	delete rgb_in;
 
 	//std::cerr << "Read rgb data size " << rgb_data.size() << std::endl;
 
@@ -268,6 +269,7 @@ color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
 		depth_in->read((char*) &tmp, sizeof(tmp));
 		depth_data.push_back(tmp);
 	}
+	delete depth_in;
 
 	//std::cerr << "Read depth data size " << depth_data.size() << std::endl;
 
@@ -302,6 +304,7 @@ void util::get_keypoints(long frame_id,
 		keypoints_in->read((char*) &tmp, sizeof(tmp));
 		keypoints3d.push_back(tmp);
 	}
+	delete keypoints_in;
 	keypoints3d.resize(keypoints3d.size() - 1);
 
 	std::istream * descriptors_in = res->getBlob("descriptors");
@@ -312,22 +315,23 @@ void util::get_keypoints(long frame_id,
 		descriptors_in->read((char*) &tmp, sizeof(tmp));
 		descriptors_data.push_back(tmp);
 	}
-
+	delete descriptors_in;
 	descriptors_data.resize(descriptors_data.size() - 1);
 
 	int cols = res->getDouble("descriptor_size");
 	int rows = res->getDouble("num_keypoints");
 	int type = res->getDouble("descriptor_type");
 
-	std::cerr << "Creating matrix " << cols << " " << rows << " " << type << " "
-			<< descriptors_data.size() << std::endl;
+	//std::cerr << "Creating matrix " << cols << " " << rows << " " << type << " "
+	//		<< descriptors_data.size() << std::endl;
 
 	cv::Mat tmp_mat = cv::Mat(rows, cols, type,
 			(void *) descriptors_data.data());
 
-	std::cerr << "Matrix size " << tmp_mat.size() << std::endl;
+	//std::cerr << "Matrix size " << tmp_mat.size() << std::endl;
 
 	tmp_mat.copyTo(descriptors);
+	delete res;
 
 }
 
@@ -474,19 +478,29 @@ void util::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	de->compute(gray, filtered_keypoints, descriptors);
 }
 
-void util::get_overlapping_pairs(std::vector<std::pair<long, long> > & overlapping_keyframes) {
+void util::get_overlapping_pairs(int map_id, std::vector<std::pair<long, long> > & overlapping_keyframes) {
 	sql::ResultSet *res;
-	res = sql_query("SELECT f1.id as id1, f2.id as id2 FROM keyframe f1, "
-			"keyframe f2 WHERE (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
+
+	std::string map_id_s = boost::lexical_cast<std::string>(map_id);
+
+	res = sql_query(""
+			"SELECT f1.id as id1, f2.id as id2 "
+			"FROM keyframe f1, keyframe f2 "
+			"WHERE f1.map_id = " + map_id_s + " "
+			"AND f2.map_id = " + map_id_s + " "
+			"AND (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
 			" + f1.q3*f2.q3) >= 1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 +"
-			" f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) AND f1.id < f2.id AND"
-			" SQRT(POWER((f1.t0 - f2.t0), 2) + POWER((f1.t1 - f2.t1), 2) +"
-			" POWER((f1.t2 - f2.t2), 2)) < 3 ;");
+			" f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) "
+			"AND f1.id < f2.id "
+			"AND SQRT(POWER((f1.t0 - f2.t0), 2) + "
+			"POWER((f1.t1 - f2.t1), 2) + "
+			"POWER((f1.t2 - f2.t2), 2)) < 3;");
 
 	while (res->next()) {
 		overlapping_keyframes.push_back(
-				std::make_pair(res->getInt("long"), res->getInt("long")));
+				std::make_pair(res->getInt64("id1"), res->getInt64("id2")));
 	}
+
 	delete res;
 
 }
