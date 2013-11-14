@@ -1,8 +1,8 @@
-#include <util.h>
+#include <util_mysql.h>
 
 using namespace std;
 
-util::util() {
+util_mysql::util_mysql() {
 	// TODO make arguments
 	server = "localhost";
 	user = "mapping";
@@ -27,11 +27,11 @@ util::util() {
 
 }
 
-util::~util() {
+util_mysql::~util_mysql() {
 	delete con;
 }
 
-sql::ResultSet* util::sql_query(std::string query) {
+sql::ResultSet* util_mysql::sql_query(std::string query) {
 	try {
 		sql::PreparedStatement *pstmt;
 		sql::ResultSet *res;
@@ -54,7 +54,7 @@ sql::ResultSet* util::sql_query(std::string query) {
 	}
 }
 
-int util::get_new_robot_id() {
+int util_mysql::get_new_robot_id() {
 	sql::ResultSet *res;
 	res = sql_query("INSERT INTO robot (id, map_id) VALUES(NULL, NULL);");
 	res = sql_query("SELECT LAST_INSERT_ID() as id");
@@ -69,7 +69,7 @@ int util::get_new_robot_id() {
 
 }
 
-void util::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
+void util_mysql::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
 
 	try {
 
@@ -136,7 +136,7 @@ void util::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
 
 }
 
-void util::add_keypoints(const color_keyframe::Ptr & k) {
+void util_mysql::add_keypoints(const color_keyframe::Ptr & k) {
 	try {
 
 		sql::PreparedStatement *pstmt =
@@ -188,7 +188,7 @@ void util::add_keypoints(const color_keyframe::Ptr & k) {
 	}
 }
 
-void util::add_measurement(long int first, long int second,
+void util_mysql::add_measurement(long int first, long int second,
 		const Sophus::SE3f & transform, const std::string & type) {
 	try {
 
@@ -227,7 +227,7 @@ void util::add_measurement(long int first, long int second,
 	}
 }
 
-color_keyframe::Ptr util::get_keyframe(long frame_id) {
+color_keyframe::Ptr util_mysql::get_keyframe(long frame_id) {
 	sql::ResultSet *res;
 	res = sql_query(
 			"SELECT * FROM keyframe WHERE id = "
@@ -237,7 +237,7 @@ color_keyframe::Ptr util::get_keyframe(long frame_id) {
 
 }
 
-Sophus::SE3f util::get_pose(sql::ResultSet * res) {
+Sophus::SE3f util_mysql::get_pose(sql::ResultSet * res) {
 	Eigen::Quaternionf q;
 	Eigen::Vector3f t;
 	q.x() = res->getDouble("q0");
@@ -252,7 +252,7 @@ Sophus::SE3f util::get_pose(sql::ResultSet * res) {
 
 }
 
-color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
+color_keyframe::Ptr util_mysql::get_keyframe(sql::ResultSet * res) {
 
 	Sophus::SE3f pose;
 	pose = get_pose(res);
@@ -299,7 +299,7 @@ color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
 	return k;
 }
 
-void util::get_keypoints(long frame_id,
+void util_mysql::get_keypoints(long frame_id,
 		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
 	sql::ResultSet *res;
 	res = sql_query(
@@ -345,7 +345,7 @@ void util::get_keypoints(long frame_id,
 
 }
 
-boost::shared_ptr<keyframe_map> util::get_robot_map(int robot_id) {
+boost::shared_ptr<keyframe_map> util_mysql::get_robot_map(int robot_id) {
 	sql::ResultSet *res;
 	res =
 			sql_query(
@@ -362,7 +362,7 @@ boost::shared_ptr<keyframe_map> util::get_robot_map(int robot_id) {
 	return map;
 }
 
-void util::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
+void util_mysql::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		const Eigen::Vector3f & intrinsics,
 		std::vector<cv::KeyPoint> & filtered_keypoints,
 		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
@@ -426,7 +426,7 @@ void util::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	de->compute(gray, filtered_keypoints, descriptors);
 }
 
-void util::get_overlapping_pairs(int map_id,
+void util_mysql::get_overlapping_pairs(int map_id,
 		std::vector<std::pair<long, long> > & overlapping_keyframes) {
 	sql::ResultSet *res;
 
@@ -454,7 +454,7 @@ void util::get_overlapping_pairs(int map_id,
 
 }
 
-void util::load_measurements(long keyframe_id, std::vector<measurement> & m) {
+void util_mysql::load_measurements(long keyframe_id, std::vector<measurement> & m) {
 
 	sql::ResultSet *res;
 	res = sql_query(
@@ -471,7 +471,7 @@ void util::load_measurements(long keyframe_id, std::vector<measurement> & m) {
 
 }
 
-void util::load_positions(int map_id, std::vector<position> & p) {
+void util_mysql::load_positions(int map_id, std::vector<position> & p) {
 	sql::ResultSet *res;
 	res = sql_query(
 			"SELECT * FROM keyframe WHERE map_id = "
@@ -488,7 +488,7 @@ void util::load_positions(int map_id, std::vector<position> & p) {
 
 }
 
-void util::update_position(const position & p) {
+void util_mysql::update_position(const position & p) {
 	sql::PreparedStatement *pstmt =
 			con->prepareStatement(
 					"UPDATE keyframe SET `q0`= ?, `q1`= ?, `q2`= ?, `q3`= ?, `t0`= ?, `t1`= ?, `t2`= ? WHERE id = ?");

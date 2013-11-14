@@ -36,7 +36,7 @@ rosbuild_genmsg()
 
 ################ Library ##########################################
 
-rosbuild_add_library(${PROJECT_NAME} src/util.cpp)
+rosbuild_add_library(${PROJECT_NAME} src/util_mysql.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization rm_multi_mapper mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
 
 

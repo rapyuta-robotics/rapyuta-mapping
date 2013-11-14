@@ -1,3 +1,7 @@
+
+#ifndef UTIL_H
+#define UTIL_H
+
 #include <memory>
 #include <iostream>
 #include <stdio.h>
@@ -15,18 +19,13 @@
 #include <keyframe_map.h>
 #include <reduce_measurement_g2o_dist.h>
 
-class DataBuf: public streambuf {
-public:
-	DataBuf(char * d, size_t s) {
-		setg(d, d, d + s);
-	}
-};
-
 class util {
 public:
 
-	util();
-	~util();
+	typedef boost::shared_ptr<util> Ptr;
+
+	util() {}
+	virtual ~util(){}
 
 	struct measurement {
 		long first;
@@ -40,51 +39,33 @@ public:
 		Sophus::SE3f transform;
 	};
 
+	virtual int get_new_robot_id() = 0;
+	virtual void add_keyframe(int robot_id, const color_keyframe::Ptr & k) = 0;
+	virtual void add_measurement(long first, long second,
+			const Sophus::SE3f & transform, const std::string & type) = 0;
 
-	int get_new_robot_id();
-	void add_keyframe(int robot_id, const color_keyframe::Ptr & k);
-	void add_measurement(long first, long second,
-			const Sophus::SE3f & transform, const std::string & type);
-
-	void add_keypoints(const color_keyframe::Ptr & k);
-	void get_keypoints(long frame_id,
+	virtual void add_keypoints(const color_keyframe::Ptr & k) = 0;
+	virtual void get_keypoints(long frame_id,
 			pcl::PointCloud<pcl::PointXYZ> & keypoints3d,
-			cv::Mat & desctriptors);
+			cv::Mat & desctriptors) = 0;
 
-	color_keyframe::Ptr get_keyframe(long frame_id);
+	virtual color_keyframe::Ptr get_keyframe(long frame_id) = 0;
 
-	boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
+	virtual boost::shared_ptr<keyframe_map> get_robot_map(int robot_id) = 0;
 
-	void get_overlapping_pairs(int map_id,
-			std::vector<std::pair<long, long> > & overlapping_keyframes);
+	virtual void get_overlapping_pairs(int map_id,
+			std::vector<std::pair<long, long> > & overlapping_keyframes) = 0;
 
-	void load_measurements(long keyframe_id, std::vector<measurement> & m);
-	void load_positions(int map_id, std::vector<position> & p);
-	void update_position(const position & p);
+	virtual void load_measurements(long keyframe_id,
+			std::vector<measurement> & m) = 0;
+	virtual void load_positions(int map_id, std::vector<position> & p) = 0;
+	virtual void update_position(const position & p) = 0;
 
-	void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
+	virtual void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 			const Eigen::Vector3f & intrinsics,
 			std::vector<cv::KeyPoint> & filtered_keypoints,
 			pcl::PointCloud<pcl::PointXYZ> & keypoints3d,
-			cv::Mat & descriptors);
-
-private:
-
-
-
-	std::string server;
-	std::string user;
-	std::string password;
-	std::string database;
-
-	sql::Driver *driver;
-	sql::Connection *con;
-
-	cv::Ptr<cv::FeatureDetector> fd;
-	cv::Ptr<cv::DescriptorExtractor> de;
-
-	sql::ResultSet* sql_query(std::string query);
-	Sophus::SE3f get_pose(sql::ResultSet * res);
-	color_keyframe::Ptr get_keyframe(sql::ResultSet * res);
+			cv::Mat & descriptors) = 0;
 };
 
+#endif

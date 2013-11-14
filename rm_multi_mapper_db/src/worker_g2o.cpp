@@ -6,16 +6,14 @@
  */
 
 #include <opencv2/core/core.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
-#include <cmath>
 
 #include <keyframe_map.h>
 #include <reduce_measurement_g2o_dist.h>
 #include <util.h>
+#include <util_mysql.h>
 
 #include <ros/ros.h>
 #include <actionlib/server/simple_action_server.h>
@@ -30,13 +28,13 @@ protected:
 	rm_multi_mapper_db::G2oWorkerResult result_;
 	boost::shared_ptr<keyframe_map> map;
 	cv::Ptr<cv::DescriptorMatcher> dm;
-	util U;
+	util::Ptr U;
 
 public:
 
 	G2oWorkerAction(std::string name) :
 			as_(nh_, name, boost::bind(&G2oWorkerAction::executeCB, this, _1),
-					false), action_name_(name) {
+					false), action_name_(name), U(new util_mysql) {
 		dm = new cv::FlannBasedMatcher;
 		as_.start();
 
@@ -63,14 +61,14 @@ public:
 			//std::cerr << "Trying to match " << goal->Overlap[i].first << " "
 			//		<< goal->Overlap[i].second << std::endl;
 
-			U.get_keypoints(goal->Overlap[i].first, keypoints3d1, descriptors1);
-			U.get_keypoints(goal->Overlap[i].second, keypoints3d2,
+			U->get_keypoints(goal->Overlap[i].first, keypoints3d1, descriptors1);
+			U->get_keypoints(goal->Overlap[i].second, keypoints3d2,
 					descriptors2);
 
 			Sophus::SE3f t;
 			if (find_transform(keypoints3d1, keypoints3d2, descriptors1,
 					descriptors2, t)) {
-				U.add_measurement(goal->Overlap[i].first,
+				U->add_measurement(goal->Overlap[i].first,
 						goal->Overlap[i].second, t, "RANSAC");
 			}
 

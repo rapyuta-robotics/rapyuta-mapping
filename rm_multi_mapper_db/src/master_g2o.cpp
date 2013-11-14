@@ -1,25 +1,13 @@
-/*
- * master_g2o.cpp
- *
- *  Created on: Sept 29, 2013
- *      Author: mayanks43
- */
-#include <sys/time.h>
-#include <fstream>
-#include <cmath>
-#include <cstdlib>
 
-#include "ros/ros.h"
-#include "std_msgs/Float32.h"
-#include "std_msgs/Int32.h"
+#include <ros/ros.h>
+#include <std_msgs/Float32.h>
+#include <std_msgs/Int32.h>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
 #include <rm_multi_mapper_db/G2oWorkerAction.h>
 
-#include <keyframe_map.h>
 #include <util.h>
-
-#include <boost/filesystem.hpp>
+#include <util_mysql.h>
 
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/solvers/dense/linear_solver_dense.h>
@@ -36,15 +24,12 @@
 #include <g2o/types/slam3d/edge_se3.h>
 #include <g2o/types/slam3d/edge_se3_offset.h>
 
-#include "mysql_connection.h"
-#include <cppconn/resultset.h>
-#include <cppconn/statement.h>
 
 typedef unsigned long long timestamp_t;
 typedef rm_multi_mapper_db::G2oWorkerAction action_t;
 typedef actionlib::SimpleActionClient<action_t> action_client;
 
-void optimize_g2o(std::vector<util::position> & p, util & U) {
+void optimize_g2o(std::vector<util::position> & p, util::Ptr & U) {
 
 	g2o::SparseOptimizer optimizer;
 	optimizer.setVerbose(true);
@@ -78,7 +63,7 @@ void optimize_g2o(std::vector<util::position> & p, util & U) {
 	for (size_t i = 0; i < p.size(); i++) {
 
 		std::vector<util::measurement> m;
-		U.load_measurements(p[i].idx, m);
+		U->load_measurements(p[i].idx, m);
 
 		for (size_t it = 0; it < m.size(); it++) {
 			int i = idx_to_pos[m[it].first];
@@ -112,7 +97,7 @@ void optimize_g2o(std::vector<util::position> & p, util & U) {
 	optimizer.optimize(20);
 	std::cout << std::endl;
 
-	for (int i = 0; i < p.size(); i++) {
+	for (size_t i = 0; i < p.size(); i++) {
 		g2o::HyperGraph::VertexIDMap::iterator v_it = optimizer.vertices().find(
 				i);
 		if (v_it == optimizer.vertices().end()) {
@@ -143,7 +128,7 @@ int main(int argc, char **argv) {
 
 	boost::shared_ptr<keyframe_map> map;
 	std::vector<measurement> m;
-	util U;
+	util::Ptr U(new util_mysql);
 
 	//timestamp_t t0 = get_timestamp();
 
@@ -151,7 +136,7 @@ int main(int argc, char **argv) {
 	int workers = argc - 2;
 
 	int map_id = boost::lexical_cast<int>(argv[1]);
-	map = U.get_robot_map(map_id);
+	map = U->get_robot_map(map_id);
 
 	ros::init(argc, argv, "multi_map");
 	ros::NodeHandle nh;
@@ -165,7 +150,7 @@ int main(int argc, char **argv) {
 		ac_list.push_back(ac);
 	}
 
-	U.get_overlapping_pairs(map_id, overlapping_keyframes);
+	U->get_overlapping_pairs(map_id, overlapping_keyframes);
 
 	//for (int i = 0; i < overlapping_keyframes.size(); i++) {
 	//	std::cerr << "Pair " << overlapping_keyframes[i].first << " "
@@ -221,11 +206,11 @@ int main(int argc, char **argv) {
 		std::cout << success << std::endl;
 
 		std::vector<util::position> p;
-		U.load_positions(map_id, p);
+		U->load_positions(map_id, p);
 		optimize_g2o(p, U);
 
 		for(int i=0; i<p.size(); i++ ){
-			U.update_position(p[i]);
+			U->update_position(p[i]);
 		}
 
 	}
