@@ -58,7 +58,6 @@ target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_stuff g2o_core
 
 ################# Tests #################################
 
-rosbuild_add_gtest(util_test test/util_test.cpp)
-target_link_libraries(util_test ${PROJECT_NAME} mysqlcppconn)
-
+rosbuild_add_gtest(test/util_test test/util_test.cpp)
+target_link_libraries(test/util_test ${PROJECT_NAME} mysqlcppconn)
 

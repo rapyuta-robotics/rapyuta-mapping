@@ -491,7 +491,7 @@ void util::load_positions(int map_id, std::vector<position> & p) {
 void util::update_position(const position & p) {
 	sql::PreparedStatement *pstmt =
 			con->prepareStatement(
-					"UPDATE keyframes SET `q0`= ?, `q1`= ?, `q2`= ?, `q3`= ?, `t0`= ?, `t1`= ?, `t2`= ? WHERE id = ?");
+					"UPDATE keyframe SET `q0`= ?, `q1`= ?, `q2`= ?, `q3`= ?, `t0`= ?, `t1`= ?, `t2`= ? WHERE id = ?");
 
 	pstmt->setDouble(1, p.transform.unit_quaternion().x());
 	pstmt->setDouble(2, p.transform.unit_quaternion().y());
@@ -502,7 +502,7 @@ void util::update_position(const position & p) {
 	pstmt->setDouble(6, p.transform.translation().y());
 	pstmt->setDouble(7, p.transform.translation().z());
 
-	pstmt->setInt64(10, p.idx);
+	pstmt->setInt64(8, p.idx);
 
 	pstmt->executeUpdate();
 
