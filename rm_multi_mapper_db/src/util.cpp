@@ -237,10 +237,9 @@ color_keyframe::Ptr util::get_keyframe(long frame_id) {
 
 }
 
-color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
+Sophus::SE3f util::get_pose(sql::ResultSet * res) {
 	Eigen::Quaternionf q;
 	Eigen::Vector3f t;
-	Eigen::Vector3f intrinsics;
 	q.x() = res->getDouble("q0");
 	q.y() = res->getDouble("q1");
 	q.z() = res->getDouble("q2");
@@ -248,6 +247,18 @@ color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
 	t[0] = res->getDouble("t0");
 	t[1] = res->getDouble("t1");
 	t[2] = res->getDouble("t2");
+
+	return Sophus::SE3f(q, t);
+
+}
+
+color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
+
+	Sophus::SE3f pose;
+	pose = get_pose(res);
+
+	Eigen::Vector3f intrinsics;
+
 	intrinsics[0] = res->getDouble("int0");
 	intrinsics[1] = res->getDouble("int1");
 	intrinsics[2] = res->getDouble("int2");
@@ -281,8 +292,7 @@ color_keyframe::Ptr util::get_keyframe(sql::ResultSet * res) {
 	cv::cvtColor(rgb, gray, CV_RGB2GRAY);
 
 	color_keyframe::Ptr k(
-			new color_keyframe(rgb, gray, depth, Sophus::SE3f(q, t),
-					intrinsics));
+			new color_keyframe(rgb, gray, depth, pose, intrinsics));
 
 	k->set_id(res->getDouble("id"));
 
@@ -352,68 +362,6 @@ boost::shared_ptr<keyframe_map> util::get_robot_map(int robot_id) {
 	return map;
 }
 
-void util::load_measurements(std::vector<measurement> &m) {
-
-	sql::ResultSet *res;
-	res = sql_query("SELECT * FROM measurement");
-	int i = 0;
-	while (res->next()) {
-		m.push_back(measurement());
-		Eigen::Quaternionf q;
-		Eigen::Vector3f t;
-
-		m[i].i = res->getInt64("one");
-		m[i].j = res->getInt64("two");
-
-		q.coeffs()[0] = res->getDouble("q0");
-		q.coeffs()[1] = res->getDouble("q1");
-		q.coeffs()[2] = res->getDouble("q2");
-		q.coeffs()[3] = res->getDouble("q3");
-		t[0] = res->getDouble("t0");
-		t[1] = res->getDouble("t1");
-		t[2] = res->getDouble("t2");
-
-		m[i].transform = Sophus::SE3f(q, t);
-		m[i].mt = (measurement_type) res->getInt64("type");
-		i++;
-
-	}
-}
-void util::save_measurements(const std::vector<measurement> &m) {
-	for (int i = 0; i < m.size(); i++) {
-		try {
-			sql::PreparedStatement *pstmt = con->prepareStatement(
-					"INSERT INTO measurement (`one`, `two`, `q0`, `q1`, "
-							"`q2`, `q3`, `t0`, `t1`, `t2`, `type`) VALUES "
-							"(?,?,?,?,?,?,?,?,?,?)");
-
-			pstmt->setInt64(1, m[i].i);
-			pstmt->setDouble(2, m[i].j);
-			pstmt->setDouble(3, m[i].transform.so3().data()[0]);
-			pstmt->setDouble(4, m[i].transform.so3().data()[1]);
-			pstmt->setDouble(5, m[i].transform.so3().data()[2]);
-			pstmt->setDouble(6, m[i].transform.so3().data()[3]);
-			pstmt->setDouble(7, m[i].transform.translation()[0]);
-			pstmt->setDouble(8, m[i].transform.translation()[1]);
-
-			pstmt->setDouble(9, m[i].transform.translation()[2]);
-			pstmt->setInt64(10, m[i].mt);
-
-			pstmt->executeUpdate();
-
-			delete pstmt;
-
-		} catch (sql::SQLException &e) {
-			std::cout << "# ERR: SQLException in " << __FILE__;
-			std::cout << "(" << __FUNCTION__ << ") on line " << __LINE__
-					<< std::endl;
-			std::cout << "# ERR: " << e.what();
-			std::cout << " (MySQL error code: " << e.getErrorCode();
-			std::cout << ", SQLState: " << e.getSQLState() << " )" << std::endl;
-		}
-	}
-}
-
 void util::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 		const Eigen::Vector3f & intrinsics,
 		std::vector<cv::KeyPoint> & filtered_keypoints,
@@ -478,7 +426,8 @@ void util::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 	de->compute(gray, filtered_keypoints, descriptors);
 }
 
-void util::get_overlapping_pairs(int map_id, std::vector<std::pair<long, long> > & overlapping_keyframes) {
+void util::get_overlapping_pairs(int map_id,
+		std::vector<std::pair<long, long> > & overlapping_keyframes) {
 	sql::ResultSet *res;
 
 	std::string map_id_s = boost::lexical_cast<std::string>(map_id);
@@ -502,6 +451,60 @@ void util::get_overlapping_pairs(int map_id, std::vector<std::pair<long, long> >
 	}
 
 	delete res;
+
+}
+
+void util::load_measurements(long keyframe_id, std::vector<measurement> & m) {
+
+	sql::ResultSet *res;
+	res = sql_query(
+			"SELECT * FROM measurement WHERE measurement.one = "
+					+ boost::lexical_cast<std::string>(keyframe_id));
+
+	while (res->next()) {
+		measurement mes;
+		mes.first = res->getInt64("one");
+		mes.second = res->getInt64("two");
+		mes.transform = get_pose(res);
+		m.push_back(mes);
+	}
+
+}
+
+void util::load_positions(int map_id, std::vector<position> & p) {
+	sql::ResultSet *res;
+	res = sql_query(
+			"SELECT * FROM keyframe WHERE map_id = "
+					+ boost::lexical_cast<std::string>(map_id));
+
+	boost::shared_ptr<keyframe_map> map(new keyframe_map);
+
+	while (res->next()) {
+		position pos;
+		pos.idx = res->getInt64("id");
+		pos.transform = get_pose(res);
+		p.push_back(pos);
+	}
+
+}
+
+void util::update_position(const position & p) {
+	sql::PreparedStatement *pstmt =
+			con->prepareStatement(
+					"UPDATE keyframes SET `q0`= ?, `q1`= ?, `q2`= ?, `q3`= ?, `t0`= ?, `t1`= ?, `t2`= ? WHERE id = ?");
+
+	pstmt->setDouble(1, p.transform.unit_quaternion().x());
+	pstmt->setDouble(2, p.transform.unit_quaternion().y());
+	pstmt->setDouble(3, p.transform.unit_quaternion().z());
+	pstmt->setDouble(4, p.transform.unit_quaternion().w());
+
+	pstmt->setDouble(5, p.transform.translation().x());
+	pstmt->setDouble(6, p.transform.translation().y());
+	pstmt->setDouble(7, p.transform.translation().z());
+
+	pstmt->setInt64(10, p.idx);
+
+	pstmt->executeUpdate();
 
 }
 

@@ -28,9 +28,18 @@ public:
 	util();
 	~util();
 
-	sql::ResultSet* sql_query(std::string query);
-	void save_measurements(const std::vector<measurement> &m);
-	void load_measurements(std::vector<measurement> &m);
+	struct measurement {
+		long first;
+		long second;
+		Sophus::SE3f transform;
+		std::string type;
+	};
+
+	struct position {
+		long idx;
+		Sophus::SE3f transform;
+	};
+
 
 	int get_new_robot_id();
 	void add_keyframe(int robot_id, const color_keyframe::Ptr & k);
@@ -49,6 +58,10 @@ public:
 	void get_overlapping_pairs(int map_id,
 			std::vector<std::pair<long, long> > & overlapping_keyframes);
 
+	void load_measurements(long keyframe_id, std::vector<measurement> & m);
+	void load_positions(int map_id, std::vector<position> & p);
+	void update_position(const position & p);
+
 	void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 			const Eigen::Vector3f & intrinsics,
 			std::vector<cv::KeyPoint> & filtered_keypoints,
@@ -56,6 +69,8 @@ public:
 			cv::Mat & descriptors);
 
 private:
+
+
 
 	std::string server;
 	std::string user;
@@ -68,6 +83,8 @@ private:
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
 
+	sql::ResultSet* sql_query(std::string query);
+	Sophus::SE3f get_pose(sql::ResultSet * res);
 	color_keyframe::Ptr get_keyframe(sql::ResultSet * res);
 };
 
