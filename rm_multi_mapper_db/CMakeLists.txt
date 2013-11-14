@@ -54,7 +54,7 @@ rosbuild_add_executable(worker_g2o src/worker_g2o.cpp)
 target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
 
 rosbuild_add_executable(master_g2o src/master_g2o.cpp)
-target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
+target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_stuff g2o_core g2o_types_slam3d g2o_solver_cholmod cholmod)
 
 ################# Tests #################################
 

@@ -44,6 +44,101 @@ typedef unsigned long long timestamp_t;
 typedef rm_multi_mapper_db::G2oWorkerAction action_t;
 typedef actionlib::SimpleActionClient<action_t> action_client;
 
+void optimize_g2o(std::vector<util::position> & p, util & U) {
+
+	g2o::SparseOptimizer optimizer;
+	optimizer.setVerbose(true);
+	g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
+
+	linearSolver = new g2o::LinearSolverCholmod<
+			g2o::BlockSolver_6_3::PoseMatrixType>();
+
+	g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
+	g2o::OptimizationAlgorithmLevenberg* solver =
+			new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+	optimizer.setAlgorithm(solver);
+
+	std::map<long, int> idx_to_pos;
+
+	for (size_t i = 0; i < p.size(); i++) {
+		idx_to_pos[p[i].idx] = i;
+
+		g2o::SE3Quat pose(p[i].transform.unit_quaternion().cast<double>(),
+				p[i].transform.translation().cast<double>());
+		g2o::VertexSE3 * v_se3 = new g2o::VertexSE3();
+
+		v_se3->setId(i);
+		if (i < 1) {
+			v_se3->setFixed(true);
+		}
+		v_se3->setEstimate(pose);
+		optimizer.addVertex(v_se3);
+	}
+
+	for (size_t i = 0; i < p.size(); i++) {
+
+		std::vector<util::measurement> m;
+		U.load_measurements(p[i].idx, m);
+
+		for (size_t it = 0; it < m.size(); it++) {
+			int i = idx_to_pos[m[it].first];
+			int j = idx_to_pos[m[it].second];
+
+			Sophus::SE3f Mij = m[it].transform;
+
+			g2o::EdgeSE3 * e = new g2o::EdgeSE3();
+
+			e->setVertex(0,
+					dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+							i)->second));
+			e->setVertex(1,
+					dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+							j)->second));
+			e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
+			e->information() = Sophus::Matrix6d::Identity();
+
+			optimizer.addEdge(e);
+
+		}
+	}
+
+	optimizer.save("debug.txt");
+
+	optimizer.initializeOptimization();
+	optimizer.setVerbose(true);
+
+	std::cout << std::endl;
+	std::cout << "Performing full BA:" << std::endl;
+	optimizer.optimize(20);
+	std::cout << std::endl;
+
+	for (int i = 0; i < p.size(); i++) {
+		g2o::HyperGraph::VertexIDMap::iterator v_it = optimizer.vertices().find(
+				i);
+		if (v_it == optimizer.vertices().end()) {
+			std::cerr << "Vertex " << i << " not in graph!" << std::endl;
+			exit(-1);
+		}
+
+		g2o::VertexSE3 * v_se3 = dynamic_cast<g2o::VertexSE3 *>(v_it->second);
+		if (v_se3 == 0) {
+			std::cerr << "Vertex " << i << "is not a VertexSE3Expmap!"
+					<< std::endl;
+			exit(-1);
+		}
+
+		double est[7];
+		v_se3->getEstimateData(est);
+
+		Eigen::Vector3d v(est);
+		Eigen::Quaterniond q(est + 3);
+
+		Sophus::SE3f t(q.cast<float>(), v.cast<float>());
+
+		p[i].transform = t;
+	}
+}
+
 int main(int argc, char **argv) {
 
 	boost::shared_ptr<keyframe_map> map;
@@ -124,9 +219,14 @@ int main(int argc, char **argv) {
 
 	if (success) {
 		std::cout << success << std::endl;
-		//U.load_measurements(m);
 
-		//map->optimize_g2o_min(m);
+		std::vector<util::position> p;
+		U.load_positions(map_id, p);
+		optimize_g2o(p, U);
+
+		for(int i=0; i<p.size(); i++ ){
+			U.update_position(p[i]);
+		}
 
 	}
 
