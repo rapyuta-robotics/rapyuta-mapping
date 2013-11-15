@@ -36,7 +36,7 @@ rosbuild_genmsg()
 
 ################ Library ##########################################
 
-rosbuild_add_library(${PROJECT_NAME} src/util_mysql.cpp)
+rosbuild_add_library(${PROJECT_NAME} src/util.cpp src/util_mysql.cpp)
 target_link_libraries(${PROJECT_NAME} tbb rm_localization rm_multi_mapper mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
 
 
@@ -55,6 +55,11 @@ target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
 
 rosbuild_add_executable(master_g2o src/master_g2o.cpp)
 target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_stuff g2o_core g2o_types_slam3d g2o_solver_cholmod cholmod)
+
+################# Map merging #################################
+
+rosbuild_add_executable(merge_maps_db src/merge_maps_db.cpp)
+target_link_libraries(merge_maps_db ${PROJECT_NAME} mysqlcppconn)
 
 ################# Tests #################################
 

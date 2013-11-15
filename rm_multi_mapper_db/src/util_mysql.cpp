@@ -92,6 +92,28 @@ util_mysql::util_mysql() {
 					"(SELECT id FROM measurement "
 					"WHERE measurement.one = f1.id AND two = f2.id )"));
 
+
+	select_random_idx.reset(
+			con->prepareStatement("SELECT id FROM keyframe "
+					"WHERE map_id=? ORDER BY RAND() LIMIT 1"));
+
+	update_keyframe.reset(
+				con->prepareStatement(
+						"UPDATE keyframe SET "
+						"`q0`= ?, `q1`= ?, `q2`= ?, `q3`= ?, "
+						"`t0`= ?, `t1`= ?, `t2`= ? WHERE id = ?"));
+
+	update_robot_map_id.reset(
+					con->prepareStatement(
+							"UPDATE robot SET "
+							"`map_id`= ? WHERE `map_id` = ?"));
+
+	update_keyframe_map_id.reset(
+						con->prepareStatement(
+								"UPDATE keyframe SET "
+								"`map_id`= ? WHERE `map_id` = ?"));
+
+
 	// Classes for feature extraction
 	de = new cv::SurfDescriptorExtractor;
 	fd = new cv::SurfFeatureDetector;
@@ -361,70 +383,6 @@ boost::shared_ptr<keyframe_map> util_mysql::get_robot_map(int robot_id) {
 	return map;
 }
 
-void util_mysql::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
-		const Eigen::Vector3f & intrinsics,
-		std::vector<cv::KeyPoint> & filtered_keypoints,
-		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
-	cv::Mat gray;
-
-	if (rgb.channels() != 1) {
-		cv::cvtColor(rgb, gray, cv::COLOR_BGR2GRAY);
-	} else {
-		gray = rgb.clone();
-	}
-
-	cv::GaussianBlur(gray, gray, cv::Size(3, 3), 3);
-
-	int threshold = 400;
-	fd->setInt("hessianThreshold", threshold);
-
-	//int threshold = 100;
-	//fd->setInt("thres", threshold);
-
-	std::vector<cv::KeyPoint> keypoints;
-
-	cv::Mat mask(depth.size(), CV_8UC1);
-	depth.convertTo(mask, CV_8U);
-
-	fd->detect(gray, keypoints, mask);
-
-	for (int i = 0; i < 5; i++) {
-		if (keypoints.size() < 300) {
-			threshold = threshold / 2;
-			fd->setInt("hessianThreshold", threshold);
-			//fd->setInt("thres", threshold);
-			keypoints.clear();
-			fd->detect(gray, keypoints, mask);
-		} else {
-			break;
-		}
-	}
-
-	if (keypoints.size() > 400)
-		keypoints.resize(400);
-
-	filtered_keypoints.clear();
-	keypoints3d.clear();
-
-	for (size_t i = 0; i < keypoints.size(); i++) {
-		if (depth.at<unsigned short>(keypoints[i].pt) != 0) {
-			filtered_keypoints.push_back(keypoints[i]);
-
-			pcl::PointXYZ p;
-			p.z = depth.at<unsigned short>(keypoints[i].pt) / 1000.0f;
-			p.x = (keypoints[i].pt.x - intrinsics[1]) * p.z / intrinsics[0];
-			p.y = (keypoints[i].pt.y - intrinsics[2]) * p.z / intrinsics[0];
-
-			//ROS_INFO("Point %f %f %f from  %f %f ", p.x, p.y, p.z, keypoints[i].pt.x, keypoints[i].pt.y);
-
-			keypoints3d.push_back(p);
-
-		}
-	}
-
-	de->compute(gray, filtered_keypoints, descriptors);
-}
-
 void util_mysql::get_overlapping_pairs(int map_id,
 		std::vector<std::pair<long, long> > & overlapping_keyframes) {
 
@@ -471,22 +429,39 @@ void util_mysql::load_positions(int map_id, std::vector<position> & p) {
 }
 
 void util_mysql::update_position(const position & p) {
-	sql::PreparedStatement *pstmt =
-			con->prepareStatement(
-					"UPDATE keyframe SET `q0`= ?, `q1`= ?, `q2`= ?, `q3`= ?, `t0`= ?, `t1`= ?, `t2`= ? WHERE id = ?");
+	update_keyframe->setDouble(1, p.transform.unit_quaternion().x());
+	update_keyframe->setDouble(2, p.transform.unit_quaternion().y());
+	update_keyframe->setDouble(3, p.transform.unit_quaternion().z());
+	update_keyframe->setDouble(4, p.transform.unit_quaternion().w());
 
-	pstmt->setDouble(1, p.transform.unit_quaternion().x());
-	pstmt->setDouble(2, p.transform.unit_quaternion().y());
-	pstmt->setDouble(3, p.transform.unit_quaternion().z());
-	pstmt->setDouble(4, p.transform.unit_quaternion().w());
+	update_keyframe->setDouble(5, p.transform.translation().x());
+	update_keyframe->setDouble(6, p.transform.translation().y());
+	update_keyframe->setDouble(7, p.transform.translation().z());
 
-	pstmt->setDouble(5, p.transform.translation().x());
-	pstmt->setDouble(6, p.transform.translation().y());
-	pstmt->setDouble(7, p.transform.translation().z());
+	update_keyframe->setInt64(8, p.idx);
 
-	pstmt->setInt64(8, p.idx);
+	update_keyframe->executeUpdate();
 
-	pstmt->executeUpdate();
+}
+
+long util_mysql::get_random_keyframe_idx(int map_id) {
+	select_random_idx->setInt(1, map_id);
+
+	boost::shared_ptr<sql::ResultSet> res(
+			select_random_idx->executeQuery());
+	res->next();
+	return res->getInt64("id");
+
+}
+
+void util_mysql::merge_map(int old_map_id, int new_map_id){
+	update_robot_map_id->setInt(1, new_map_id);
+	update_robot_map_id->setInt(2, old_map_id);
+	update_robot_map_id->executeUpdate();
+
+	update_keyframe_map_id->setInt(1, new_map_id);
+	update_keyframe_map_id->setInt(2, old_map_id);
+	update_keyframe_map_id->executeUpdate();
 
 }
 

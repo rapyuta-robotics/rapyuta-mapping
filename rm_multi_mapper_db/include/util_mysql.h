@@ -4,9 +4,6 @@
 
 #include <util.h>
 
-#include <opencv2/nonfree/features2d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-
 #include <mysql_connection.h>
 #include <cppconn/driver.h>
 #include <cppconn/exception.h>
@@ -40,12 +37,8 @@ public:
 	void load_measurements(long keyframe_id, std::vector<measurement> & m);
 	void load_positions(int map_id, std::vector<position> & p);
 	void update_position(const position & p);
-
-	void compute_features(const cv::Mat & rgb, const cv::Mat & depth,
-			const Eigen::Vector3f & intrinsics,
-			std::vector<cv::KeyPoint> & filtered_keypoints,
-			pcl::PointCloud<pcl::PointXYZ> & keypoints3d,
-			cv::Mat & descriptors);
+	long get_random_keyframe_idx(int map);
+	void merge_map(int old_map_id, int new_map_id);
 
 
 private:
@@ -79,9 +72,10 @@ private:
 	boost::shared_ptr<sql::PreparedStatement> select_positions;
 	boost::shared_ptr<sql::PreparedStatement> select_measurements;
 	boost::shared_ptr<sql::PreparedStatement> select_overlapping_keyframes;
-
-	cv::Ptr<cv::FeatureDetector> fd;
-	cv::Ptr<cv::DescriptorExtractor> de;
+	boost::shared_ptr<sql::PreparedStatement> select_random_idx;
+	boost::shared_ptr<sql::PreparedStatement> update_keyframe;
+	boost::shared_ptr<sql::PreparedStatement> update_robot_map_id;
+	boost::shared_ptr<sql::PreparedStatement> update_keyframe_map_id;
 
 	Sophus::SE3f get_pose(boost::shared_ptr<sql::ResultSet> & res);
 	color_keyframe::Ptr get_keyframe(boost::shared_ptr<sql::ResultSet> & res);

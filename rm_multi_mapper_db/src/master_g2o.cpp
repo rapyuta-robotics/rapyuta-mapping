@@ -208,7 +208,7 @@ int main(int argc, char **argv) {
 		U->load_positions(map_id, p);
 		optimize_g2o(p, U);
 
-		for(int i=0; i<p.size(); i++ ){
+		for(size_t i=0; i<p.size(); i++ ){
 			U->update_position(p[i]);
 		}
 
