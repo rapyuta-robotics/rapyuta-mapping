@@ -19,7 +19,6 @@
 #include "std_msgs/Float32.h"
 #include "std_msgs/Int32.h"
 
-
 int main(int argc, char **argv) {
 
 	keyframe_map map;
@@ -29,24 +28,24 @@ int main(int argc, char **argv) {
 
 	ros::Publisher pointcloud_pub = nh.advertise<
 			pcl::PointCloud<pcl::PointXYZRGB> >("pointcloud", 1);
-   	
-	map.load(argv[1]);
 
+	map.load(argv[1]);
 
 	std::cerr << map.frames.size() << std::endl;
 	for (int level = 2; level >= 0; level--) {
 		for (int i = 0; i < (level + 1) * (level + 1) * 50; i++) {
-	        float max_update = map.optimize_panorama(level);
+			float max_update = map.optimize_panorama(level);
 
-	        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map.get_map_pointcloud();
+			pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud =
+					map.get_map_pointcloud();
 
-	        		cloud->header.frame_id = "world";
-	        		cloud->header.stamp = ros::Time::now();
-	        		cloud->header.seq = 0;
-	        		pointcloud_pub.publish(cloud);
+			cloud->header.frame_id = "world";
+			cloud->header.stamp = ros::Time::now();
+			cloud->header.seq = 0;
+			pointcloud_pub.publish(cloud);
 
 			if (max_update < 1e-4)
-			    break;
+				break;
 		}
 	}
 

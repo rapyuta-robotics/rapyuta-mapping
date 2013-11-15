@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS `robot` (
 
 
 CREATE TABLE IF NOT EXISTS `measurement` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `one` int(11) NOT NULL,
-  `two` int(11) NOT NULL,
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `one` BIGINT NOT NULL,
+  `two` BIGINT NOT NULL,
   `q0` FLOAT NOT NULL,
   `q1` FLOAT NOT NULL,
   `q2` FLOAT NOT NULL,
@@ -35,7 +35,10 @@ CREATE TABLE IF NOT EXISTS `keyframe` (
   `int2` FLOAT NOT NULL,
   `rgb` MEDIUMBLOB NOT NULL,
   `depth` MEDIUMBLOB NOT NULL,
+  `num_keypoints` INT NOT NULL,
   `keypoints` MEDIUMBLOB NOT NULL,
+  `descriptor_size` INT NOT NULL,
+  `descriptor_type` INT NOT NULL,
   `descriptors` MEDIUMBLOB NOT NULL,
    PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

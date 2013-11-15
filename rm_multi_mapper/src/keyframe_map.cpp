@@ -6,7 +6,6 @@
 #include <reduce_jacobian_rgb.h>
 #include <reduce_jacobian_slam_3d.h>
 
-#include <util.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
@@ -535,6 +534,117 @@ float keyframe_map::optimize_slam(int skip_n) {
 	return iteration_max_update;
 
 }
+
+/*
+void keyframe_map::optimize_g2o_min(const std::vector<measurement> &m){
+
+	g2o::SparseOptimizer optimizer;
+	optimizer.setVerbose(true);
+	g2o::BlockSolver_6_3::LinearSolverType * linearSolver;
+
+	linearSolver = new g2o::LinearSolverCholmod<
+			g2o::BlockSolver_6_3::PoseMatrixType>();
+
+	g2o::BlockSolver_6_3 * solver_ptr = new g2o::BlockSolver_6_3(linearSolver);
+	g2o::OptimizationAlgorithmLevenberg* solver =
+			new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+	optimizer.setAlgorithm(solver);
+
+	for (size_t i = 0; i < frames.size(); i++) {
+		Sophus::SE3f & pos = frames[i]->get_pos();
+
+		g2o::SE3Quat pose(pos.unit_quaternion().cast<double>(),
+				pos.translation().cast<double>());
+		g2o::VertexSE3 * v_se3 = new g2o::VertexSE3();
+
+		v_se3->setId(i);
+		if (i < 1) {
+			v_se3->setFixed(true);
+		}
+		v_se3->setEstimate(pose);
+		optimizer.addVertex(v_se3);
+	}
+
+	for (size_t it = 0; it < m.size(); it++) {
+		int i = m[it].i;
+		int j = m[it].j;
+
+		Sophus::SE3f Mij = m[it].transform;
+
+		g2o::EdgeSE3 * e = new g2o::EdgeSE3();
+
+		e->setVertex(0,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						i)->second));
+		e->setVertex(1,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						j)->second));
+		e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
+		e->information() = Sophus::Matrix6d::Identity();
+
+		optimizer.addEdge(e);
+
+	}
+
+	for (size_t it = 1; it < frames.size(); it++) {
+		int i = it - 1;
+		int j = it;
+
+		Sophus::SE3f Mij = frames[i]->get_pos().inverse()
+				* frames[j]->get_pos();
+
+		g2o::EdgeSE3 * e = new g2o::EdgeSE3();
+
+		e->setVertex(0,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						i)->second));
+		e->setVertex(1,
+				dynamic_cast<g2o::OptimizableGraph::Vertex*>(optimizer.vertices().find(
+						j)->second));
+		e->setMeasurement(Eigen::Isometry3d(Mij.cast<double>().matrix()));
+		e->information() = Sophus::Matrix6d::Identity();
+
+		optimizer.addEdge(e);
+
+	}
+
+	optimizer.save("debug.txt");
+
+	optimizer.initializeOptimization();
+	optimizer.setVerbose(true);
+
+	std::cout << std::endl;
+	std::cout << "Performing full BA:" << std::endl;
+	optimizer.optimize(20);
+	std::cout << std::endl;
+
+	for (int i = 0; i < frames.size(); i++) {
+		g2o::HyperGraph::VertexIDMap::iterator v_it = optimizer.vertices().find(
+				i);
+		if (v_it == optimizer.vertices().end()) {
+			std::cerr << "Vertex " << i << " not in graph!" << std::endl;
+			exit(-1);
+		}
+
+		g2o::VertexSE3 * v_se3 = dynamic_cast<g2o::VertexSE3 *>(v_it->second);
+		if (v_se3 == 0) {
+			std::cerr << "Vertex " << i << "is not a VertexSE3Expmap!"
+					<< std::endl;
+			exit(-1);
+		}
+
+		double est[7];
+		v_se3->getEstimateData(est);
+
+		Eigen::Vector3d v(est);
+		Eigen::Quaterniond q(est + 3);
+
+		Sophus::SE3f t(q.cast<float>(), v.cast<float>());
+
+		frames[i]->get_pos() = t;
+	}
+}
+*/
 
 void keyframe_map::optimize_g2o() {
 

@@ -2,10 +2,10 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-
-reduce_jacobian_ros::reduce_jacobian_ros(std::vector<color_keyframe::Ptr> & frames,
-			int size, int subsample_level) : size(size), 
-			subsample_level(0), frames(frames) {
+reduce_jacobian_ros::reduce_jacobian_ros(
+		std::vector<color_keyframe::Ptr> & frames, int size,
+		int subsample_level) :
+		size(size), subsample_level(0), frames(frames) {
 
 	JtJ.setZero(size * 3 + 3, size * 3 + 3);
 	Jte.setZero(size * 3 + 3);
@@ -196,9 +196,10 @@ void reduce_jacobian_ros::compute_frame_jacobian(const Eigen::Vector3f & i,
 
 }
 
-void reduce_jacobian_ros::reduce(const rm_multi_mapper::WorkerGoalConstPtr &goal) {
+void reduce_jacobian_ros::reduce(
+		const rm_multi_mapper::WorkerGoalConstPtr &goal) {
 
-	for (int k=0; k<goal->Overlap.size(); k++) {
+	for (int k = 0; k < goal->Overlap.size(); k++) {
 		int i = goal->Overlap[k].first;
 		int j = goal->Overlap[k].second;
 
@@ -220,7 +221,8 @@ void reduce_jacobian_ros::reduce(const rm_multi_mapper::WorkerGoalConstPtr &goal
 		Eigen::Matrix3f H = K * Qij.matrix() * K.inverse();
 		cv::Mat cvH(3, 3, CV_32F, H.data());
 
-		cv::Mat intensity_j_float, intensity_j_warped, intensity_i_dx, intensity_i_dy;
+		cv::Mat intensity_j_float, intensity_j_warped, intensity_i_dx,
+				intensity_i_dy;
 		intensity_j.convertTo(intensity_j_float, CV_32F);
 		intensity_j_warped = cv::Mat::zeros(intensity_j_float.size(),
 				intensity_j_float.type());
@@ -251,7 +253,7 @@ void reduce_jacobian_ros::reduce(const rm_multi_mapper::WorkerGoalConstPtr &goal
 				if (intensity_j_warped.at<float>(v, u) != 0) {
 
 					float e = (float) intensity_i.at<uint8_t>(v, u)
-							-  intensity_j_warped.at<float>(v, u);
+							- intensity_j_warped.at<float>(v, u);
 
 					float dx = intensity_i_dx.at<int16_t>(v, u);
 					float dy = intensity_i_dy.at<int16_t>(v, u);

@@ -1,0 +1,24 @@
+<package>
+  <description brief="rm_multi_mapper_db">
+
+     rm_multi_mapper_db
+
+  </description>
+  <author>Vladyslav Usenko</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/rm_multi_mapper_db</url>
+  <depend package="roscpp"/>
+  <depend package="g2o"/>
+  <depend package="rm_localization"/>
+  <depend package="opencv2"/>
+  <depend package="tf"/>
+  <depend package="tf_conversions"/>
+  <depend package="eigen_conversions"/>
+  <depend package="sophus"/>
+  <depend package="pcl_ros"/>
+  <depend package="rm_multi_mapper"/>
+
+</package>
+
+

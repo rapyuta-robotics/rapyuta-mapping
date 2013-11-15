@@ -53,8 +53,9 @@ struct reduce_measurement_g2o {
 	void add_ransac_measurement(int i, int j);
 	void add_floor_measurement(int i);
 
-	void operator()(const tbb::blocked_range<
-			tbb::concurrent_vector<std::pair<int, int> >::iterator> & r);
+	void operator()(
+			const tbb::blocked_range<
+					tbb::concurrent_vector<std::pair<int, int> >::iterator> & r);
 
 	void join(reduce_measurement_g2o& rb);
 
@@ -78,8 +79,8 @@ struct reduce_measurement_g2o {
 			pcl::PointCloud<pcl::PointXYZ> & keypoints3d,
 			cv::Mat & descriptors);
 
-	bool find_transform(const color_keyframe::Ptr & fi, const color_keyframe::Ptr & fj,
-			Sophus::SE3f & t);
+	bool find_transform(const color_keyframe::Ptr & fi,
+			const color_keyframe::Ptr & fj, Sophus::SE3f & t);
 
 };
 

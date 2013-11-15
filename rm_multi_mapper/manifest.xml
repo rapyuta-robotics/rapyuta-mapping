@@ -19,6 +19,10 @@
   <depend package="rostime"/>
   <depend package="pcl_ros"/>
   <depend package="g2o"/>
+
+  <export>
+    <cpp cflags="-I${prefix}/include"  lflags="-L${prefix}/lib"/>
+  </export>
   
 </package>
 

@@ -43,6 +43,8 @@ target_link_libraries(${PROJECT_NAME} tbb)
 rosbuild_add_executable(localization src/main.cpp)
 target_link_libraries(localization ${PROJECT_NAME})
 
+rosbuild_add_gtest(test/sigma_points_test test/sigma_points_test.cpp)
+
 #rosbuild_add_executable(test_vo src/test_vo.cpp)
 #target_link_libraries(test_vo ${PROJECT_NAME} ${VTK_LIBRARIES})
 

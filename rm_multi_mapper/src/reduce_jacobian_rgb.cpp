@@ -202,7 +202,6 @@ void reduce_jacobian_rgb::compute_frame_jacobian(const Eigen::Vector3f & i,
 
 }
 
-
 void reduce_jacobian_rgb::operator()(
 		const tbb::blocked_range<
 				tbb::concurrent_vector<std::pair<int, int> >::iterator>& r) {
@@ -229,7 +228,8 @@ void reduce_jacobian_rgb::operator()(
 		Eigen::Matrix3f H = K * Qij.matrix() * K.inverse();
 		cv::Mat cvH(3, 3, CV_32F, H.data());
 
-		cv::Mat intensity_j_float, intensity_j_warped, intensity_i_dx, intensity_i_dy;
+		cv::Mat intensity_j_float, intensity_j_warped, intensity_i_dx,
+				intensity_i_dy;
 		intensity_j.convertTo(intensity_j_float, CV_32F);
 		intensity_j_warped = cv::Mat::zeros(intensity_j_float.size(),
 				intensity_j_float.type());
@@ -260,7 +260,7 @@ void reduce_jacobian_rgb::operator()(
 				if (intensity_j_warped.at<float>(v, u) != 0) {
 
 					float e = (float) intensity_i.at<uint8_t>(v, u)
-							-  intensity_j_warped.at<float>(v, u);
+							- intensity_j_warped.at<float>(v, u);
 
 					float dx = intensity_i_dx.at<int16_t>(v, u);
 					float dy = intensity_i_dy.at<int16_t>(v, u);
