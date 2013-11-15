@@ -108,10 +108,10 @@ public:
 	bool estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 			const pcl::PointCloud<pcl::PointXYZ> & dst,
 			const std::vector<cv::DMatch> matches, int num_iter,
-			float distance2_threshold, int min_num_inliers,
+			float distance2_threshold, size_t min_num_inliers,
 			Eigen::Affine3f & trans, std::vector<bool> & inliers) const {
 
-		int max_inliers = 0;
+		size_t max_inliers = 0;
 
 		if (matches.size() < min_num_inliers)
 			return false;
@@ -154,7 +154,7 @@ public:
 			//std::cerr << "trans " << std::endl << transformation.matrix()
 			//		<< std::endl;
 
-			int current_num_inliers = 0;
+			size_t current_num_inliers = 0;
 			std::vector<bool> current_inliers;
 			current_inliers.resize(matches.size());
 			for (size_t i = 0; i < matches.size(); i++) {

@@ -38,6 +38,19 @@ util_mysql::util_mysql() {
 							" VALUES"
 							" (NULL,?,?,?,?,?,?,?,?,?,?)"));
 
+	insert_new_robot.reset(
+			con->prepareStatement("INSERT INTO robot (id, map_id) "
+					"VALUES(NULL, NULL)"));
+
+	insert_map_id.reset(
+				con->prepareStatement(
+						"UPDATE robot SET map_id = LAST_INSERT_ID() "
+						"WHERE id = LAST_INSERT_ID()"));
+
+	select_map_id.reset(
+				con->prepareStatement(
+						"SELECT LAST_INSERT_ID() as id"));
+
 	select_keyframe.reset(
 			con->prepareStatement("SELECT `q0`, `q1`, `q2`, `q3`, `t0`, `t1`, `t2`, "
 				"`int0`, `int1`, `int2`, `rgb`, `depth`, `id` "
@@ -63,6 +76,22 @@ util_mysql::util_mysql() {
 					con->prepareStatement("SELECT * FROM measurement "
 							"WHERE measurement.one = ?"));
 
+	select_overlapping_keyframes.reset(
+			con->prepareStatement("SELECT f1.id as id1, f2.id as id2 "
+					"FROM keyframe f1, keyframe f2 "
+					"WHERE f1.map_id = ? "
+					"AND f2.map_id = ? "
+					"AND (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
+					" + f1.q3*f2.q3) >= 1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 +"
+					" f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) "
+					"AND f1.id < f2.id "
+					"AND SQRT(POWER((f1.t0 - f2.t0), 2) + "
+					"POWER((f1.t1 - f2.t1), 2) + "
+					"POWER((f1.t2 - f2.t2), 2)) < 3 "
+					"AND NOT EXISTS "
+					"(SELECT id FROM measurement "
+					"WHERE measurement.one = f1.id AND two = f2.id )"));
+
 	// Classes for feature extraction
 	de = new cv::SurfDescriptorExtractor;
 	fd = new cv::SurfFeatureDetector;
@@ -80,40 +109,14 @@ util_mysql::util_mysql() {
 util_mysql::~util_mysql() {
 }
 
-sql::ResultSet* util_mysql::sql_query(std::string query) {
-	try {
-		sql::PreparedStatement *pstmt;
-		sql::ResultSet *res;
-
-		/* Select in ascending order */
-		pstmt = con->prepareStatement(query);
-		res = pstmt->executeQuery();
-
-		delete pstmt;
-		return res;
-
-	} catch (sql::SQLException &e) {
-		std::cout << "# ERR: SQLException in " << __FILE__;
-		std::cout << "(" << __FUNCTION__ << ") on line " << __LINE__
-				<< std::endl;
-		std::cout << "# ERR: " << e.what();
-		std::cout << " (MySQL error code: " << e.getErrorCode();
-		std::cout << ", SQLState: " << e.getSQLState() << " )" << std::endl;
-		return NULL;
-	}
-}
-
 int util_mysql::get_new_robot_id() {
-	sql::ResultSet *res;
-	res = sql_query("INSERT INTO robot (id, map_id) VALUES(NULL, NULL);");
-	res = sql_query("SELECT LAST_INSERT_ID() as id");
+
+	insert_new_robot->executeUpdate();
+	insert_map_id->executeUpdate();
+
+	boost::shared_ptr<sql::ResultSet> res(select_map_id->executeQuery());
 	res->next();
 	int robot_id = res->getInt("id");
-	res = sql_query(
-			"UPDATE robot SET map_id = "
-					+ boost::lexical_cast<std::string>(robot_id)
-					+ " WHERE id = "
-					+ boost::lexical_cast<std::string>(robot_id));
 	return robot_id;
 
 }
@@ -424,30 +427,17 @@ void util_mysql::compute_features(const cv::Mat & rgb, const cv::Mat & depth,
 
 void util_mysql::get_overlapping_pairs(int map_id,
 		std::vector<std::pair<long, long> > & overlapping_keyframes) {
-	sql::ResultSet *res;
 
-	std::string map_id_s = boost::lexical_cast<std::string>(map_id);
+	select_overlapping_keyframes->setInt(1, map_id);
+	select_overlapping_keyframes->setInt(2, map_id);
 
-	res = sql_query(""
-			"SELECT f1.id as id1, f2.id as id2 "
-			"FROM keyframe f1, keyframe f2 "
-			"WHERE f1.map_id = " + map_id_s + " "
-			"AND f2.map_id = " + map_id_s + " "
-			"AND (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
-			" + f1.q3*f2.q3) >= 1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 +"
-			" f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) "
-			"AND f1.id < f2.id "
-			"AND SQRT(POWER((f1.t0 - f2.t0), 2) + "
-			"POWER((f1.t1 - f2.t1), 2) + "
-			"POWER((f1.t2 - f2.t2), 2)) < 3;");
+	boost::shared_ptr<sql::ResultSet> res(
+			select_overlapping_keyframes->executeQuery());
 
 	while (res->next()) {
 		overlapping_keyframes.push_back(
 				std::make_pair(res->getInt64("id1"), res->getInt64("id2")));
 	}
-
-	delete res;
-
 }
 
 void util_mysql::load_measurements(long keyframe_id,

@@ -70,16 +70,19 @@ private:
 	boost::shared_ptr<sql::PreparedStatement> insert_keyframe;
 	boost::shared_ptr<sql::PreparedStatement> insert_keypoints;
 	boost::shared_ptr<sql::PreparedStatement> insert_measurement;
+	boost::shared_ptr<sql::PreparedStatement> insert_new_robot;
+	boost::shared_ptr<sql::PreparedStatement> insert_map_id;
+	boost::shared_ptr<sql::PreparedStatement> select_map_id;
 	boost::shared_ptr<sql::PreparedStatement> select_keyframe;
 	boost::shared_ptr<sql::PreparedStatement> select_keypoints;
 	boost::shared_ptr<sql::PreparedStatement> select_map;
 	boost::shared_ptr<sql::PreparedStatement> select_positions;
 	boost::shared_ptr<sql::PreparedStatement> select_measurements;
+	boost::shared_ptr<sql::PreparedStatement> select_overlapping_keyframes;
 
 	cv::Ptr<cv::FeatureDetector> fd;
 	cv::Ptr<cv::DescriptorExtractor> de;
 
-	sql::ResultSet* sql_query(std::string query);
 	Sophus::SE3f get_pose(boost::shared_ptr<sql::ResultSet> & res);
 	color_keyframe::Ptr get_keyframe(boost::shared_ptr<sql::ResultSet> & res);
 };
