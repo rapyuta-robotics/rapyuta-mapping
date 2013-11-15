@@ -208,8 +208,8 @@ void util_mysql::add_keypoints(const color_keyframe::Ptr & k) {
 		insert_keypoints->setInt(3, descriptors.type());
 
 		assert(descriptors.type() == CV_32F);
-		std::cerr << "Keypoints size " << keypoints3d.size() << " "
-				<< descriptors.size() << std::endl;
+		//std::cerr << "Keypoints size " << keypoints3d.size() << " "
+		//		<< descriptors.size() << std::endl;
 
 		DataBuf keypoints_buffer((char*) keypoints3d.points.data(),
 				keypoints3d.points.size() * sizeof(pcl::PointXYZ));

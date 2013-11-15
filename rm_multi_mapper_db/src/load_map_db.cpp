@@ -19,8 +19,8 @@ int main(int argc, char **argv) {
 		U->add_keyframe(robot_id, map.frames[i]);
 		U->add_keypoints(map.frames[i]);
 		if (i != 0) {
-			std::cerr << map.frames[i - 1]->get_id() << " "
-					<< map.frames[i]->get_id() << std::endl;
+			//std::cerr << map.frames[i - 1]->get_id() << " "
+			//		<< map.frames[i]->get_id() << std::endl;
 			U->add_measurement(map.frames[i - 1]->get_id(),
 					map.frames[i]->get_id(),
 					map.frames[i - 1]->get_pos().inverse()
