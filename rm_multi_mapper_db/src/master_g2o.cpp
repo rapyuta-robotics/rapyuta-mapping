@@ -127,7 +127,6 @@ void optimize_g2o(std::vector<util::position> & p, util::Ptr & U) {
 int main(int argc, char **argv) {
 
 	boost::shared_ptr<keyframe_map> map;
-	std::vector<measurement> m;
 	util::Ptr U(new util_mysql);
 
 	//timestamp_t t0 = get_timestamp();

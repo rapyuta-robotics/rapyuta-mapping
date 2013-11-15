@@ -11,7 +11,6 @@
 #include <pcl/point_types.h>
 
 #include <keyframe_map.h>
-#include <reduce_measurement_g2o_dist.h>
 #include <util.h>
 #include <util_mysql.h>
 

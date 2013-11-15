@@ -10,8 +10,58 @@ util_mysql::util_mysql() {
 	database = "mapping";
 
 	driver = get_driver_instance();
-	con = driver->connect("tcp://" + server + ":3306", user, password);
+	con.reset(driver->connect("tcp://" + server + ":3306", user, password));
 	con->setSchema(database);
+
+	get_map_id_from_robot_id.reset(
+			con->prepareStatement("SELECT map_id FROM robot WHERE id = ?"));
+
+	insert_keyframe.reset(con->prepareStatement("INSERT INTO keyframe "
+			"(`id`, `q0`, `q1`, `q2`, `q3`,"
+			" `t0`, `t1`, `t2`, `int0`, `int1`,"
+			" `int2`, `rgb`, `depth`, `map_id`) "
+			"VALUES "
+			"(?,?,?,?,?"
+			",?,?,?,?,?"
+			",?,?,?,?)"));
+
+	insert_keypoints.reset(con->prepareStatement("UPDATE keyframe SET"
+			" `num_keypoints`=? , `descriptor_size`= ?, `descriptor_type`=?,"
+			" `keypoints`= ?, `descriptors`=? "
+			" WHERE `id` = ? "));
+
+	insert_measurement.reset(
+			con->prepareStatement(
+					"INSERT INTO measurement"
+							" (`id`, `one`, `two`, `q0`, `q1`, `q2`,"
+							" `q3`, `t0`, `t1`, `t2`, `type`)"
+							" VALUES"
+							" (NULL,?,?,?,?,?,?,?,?,?,?)"));
+
+	select_keyframe.reset(
+			con->prepareStatement("SELECT `q0`, `q1`, `q2`, `q3`, `t0`, `t1`, `t2`, "
+				"`int0`, `int1`, `int2`, `rgb`, `depth`, `id` "
+				"FROM keyframe WHERE `id` = ?"));
+
+
+	select_keypoints.reset(
+				con->prepareStatement("SELECT `keypoints`, `descriptors`, "
+						"`descriptor_size`, `num_keypoints`, `descriptor_type` "
+						"FROM keyframe WHERE `id` = ?"));
+
+	select_map.reset(
+				con->prepareStatement("SELECT `q0`, `q1`, `q2`, `q3`, `t0`, `t1`, `t2`, "
+					"`int0`, `int1`, `int2`, `rgb`, `depth`, `id` "
+					"FROM keyframe WHERE `map_id` = "
+					"(SELECT `map_id` FROM robot WHERE `id` = ?)"));
+
+	select_positions.reset(
+				con->prepareStatement("SELECT `q0`, `q1`, `q2`, `q3`, `t0`, `t1`, `t2`, `id` "
+					"FROM keyframe WHERE `map_id` = ?"));
+
+	select_measurements.reset(
+					con->prepareStatement("SELECT * FROM measurement "
+							"WHERE measurement.one = ?"));
 
 	// Classes for feature extraction
 	de = new cv::SurfDescriptorExtractor;
@@ -28,7 +78,6 @@ util_mysql::util_mysql() {
 }
 
 util_mysql::~util_mysql() {
-	delete con;
 }
 
 sql::ResultSet* util_mysql::sql_query(std::string query) {
@@ -73,57 +122,41 @@ void util_mysql::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
 
 	try {
 
-		sql::ResultSet *res;
-		res = sql_query(
-				"SELECT map_id FROM robot WHERE id = "
-						+ boost::lexical_cast<std::string>(robot_id));
-
+		get_map_id_from_robot_id->setInt(1, robot_id);
+		boost::shared_ptr<sql::ResultSet> res(
+				get_map_id_from_robot_id->executeQuery());
 		res->next();
 		int map_id = res->getInt("map_id");
 
-		sql::PreparedStatement *pstmt = con->prepareStatement(
-				"INSERT INTO keyframe "
-						"(`id`, `q0`, `q1`, `q2`, `q3`,"
-						" `t0`, `t1`, `t2`, `int0`, `int1`,"
-						" `int2`, `rgb`, `depth`, `map_id`) "
-						"VALUES "
-						"(?,?,?,?,?"
-						",?,?,?,?,?"
-						",?,?,?,?)");
+		insert_keyframe->setInt64(1, k->get_id());
+		insert_keyframe->setDouble(2, k->get_pos().unit_quaternion().x());
+		insert_keyframe->setDouble(3, k->get_pos().unit_quaternion().y());
+		insert_keyframe->setDouble(4, k->get_pos().unit_quaternion().z());
+		insert_keyframe->setDouble(5, k->get_pos().unit_quaternion().w());
 
-		pstmt->setInt64(1, k->get_id());
-		pstmt->setDouble(2, k->get_pos().unit_quaternion().x());
-		pstmt->setDouble(3, k->get_pos().unit_quaternion().y());
-		pstmt->setDouble(4, k->get_pos().unit_quaternion().z());
-		pstmt->setDouble(5, k->get_pos().unit_quaternion().w());
+		insert_keyframe->setDouble(6, k->get_pos().translation().x());
+		insert_keyframe->setDouble(7, k->get_pos().translation().y());
+		insert_keyframe->setDouble(8, k->get_pos().translation().z());
 
-		pstmt->setDouble(6, k->get_pos().translation().x());
-		pstmt->setDouble(7, k->get_pos().translation().y());
-		pstmt->setDouble(8, k->get_pos().translation().z());
-
-		pstmt->setDouble(9, k->get_intrinsics()[0]);
-		pstmt->setDouble(10, k->get_intrinsics()[1]);
-		pstmt->setDouble(11, k->get_intrinsics()[2]);
+		insert_keyframe->setDouble(9, k->get_intrinsics()[0]);
+		insert_keyframe->setDouble(10, k->get_intrinsics()[1]);
+		insert_keyframe->setDouble(11, k->get_intrinsics()[2]);
 
 		std::vector<uint8_t> rgb_data, depth_data;
 
 		cv::imencode(".png", k->get_rgb(), rgb_data);
 		DataBuf rgb_buffer((char*) rgb_data.data(), rgb_data.size());
 		std::istream rgb_stream(&rgb_buffer);
-		//std::cerr << "Write rgb data size " << rgb_data.size() << std::endl;
 
 		cv::imencode(".png", k->get_d(0), depth_data);
 		DataBuf depth_buffer((char*) depth_data.data(), depth_data.size());
 		std::istream depth_stream(&depth_buffer);
-		//std::cerr << "Write depth data size " << depth_data.size() << std::endl;
 
-		pstmt->setBlob(12, &rgb_stream);
-		pstmt->setBlob(13, &depth_stream);
-		pstmt->setInt(14, map_id);
+		insert_keyframe->setBlob(12, &rgb_stream);
+		insert_keyframe->setBlob(13, &depth_stream);
+		insert_keyframe->setInt(14, map_id);
 
-		pstmt->executeUpdate();
-
-		delete pstmt;
+		insert_keyframe->executeUpdate();
 
 	} catch (sql::SQLException &e) {
 		std::cout << "# ERR: SQLException in " << __FILE__;
@@ -139,22 +172,15 @@ void util_mysql::add_keyframe(int robot_id, const color_keyframe::Ptr & k) {
 void util_mysql::add_keypoints(const color_keyframe::Ptr & k) {
 	try {
 
-		sql::PreparedStatement *pstmt =
-				con->prepareStatement(
-						"UPDATE keyframe SET"
-								" `num_keypoints`=? , `descriptor_size`= ?, `descriptor_type`=?,"
-								" `keypoints`= ?, `descriptors`=? "
-								" WHERE `id` = ? ");
-
 		std::vector<cv::KeyPoint> keypoints;
 		pcl::PointCloud<pcl::PointXYZ> keypoints3d;
 		cv::Mat descriptors;
 		compute_features(k->get_i(0), k->get_d(0), k->get_intrinsics(0),
 				keypoints, keypoints3d, descriptors);
 
-		pstmt->setInt(1, keypoints3d.size());
-		pstmt->setInt(2, descriptors.cols);
-		pstmt->setInt(3, descriptors.type());
+		insert_keypoints->setInt(1, keypoints3d.size());
+		insert_keypoints->setInt(2, descriptors.cols);
+		insert_keypoints->setInt(3, descriptors.type());
 
 		assert(descriptors.type() == CV_32F);
 		std::cerr << "Keypoints size " << keypoints3d.size() << " "
@@ -168,15 +194,11 @@ void util_mysql::add_keypoints(const color_keyframe::Ptr & k) {
 				descriptors.cols * descriptors.rows * sizeof(float));
 		std::istream descriptors_stream(&descriptors_buffer);
 
-		//std::cerr << "Decriptors size " << descriptors.cols * descriptors.rows * sizeof(float) << std::endl;
+		insert_keypoints->setBlob(4, &keypoints_stream);
+		insert_keypoints->setBlob(5, &descriptors_stream);
+		insert_keypoints->setInt64(6, k->get_id());
 
-		pstmt->setBlob(4, &keypoints_stream);
-		pstmt->setBlob(5, &descriptors_stream);
-		pstmt->setInt64(6, k->get_id());
-
-		pstmt->executeUpdate();
-
-		delete pstmt;
+		insert_keypoints->executeUpdate();
 
 	} catch (sql::SQLException &e) {
 		std::cout << "# ERR: SQLException in " << __FILE__;
@@ -192,30 +214,21 @@ void util_mysql::add_measurement(long int first, long int second,
 		const Sophus::SE3f & transform, const std::string & type) {
 	try {
 
-		sql::PreparedStatement *pstmt =
-				con->prepareStatement(
-						"INSERT INTO measurement"
-								" (`id`, `one`, `two`, `q0`, `q1`, `q2`, `q3`, `t0`, `t1`, `t2`, `type`)"
-								" VALUES"
-								" (NULL,?,?,?,?,?,?,?,?,?,?)");
+		insert_measurement->setInt64(1, first);
+		insert_measurement->setInt64(2, second);
 
-		pstmt->setInt64(1, first);
-		pstmt->setInt64(2, second);
+		insert_measurement->setDouble(3, transform.unit_quaternion().x());
+		insert_measurement->setDouble(4, transform.unit_quaternion().y());
+		insert_measurement->setDouble(5, transform.unit_quaternion().z());
+		insert_measurement->setDouble(6, transform.unit_quaternion().w());
 
-		pstmt->setDouble(3, transform.unit_quaternion().x());
-		pstmt->setDouble(4, transform.unit_quaternion().y());
-		pstmt->setDouble(5, transform.unit_quaternion().z());
-		pstmt->setDouble(6, transform.unit_quaternion().w());
+		insert_measurement->setDouble(7, transform.translation().x());
+		insert_measurement->setDouble(8, transform.translation().y());
+		insert_measurement->setDouble(9, transform.translation().z());
 
-		pstmt->setDouble(7, transform.translation().x());
-		pstmt->setDouble(8, transform.translation().y());
-		pstmt->setDouble(9, transform.translation().z());
+		insert_measurement->setString(10, type);
 
-		pstmt->setString(10, type);
-
-		pstmt->executeUpdate();
-
-		delete pstmt;
+		insert_measurement->executeUpdate();
 
 	} catch (sql::SQLException &e) {
 		std::cout << "# ERR: SQLException in " << __FILE__;
@@ -228,16 +241,14 @@ void util_mysql::add_measurement(long int first, long int second,
 }
 
 color_keyframe::Ptr util_mysql::get_keyframe(long frame_id) {
-	sql::ResultSet *res;
-	res = sql_query(
-			"SELECT * FROM keyframe WHERE id = "
-					+ boost::lexical_cast<std::string>(frame_id));
+	select_keyframe->setInt64(1, frame_id);
+	boost::shared_ptr<sql::ResultSet> res(select_keyframe->executeQuery());
 	res->next();
 	return get_keyframe(res);
 
 }
 
-Sophus::SE3f util_mysql::get_pose(sql::ResultSet * res) {
+Sophus::SE3f util_mysql::get_pose(boost::shared_ptr<sql::ResultSet> & res) {
 	Eigen::Quaternionf q;
 	Eigen::Vector3f t;
 	q.x() = res->getDouble("q0");
@@ -252,7 +263,7 @@ Sophus::SE3f util_mysql::get_pose(sql::ResultSet * res) {
 
 }
 
-color_keyframe::Ptr util_mysql::get_keyframe(sql::ResultSet * res) {
+color_keyframe::Ptr util_mysql::get_keyframe(boost::shared_ptr<sql::ResultSet> & res) {
 
 	Sophus::SE3f pose;
 	pose = get_pose(res);
@@ -264,23 +275,21 @@ color_keyframe::Ptr util_mysql::get_keyframe(sql::ResultSet * res) {
 	intrinsics[2] = res->getDouble("int2");
 
 	std::vector<uint8_t> rgb_data, depth_data;
-	std::istream * rgb_in = res->getBlob("rgb");
+	boost::shared_ptr<std::istream> rgb_in(res->getBlob("rgb"));
 	while (*rgb_in) {
 		uint8_t tmp;
 		rgb_in->read((char*) &tmp, sizeof(tmp));
 		rgb_data.push_back(tmp);
 	}
-	delete rgb_in;
 
 	//std::cerr << "Read rgb data size " << rgb_data.size() << std::endl;
 
-	std::istream * depth_in = res->getBlob("depth");
+	boost::shared_ptr<std::istream> depth_in(res->getBlob("depth"));
 	while (*depth_in) {
 		uint8_t tmp;
 		depth_in->read((char*) &tmp, sizeof(tmp));
 		depth_data.push_back(tmp);
 	}
-	delete depth_in;
 
 	//std::cerr << "Read depth data size " << depth_data.size() << std::endl;
 
@@ -301,23 +310,21 @@ color_keyframe::Ptr util_mysql::get_keyframe(sql::ResultSet * res) {
 
 void util_mysql::get_keypoints(long frame_id,
 		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
-	sql::ResultSet *res;
-	res = sql_query(
-			"SELECT * FROM keyframe WHERE id = "
-					+ boost::lexical_cast<std::string>(frame_id));
+
+	select_keypoints->setInt64(1, frame_id);
+	boost::shared_ptr<sql::ResultSet> res(select_keypoints->executeQuery());
 	res->next();
 
 	keypoints3d.clear();
-	std::istream * keypoints_in = res->getBlob("keypoints");
+	boost::shared_ptr<std::istream> keypoints_in(res->getBlob("keypoints"));
 	while (*keypoints_in) {
 		pcl::PointXYZ tmp;
 		keypoints_in->read((char*) &tmp, sizeof(tmp));
 		keypoints3d.push_back(tmp);
 	}
-	delete keypoints_in;
 	keypoints3d.resize(keypoints3d.size() - 1);
 
-	std::istream * descriptors_in = res->getBlob("descriptors");
+	boost::shared_ptr<std::istream> descriptors_in(res->getBlob("descriptors"));
 	std::vector<uint8_t> descriptors_data;
 
 	while (*descriptors_in) {
@@ -325,34 +332,23 @@ void util_mysql::get_keypoints(long frame_id,
 		descriptors_in->read((char*) &tmp, sizeof(tmp));
 		descriptors_data.push_back(tmp);
 	}
-	delete descriptors_in;
 	descriptors_data.resize(descriptors_data.size() - 1);
 
 	int cols = res->getDouble("descriptor_size");
 	int rows = res->getDouble("num_keypoints");
 	int type = res->getDouble("descriptor_type");
 
-	//std::cerr << "Creating matrix " << cols << " " << rows << " " << type << " "
-	//		<< descriptors_data.size() << std::endl;
-
 	cv::Mat tmp_mat = cv::Mat(rows, cols, type,
 			(void *) descriptors_data.data());
 
-	//std::cerr << "Matrix size " << tmp_mat.size() << std::endl;
 
 	tmp_mat.copyTo(descriptors);
-	delete res;
 
 }
 
 boost::shared_ptr<keyframe_map> util_mysql::get_robot_map(int robot_id) {
-	sql::ResultSet *res;
-	res =
-			sql_query(
-					"SELECT * FROM keyframe WHERE map_id = ( SELECT map_id FROM robot WHERE id = "
-							+ boost::lexical_cast<std::string>(robot_id)
-							+ " )");
-
+	select_map->setInt(1, robot_id);
+	boost::shared_ptr<sql::ResultSet> res(select_map->executeQuery());
 	boost::shared_ptr<keyframe_map> map(new keyframe_map);
 
 	while (res->next()) {
@@ -454,12 +450,11 @@ void util_mysql::get_overlapping_pairs(int map_id,
 
 }
 
-void util_mysql::load_measurements(long keyframe_id, std::vector<measurement> & m) {
+void util_mysql::load_measurements(long keyframe_id,
+		std::vector<measurement> & m) {
 
-	sql::ResultSet *res;
-	res = sql_query(
-			"SELECT * FROM measurement WHERE measurement.one = "
-					+ boost::lexical_cast<std::string>(keyframe_id));
+	select_measurements->setInt64(1, keyframe_id);
+	boost::shared_ptr<sql::ResultSet> res(select_measurements->executeQuery());
 
 	while (res->next()) {
 		measurement mes;
@@ -472,12 +467,9 @@ void util_mysql::load_measurements(long keyframe_id, std::vector<measurement> & 
 }
 
 void util_mysql::load_positions(int map_id, std::vector<position> & p) {
-	sql::ResultSet *res;
-	res = sql_query(
-			"SELECT * FROM keyframe WHERE map_id = "
-					+ boost::lexical_cast<std::string>(map_id));
+	select_positions->setInt(1, map_id);
+	boost::shared_ptr<sql::ResultSet> res(select_positions->executeQuery());
 
-	boost::shared_ptr<keyframe_map> map(new keyframe_map);
 
 	while (res->next()) {
 		position pos;

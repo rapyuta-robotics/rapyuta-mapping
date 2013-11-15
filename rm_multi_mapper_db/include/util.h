@@ -2,22 +2,10 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include <memory>
-#include <iostream>
-#include <stdio.h>
-#include <malloc.h>
-#include <opencv2/opencv.hpp>
-#include <opencv2/nonfree/features2d.hpp>
-
-/*MySQL includes */
-#include "mysql_connection.h"
-#include <cppconn/driver.h>
-#include <cppconn/exception.h>
-#include <cppconn/resultset.h>
-#include <cppconn/prepared_statement.h>
-
+#include <opencv2/core/core.hpp>
+#include <pcl_ros/point_cloud.h>
+#include <pcl/point_types.h>
 #include <keyframe_map.h>
-#include <reduce_measurement_g2o_dist.h>
 
 class util {
 public:
