@@ -8,9 +8,11 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 set(ROS_BUILD_TYPE RelWithDebInfo)
-rosbuild_find_ros_package(actionlib_msgs)
-include(${actionlib_msgs_PACKAGE_PATH}/cmake/actionbuild.cmake)
-genaction()
+
+#rosbuild_find_ros_package(actionlib_msgs)
+#include(${actionlib_msgs_PACKAGE_PATH}/cmake/actionbuild.cmake)
+#genaction()
+
 rosbuild_init()
 
 include_directories(/usr/include/suitesparse)
@@ -21,7 +23,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 #uncomment if you have defined messages
-rosbuild_genmsg()
+#rosbuild_genmsg()
 #uncomment if you have defined services
 #rosbuild_gensrv()
 
@@ -37,7 +39,7 @@ include_directories(${VTK_INCLUDE_DIRS})
 ############################## Library ###########################
 
 rosbuild_add_library(${PROJECT_NAME} src/color_keyframe.cpp src/keyframe_map.cpp
-src/reduce_jacobian_rgb.cpp src/reduce_jacobian_slam.cpp 
+src/reduce_jacobian_rgb.cpp #src/reduce_jacobian_slam.cpp 
 src/reduce_jacobian_slam_3d.cpp
 src/reduce_measurement_g2o.cpp 
 src/robot_mapper.cpp)
