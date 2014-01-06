@@ -19,6 +19,9 @@
 
 #include <tbb/concurrent_vector.h>
 
+#include <std_msgs/String.h>
+#include <sstream>
+
 #include <std_srvs/Empty.h>
 #include <rm_localization/UpdateMap.h>
 
@@ -60,9 +63,11 @@ protected:
 
 	ros::Publisher odom_pub;
 	ros::Publisher keyframe_pub;
+	ros::Publisher keyframe_pos_pub;
 	ros::ServiceServer update_map_service;
 	ros::ServiceServer send_all_keyframes_service;
 	ros::ServiceServer clear_keyframes_service;
+	ros::ServiceServer keyframes_positions_service;
 
 	std::string base_frame;
 
@@ -87,6 +92,7 @@ public:
 		odom_pub = nh_.advertise<nav_msgs::Odometry>("vo", queue_size_);
 		keyframe_pub = nh_.advertise<rm_localization::Keyframe>("keyframe",
 				queue_size_);
+		keyframe_pos_pub = nh_.advertise<std_msgs::String>("position_data", 1000);
 
 		update_map_service = nh_.advertiseService("update_map",
 				&CaptureServer::update_map, this);
@@ -96,6 +102,9 @@ public:
 
 		clear_keyframes_service = nh_.advertiseService("clear_keyframes",
 				&CaptureServer::clear_keyframes, this);
+		
+		keyframes_positions_service = nh_.advertiseService("keyframes_positions",
+				&CaptureServer::keyframes_positions, this); 
 
 		rgb_sub.subscribe(nh_, "rgb/image_raw", queue_size_);
 		depth_sub.subscribe(nh_, "depth/image_raw", queue_size_);
@@ -231,6 +240,30 @@ public:
 
 		keyframes.clear();
 
+		return true;
+	}
+
+	bool keyframes_positions(std_srvs::Empty::Request &req,
+			std_srvs::Empty::Response &res) {
+
+		//ros::Publisher keyframe_pos_pub;
+		//keyframe_pos_pub = nh_.advertise<std_msgs::String>("position_data", 1000);
+
+		ROS_INFO("%s%s", "Positions published to 'position_data' with Format:\n",
+				"timestamp tx ty tz qx qy qz qw");
+
+		for (size_t i = 0; i < keyframes.size(); i++) {
+
+			//Todo: convert data to the right format
+			
+			std_msgs::String msg;
+
+			std::stringstream ss;
+			ss << "test" << i;
+			msg.data = ss.str();
+			
+			keyframe_pos_pub.publish(msg);		
+		}
 		return true;
 	}
 

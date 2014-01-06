@@ -1,0 +1,16 @@
+<!-- Odometry validation -->
+
+<launch>
+
+	<node pkg="rosbag" type="play" name="camera" args="$(find rm_localization)/test/camera_msgs.bag --hz=30" respawn="true">
+ 
+		<remap from="/camera/depth/image"	to="depth/image_raw"/>
+    <remap from="/camera/rgb/camera_info"	to="rgb/camera_info"/>
+    <remap from="/camera/rgb/image_color"	to="rgb/image_raw"/>
+
+	</node>
+
+  <node pkg="rm_localization" type="localization" name="loclization"/>
+
+</launch>
+
