@@ -1,4 +1,4 @@
-<!-- Odometry validation -->
+<!-- Odometry validation / Needs a bag file at rm_localization/test named camera_msgs.bag (converted bag files from http://vision.cs.tum.edu/data/datasets/rgbd-dataset with vgatoqvga.py -->
 
 <launch>
 

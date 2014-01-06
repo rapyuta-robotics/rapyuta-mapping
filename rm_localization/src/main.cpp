@@ -254,12 +254,17 @@ public:
 
 		for (size_t i = 0; i < keyframes.size(); i++) {
 
-			//Todo: convert data to the right format
+			Eigen::Quaternionf::Matrix3 rotation_mat = 
+					keyframes[i]->get_pos().rotationMatrix();
+			Eigen::Quaternionf orientation(rotation_mat);
+			Eigen::Matrix<float,3,4> matrix = keyframes[i]->get_pos().matrix3x4();
 			
 			std_msgs::String msg;
 
 			std::stringstream ss;
-			ss << "test" << i;
+			ss << "test" << " " << matrix(3,0) << " " << matrix(3,1) << " " <<
+					matrix(3,2) << " " << orientation.x() << " " << orientation.y() <<
+					" " << orientation.z() << " " << orientation.w();
 			msg.data = ss.str();
 			
 			keyframe_pos_pub.publish(msg);		
