@@ -54,6 +54,10 @@ keyframe::~keyframe() {
 
 }
 
+void keyframe::set_timestamp(ros::Time stamp) {
+	timestamp = stamp;
+}
+
 bool keyframe::estimate_position(frame & f) {
 	Sophus::SE3f Mrc;
 	bool res = estimate_relative_position(f, Mrc);

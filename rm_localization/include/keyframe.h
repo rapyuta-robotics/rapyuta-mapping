@@ -14,6 +14,8 @@
 #include <convert_depth_to_cloud.h>
 #include <reduce_jacobian.h>
 
+#include <ros/time.h>
+
 class keyframe: public frame {
 
 public:
@@ -30,6 +32,11 @@ public:
 	bool estimate_relative_position(frame & f, Sophus::SE3f & Mrc);
 
 	void update_intrinsics(const Eigen::Vector3f & intrinsics);
+
+	void set_timestamp(ros::Time stamp);
+	inline ros::Time get_timestamp() {
+		return timestamp;
+	}
 
 	inline cv::Mat get_i_dx(int level) {
 		return cv::Mat(rows / (1 << level), cols / (1 << level), CV_16S,
@@ -55,6 +62,7 @@ public:
 protected:
 
 	long int id;
+	ros::Time timestamp;
 
 	int16_t ** intencity_pyr_dx;
 	int16_t ** intencity_pyr_dy;

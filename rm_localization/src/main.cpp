@@ -262,9 +262,10 @@ public:
 			std_msgs::String msg;
 
 			std::stringstream ss;
-			ss << "test" << " " << matrix(3,0) << " " << matrix(3,1) << " " <<
-					matrix(3,2) << " " << orientation.x() << " " << orientation.y() <<
-					" " << orientation.z() << " " << orientation.w();
+			ss << keyframes[i]->get_timestamp().toSec() << " " << matrix(3,0) << " "
+					<< matrix(3,1) << " " << matrix(3,2) << " " << orientation.x() << " "
+					<< orientation.y() << " " << orientation.z() << " " <<
+					orientation.w();
 			msg.data = ss.str();
 			
 			keyframe_pos_pub.publish(msg);		
@@ -372,6 +373,7 @@ public:
 				keyframe::Ptr k(
 						new keyframe(yuv2->image, depth->image, camera_position,
 								intrinsics));
+				k->set_timestamp(yuv2->header.stamp);
 
 				closest_keyframe->estimate_position(*k);
 
@@ -406,6 +408,7 @@ public:
 			keyframe::Ptr k(
 					new keyframe(yuv2->image, depth->image, camera_position,
 							intrinsics));
+			k->set_timestamp(yuv2->header.stamp);
 			keyframe_pub.publish(k->to_msg(yuv2, keyframes.size()));
 			keyframes.push_back(k);
 			ROS_INFO_STREAM(
