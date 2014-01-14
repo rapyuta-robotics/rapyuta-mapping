@@ -1,5 +1,6 @@
 #include <util.h>
 #include <util_mysql.h>
+#include <util_mongo.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -22,10 +23,10 @@ int main(int argc, char **argv) {
 	ros::Publisher pointcloud_pub = nh.advertise<
 			pcl::PointCloud<pcl::PointXYZRGB> >("/pointcloud", 1);
 
-	util::Ptr U(new util_mysql);
+	util::Ptr U(new util_mongo);
 	boost::shared_ptr<keyframe_map> map = U->get_robot_map(map_id);
 
-	std::cerr << map->frames.size() << std::endl;
+	std::cerr << "Map size " << map->frames.size() << std::endl;
 
 	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud = map->get_map_pointcloud();
 

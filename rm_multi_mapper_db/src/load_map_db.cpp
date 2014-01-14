@@ -1,18 +1,21 @@
 #include <util.h>
+#include <util_mongo.h>
 #include <util_mysql.h>
 #include <iostream>
 #include <keyframe_map.h>
 
 int main(int argc, char **argv) {
 
-	util::Ptr U(new util_mysql);
+	util::Ptr U(new util_mongo);
 	int robot_id = U->get_new_robot_id();
 	std::cerr << "New robot id " << robot_id << std::endl;
 
 	keyframe_map map;
 	map.load(argv[1]);
+	cout<<"robot_id"<<robot_id<<endl;
 
 	long shift = robot_id * (1l << 32);
+	std::cout<<"shift is"<<shift<<std::endl;
 
 	for (size_t i = 0; i < map.frames.size(); i++) {
 		map.frames[i]->set_id(shift + i);

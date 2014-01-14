@@ -8,6 +8,7 @@
 
 #include <util.h>
 #include <util_mysql.h>
+#include <util_mongo.h>
 
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/solvers/dense/linear_solver_dense.h>
@@ -127,7 +128,7 @@ void optimize_g2o(std::vector<util::position> & p, util::Ptr & U) {
 int main(int argc, char **argv) {
 
 	boost::shared_ptr<keyframe_map> map;
-	util::Ptr U(new util_mysql);
+	util::Ptr U(new util_mongo);
 
 	//timestamp_t t0 = get_timestamp();
 

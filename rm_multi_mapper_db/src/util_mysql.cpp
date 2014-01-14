@@ -444,7 +444,7 @@ void util_mysql::update_position(const position & p) {
 
 }
 
-long util_mysql::get_random_keyframe_idx(int map_id) {
+long long util_mysql::get_random_keyframe_idx(int map_id) {
 	select_random_idx->setInt(1, map_id);
 
 	boost::shared_ptr<sql::ResultSet> res(

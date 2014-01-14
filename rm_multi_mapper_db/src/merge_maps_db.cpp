@@ -1,9 +1,10 @@
 #include <util.h>
 #include <util_mysql.h>
+#include <util_mongo.h>
 
 int main(int argc, char** argv) {
 	ros::init(argc, argv, "map_merger_db");
-	util::Ptr U(new util_mysql);
+	util::Ptr U(new util_mongo);
 
 	int map_id1 = boost::lexical_cast<int>(argv[1]);
 	int map_id2 = boost::lexical_cast<int>(argv[2]);

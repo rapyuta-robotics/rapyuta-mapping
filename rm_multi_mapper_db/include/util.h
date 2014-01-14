@@ -51,7 +51,7 @@ public:
 	virtual void load_positions(int map_id, std::vector<position> & p) = 0;
 	virtual void update_position(const position & p) = 0;
 
-	virtual long get_random_keyframe_idx(int map) = 0;
+	virtual long long get_random_keyframe_idx(int map) = 0;
 	virtual void merge_map(int old_map_id, int new_map_id) = 0;
 
 	virtual void compute_features(const cv::Mat & rgb, const cv::Mat & depth,

@@ -37,7 +37,7 @@ public:
 	void load_measurements(long keyframe_id, std::vector<measurement> & m);
 	void load_positions(int map_id, std::vector<position> & p);
 	void update_position(const position & p);
-	long get_random_keyframe_idx(int map);
+	long long get_random_keyframe_idx(int map);
 	void merge_map(int old_map_id, int new_map_id);
 
 

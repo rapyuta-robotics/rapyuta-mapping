@@ -36,8 +36,8 @@ rosbuild_genmsg()
 
 ################ Library ##########################################
 
-rosbuild_add_library(${PROJECT_NAME} src/util.cpp src/util_mysql.cpp)
-target_link_libraries(${PROJECT_NAME} tbb rm_localization rm_multi_mapper mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod)
+rosbuild_add_library(${PROJECT_NAME} src/util.cpp src/util_mysql.cpp src/util_mongo.cpp)
+target_link_libraries(${PROJECT_NAME} tbb rm_localization rm_multi_mapper mysqlcppconn g2o_types_slam3d g2o_solver_cholmod cholmod mongoclient ssl crypto)
 
 
 ################ Helper functions to work with database ###########
@@ -60,6 +60,9 @@ target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_stuff g2o_core
 
 rosbuild_add_executable(merge_maps_db src/merge_maps_db.cpp)
 target_link_libraries(merge_maps_db ${PROJECT_NAME} mysqlcppconn)
+
+rosbuild_add_executable(test_mongo src/test_mongo.cpp)
+target_link_libraries(test_mongo ${PROJECT_NAME} mongoclient ssl crypto)
 
 ################# Tests #################################
 
