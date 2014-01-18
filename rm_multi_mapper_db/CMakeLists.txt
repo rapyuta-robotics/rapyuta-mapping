@@ -61,9 +61,6 @@ target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_stuff g2o_core
 rosbuild_add_executable(merge_maps_db src/merge_maps_db.cpp)
 target_link_libraries(merge_maps_db ${PROJECT_NAME} mysqlcppconn)
 
-rosbuild_add_executable(test_mongo src/test_mongo.cpp)
-target_link_libraries(test_mongo ${PROJECT_NAME} mongoclient ssl crypto)
-
 ################# Tests #################################
 
 rosbuild_add_gtest(test/util_test test/util_test.cpp)

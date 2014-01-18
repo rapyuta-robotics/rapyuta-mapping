@@ -10,7 +10,6 @@
 #include <ctime>
 #include "mongo/client/dbclient.h"
 
-
 class util_mongo : public util {
 public:
 

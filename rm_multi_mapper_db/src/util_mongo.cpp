@@ -191,36 +191,31 @@ void util_mongo::get_keypoints(long frame_id,
 	mongo::BSONObj res = conn.findOne( "mapping.keyframe" , query.obj() );
 
 	keypoints3d.clear();
-	cout<<"frame_id"<<frame_id<<endl;
+	//cout<<"frame_id"<<frame_id<<endl;
 	int keypoints3d_size;
 	const char *keypoints3d_ptr;
 	keypoints3d_ptr = res.getField("keypoints").binDataClean(keypoints3d_size);
 	DataBuf keypoints_buffer((char *) keypoints3d_ptr, keypoints3d_size);
 	std::istream keypoints_stream(&keypoints_buffer);
-	boost::shared_ptr<std::istream> keypoints_in(&keypoints_stream);
-	while (*keypoints_in) {
+	/*boost::shared_ptr<std::istream> keypoints_in(&keypoints_stream);*/
+	while (keypoints_stream) {
 		pcl::PointXYZ tmp;
-		keypoints_in->read((char*) &tmp, sizeof(tmp));
+		keypoints_stream.read((char*) &tmp, sizeof(tmp));
 		keypoints3d.push_back(tmp);
 	}
 	keypoints3d.resize(keypoints3d.size() - 1);
-
-
-	delete(keypoints_stream);
-	delete(keypoints3d_ptr);
-	cout<<"here";
 
 	int descriptors_size;
 	std::vector<uint8_t> descriptors_data;
 	const char *descriptors_ptr;
 	descriptors_ptr = res.getField("descriptors").binDataClean(descriptors_size);
-	cout<<"descriptors size"<<descriptors_size<<endl;
+	//cout<<"descriptors size"<<descriptors_size<<endl;
 	DataBuf descriptors_buffer((char*) descriptors_ptr, descriptors_size);
 	std::istream descriptors_stream(&descriptors_buffer);
-	boost::shared_ptr<std::istream> descriptors_in(&descriptors_stream);
-	while (*descriptors_in) {
+	//boost::shared_ptr<std::istream> descriptors_in(&descriptors_stream);
+	while (descriptors_stream) {
 		uint8_t tmp;
-		descriptors_in->read((char*) &tmp, sizeof(tmp));
+		descriptors_stream.read((char*) &tmp, sizeof(tmp));
 		descriptors_data.push_back(tmp);
 	}
 	descriptors_data.resize(descriptors_data.size() - 1);
@@ -233,12 +228,9 @@ void util_mongo::get_keypoints(long frame_id,
 			(void *) descriptors_data.data());
 
 	cv::Size s = tmp_mat.size();
-	//cout<<"descriptors";
-	cout<<"height width "<<s.height<<" "<<s.width<<endl;
+	//cout<<"height width "<<s.height<<" "<<s.width<<endl;
 
-	cout << "M = "<< endl << " "  << tmp_mat << endl << endl;
-	delete(descriptors_stream);
-	delete(descriptors_ptr);
+	//cout << "M = "<< endl << " "  << tmp_mat << endl << endl;
 
 	tmp_mat.copyTo(descriptors);
 
