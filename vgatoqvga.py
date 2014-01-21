@@ -82,13 +82,13 @@ if __name__ == '__main__':
         if topic == "/camera/rgb/image_color":
             rgb_image_color = msg
             
-            cv_rgb_image = np.asarray(bridge.imgmsg_to_cv(rgb_image_color))
+            cv_rgb_image = np.asarray(bridge.imgmsg_to_cv(rgb_image_color, 'rgb8'))
             qvga_cv_rgb_image = (cv_rgb_image[::2,::2,:].astype(np.uint32) + cv_rgb_image[1::2,::2,:] + cv_rgb_image[::2,1::2,:] + cv_rgb_image[1::2,1::2,:]) / 4.0
             qvga_cv_rgb_image = qvga_cv_rgb_image.astype(np.uint8)
             
-            qvga_cv_gray_image = cv2.cvtColor(qvga_cv_rgb_image, cv.CV_RGB2GRAY)
+            #qvga_cv_yuv_image = cv2.cvtColor(qvga_cv_rgb_image, cv.CV_BGR2YCrCb)
 
-            new_rgb_image_color = bridge.cv_to_imgmsg(cv.fromarray(qvga_cv_gray_image), "mono8")
+            new_rgb_image_color = bridge.cv_to_imgmsg(cv.fromarray(qvga_cv_rgb_image), "rgb8")
             new_rgb_image_color.header = rgb_image_color.header
 
             outbag.write("/camera/rgb/image_raw", new_rgb_image_color,t)
@@ -118,6 +118,15 @@ if __name__ == '__main__':
             outbag.write("/camera/depth/image_raw", new_depth_image,t)
 
             continue
+
+        if topic == "/tf":
+            new_transforms = []
+            for i in range(len(msg.transforms)):
+                if msg.transforms[i].header.frame_id not in ['/world', '/kinect']:
+                    new_transforms.append(msg.transforms[i])
+            msg.transforms = new_transforms
+            if(len(msg.transforms) > 0):
+                outbag.write("/tf", msg, t)
  
         # anything else: pass through
         outbag.write(topic,msg,t)
