@@ -1,7 +1,7 @@
 #include <frame.h>
 #include <cassert>
 #include <tbb/parallel_for.h>
-//#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 		const Sophus::SE3f & position, const Eigen::Vector3f & intrinsics,
@@ -24,7 +24,9 @@ frame::frame(const cv::Mat & yuv, const cv::Mat & depth,
 		depth_pyr[level] = new uint16_t[(cols * rows) >> (2 * level)];
 	}
 
-	if (yuv.channels() == 2) {
+	if (yuv.channels() == 3) {
+		cv::cvtColor(yuv, get_i(0), CV_RGB2GRAY);
+	} else if (yuv.channels() == 2) {
 		convert cvt(yuv.data, intencity_pyr[0]);
 		tbb::parallel_for(tbb::blocked_range<int>(0, cols * rows), cvt);
 
