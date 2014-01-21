@@ -116,6 +116,8 @@ if __name__ == '__main__':
             new_depth_image.header = depth_image.header
 
             outbag.write("/camera/depth/image_raw", new_depth_image,t)
+
+            continue
  
         # anything else: pass through
         outbag.write(topic,msg,t)
