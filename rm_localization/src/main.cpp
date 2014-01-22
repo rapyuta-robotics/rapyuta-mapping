@@ -27,6 +27,7 @@
 
 #include <frame.h>
 #include <keyframe.h>
+#include <fstream>
 
 class CaptureServer {
 protected:
@@ -71,6 +72,9 @@ protected:
 
 	std::string base_frame;
 
+	bool save_trajectory;
+	std::ofstream trajectory_file;
+
 public:
 
 	CaptureServer() :
@@ -88,6 +92,10 @@ public:
 				0, 0, 0, 0, 0, var}};
 
 		queue_size_ = 5;
+		save_trajectory = true;
+		if (save_trajectory) {
+			trajectory_file.open("/tmp/trajectory.txt", std::ofstream::out);
+		}
 
 		odom_pub = nh_.advertise<nav_msgs::Odometry>("vo", queue_size_);
 		keyframe_pub = nh_.advertise<rm_localization::Keyframe>("keyframe",
@@ -127,6 +135,9 @@ public:
 
 	~CaptureServer(void) {
 		delete rgb_tf_sub;
+		if (save_trajectory) {
+			trajectory_file.close();
+		}
 	}
 
 	// 1.0 when 10 degrees rotation or 1m translation
@@ -135,7 +146,7 @@ public:
 		float angle = t1.unit_quaternion().angularDistance(
 				t2.unit_quaternion());
 
-		return angle / (M_PI / 18) + distance/0.3;
+		return angle / (M_PI / 18) + distance / 0.3;
 
 	}
 
@@ -383,8 +394,7 @@ public:
 				keyframes.push_back(k);
 				ROS_INFO_STREAM(
 						"Added keyframe with intrinsics " << k->get_intrinsics().transpose());
-				ROS_INFO_STREAM(
-						"Closest keyframe at distance " << distance);
+				ROS_INFO_STREAM( "Closest keyframe at distance " << distance);
 
 				//publish_odom(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);
 
@@ -413,6 +423,17 @@ public:
 			keyframes.push_back(k);
 			ROS_INFO_STREAM(
 					"Added keyframe with intrinsics " << k->get_intrinsics().transpose());
+		}
+
+		if (save_trajectory) {
+			trajectory_file << yuv2->header.stamp << " "
+					<< camera_position.translation()[0] << " "
+					<< camera_position.translation()[1] << " "
+					<< camera_position.translation()[2] << " "
+					<< camera_position.unit_quaternion().coeffs()[0] << " "
+					<< camera_position.unit_quaternion().coeffs()[1] << " "
+					<< camera_position.unit_quaternion().coeffs()[2] << " "
+					<< camera_position.unit_quaternion().coeffs()[3] << std::endl;
 		}
 
 		publish_tf(yuv2_msg->header.frame_id, yuv2_msg->header.stamp);

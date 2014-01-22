@@ -1,0 +1,8 @@
+<launch>
+	<group ns="cloudbot0">
+		<node pkg="rm_localization" type="localization" respawn="true" name="localization" output="screen" cwd="node" />
+		<node pkg="tf" type="static_transform_publisher" name="base_footpring_tf" 
+args="0 0  0 0 0 0  /base_footprint /openni_camera 33" />
+
+	</group>
+</launch>
