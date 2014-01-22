@@ -4,7 +4,11 @@
 
 int main(int argc, char** argv) {
 	ros::init(argc, argv, "map_merger_db");
+#ifdef MONGO
 	util::Ptr U(new util_mongo);
+#else
+	util::Ptr U(new util_mysql);
+#endif
 
 	int map_id1 = boost::lexical_cast<int>(argv[1]);
 	int map_id2 = boost::lexical_cast<int>(argv[2]);

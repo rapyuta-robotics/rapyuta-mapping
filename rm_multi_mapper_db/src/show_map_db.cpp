@@ -23,7 +23,11 @@ int main(int argc, char **argv) {
 	ros::Publisher pointcloud_pub = nh.advertise<
 			pcl::PointCloud<pcl::PointXYZRGB> >("/pointcloud", 1);
 
+#ifdef MONGO
 	util::Ptr U(new util_mongo);
+#else
+	util::Ptr U(new util_mysql);
+#endif
 	boost::shared_ptr<keyframe_map> map = U->get_robot_map(map_id);
 
 	std::cerr << "Map size " << map->frames.size() << std::endl;

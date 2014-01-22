@@ -28,13 +28,21 @@ protected:
 	util::Ptr U;
 
 public:
-
+#ifdef MONGO
 	G2oWorkerAction(std::string name) :
 			as_(nh_, name, boost::bind(&G2oWorkerAction::executeCB, this, _1),
 					false), action_name_(name), U(new util_mongo) {
 		as_.start();
 
 	}
+#else
+	G2oWorkerAction(std::string name) :
+			as_(nh_, name, boost::bind(&G2oWorkerAction::executeCB, this, _1),
+					false), action_name_(name), U(new util_mysql) {
+		as_.start();
+
+	}
+#endif
 
 	~G2oWorkerAction(void) {
 	}

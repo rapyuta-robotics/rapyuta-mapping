@@ -6,7 +6,11 @@
 
 int main(int argc, char **argv) {
 
+#ifdef MONGO
 	util::Ptr U(new util_mongo);
+#else
+	util::Ptr U(new util_mysql);
+#endif
 	int robot_id = U->get_new_robot_id();
 	std::cerr << "New robot id " << robot_id << std::endl;
 

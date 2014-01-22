@@ -128,7 +128,11 @@ void optimize_g2o(std::vector<util::position> & p, util::Ptr & U) {
 int main(int argc, char **argv) {
 
 	boost::shared_ptr<keyframe_map> map;
+#ifdef MONGO
 	util::Ptr U(new util_mongo);
+#else
+	util::Ptr U(new util_mysql);
+#endif
 
 	//timestamp_t t0 = get_timestamp();
 
