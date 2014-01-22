@@ -154,7 +154,7 @@ rm_localization::Keyframe::Ptr keyframe::to_msg(
 	if (yuv2->image.channels() == 3) {
 		rgb = yuv2->image;
 	} else {
-		cv::cvtColor(yuv2->image, rgb, CV_YUV2BGR_UYVY);
+		cv::cvtColor(yuv2->image, rgb, CV_YUV2RGB_UYVY);
 	}
 
 	cv::imencode(".png", rgb, k->rgb_png_data);

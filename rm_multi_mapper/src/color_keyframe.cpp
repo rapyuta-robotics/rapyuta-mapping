@@ -95,9 +95,9 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr color_keyframe::get_colored_pointcloud(
 
 				pcl::PointXYZRGB p;
 				p.getVector4fMap() = transform * vec;
-				p.r = color[2];
+				p.r = color[0];
 				p.g = color[1];
-				p.b = color[0];
+				p.b = color[2];
 
 				cloud->push_back(p);
 			}

@@ -59,7 +59,7 @@ if __name__ == '__main__':
             P[-1] = 1.0
             depth_camera_info.P = tuple(P)
 
-            outbag.write("/camera/depth/camera_info",depth_camera_info,t)            
+            outbag.write("/cloudbot0/depth/camera_info",depth_camera_info,t)            
             continue
 
         if topic == "/camera/rgb/camera_info":
@@ -76,7 +76,7 @@ if __name__ == '__main__':
             P[-1] = 1.0
             rgb_camera_info.P = tuple(P)
 
-            outbag.write("/camera/rgb/camera_info",rgb_camera_info,t)
+            outbag.write("/cloudbot0/rgb/camera_info",rgb_camera_info,t)
             continue
             
         if topic == "/camera/rgb/image_color":
@@ -91,7 +91,7 @@ if __name__ == '__main__':
             new_rgb_image_color = bridge.cv_to_imgmsg(cv.fromarray(qvga_cv_rgb_image), "rgb8")
             new_rgb_image_color.header = rgb_image_color.header
 
-            outbag.write("/camera/rgb/image_raw", new_rgb_image_color,t)
+            outbag.write("/cloudbot0/rgb/image_raw", new_rgb_image_color,t)
 
             continue
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
             new_depth_image = bridge.cv_to_imgmsg(cv.fromarray(depth_qvga_sort[:,:,2].copy()))
             new_depth_image.header = depth_image.header
 
-            outbag.write("/camera/depth/image_raw", new_depth_image,t)
+            outbag.write("/cloudbot0/depth/image_raw", new_depth_image,t)
 
             continue
 
