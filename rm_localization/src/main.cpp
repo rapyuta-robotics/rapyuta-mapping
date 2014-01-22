@@ -130,7 +130,6 @@ public:
 
 		sync->registerCallback(
 				boost::bind(&CaptureServer::RGBDCallback, this, _1, _2, _3));
-
 	}
 
 	~CaptureServer(void) {
@@ -273,10 +272,10 @@ public:
 			std_msgs::String msg;
 
 			std::stringstream ss;
-			ss << keyframes[i]->get_timestamp().toSec() << " " << matrix(3,0) << " "
-					<< matrix(3,1) << " " << matrix(3,2) << " " << orientation.x() << " "
-					<< orientation.y() << " " << orientation.z() << " " <<
-					orientation.w();
+			ss << std::setprecision(15) << keyframes[i]->get_timestamp().toSec() << " " <<
+			matrix(0,3) << " " << matrix(1,3) << " " << matrix(2,3) << " " <<
+			orientation.x() << " " << orientation.y() << " " << orientation.z() <<
+			" " << orientation.w();
 			msg.data = ss.str();
 			
 			keyframe_pos_pub.publish(msg);		

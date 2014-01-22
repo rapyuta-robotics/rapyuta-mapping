@@ -2,15 +2,13 @@
 
 <launch>
 
-	<node pkg="rosbag" type="play" name="camera" args="$(find rm_localization)/test/camera_msgs.bag --hz=30" respawn="true">
- 
-		<remap from="/camera/depth/image"	to="depth/image_raw"/>
-    <remap from="/camera/rgb/camera_info"	to="rgb/camera_info"/>
-    <remap from="/camera/rgb/image_color"	to="rgb/image_raw"/>
+	<param name="use_sim_time" value="true" type="bool"/>
+	
+	<group ns="cloudbot0">
+		<node pkg="rm_localization" type="localization" respawn="true" name="localization" output="screen" cwd="node" />
+		<node pkg="tf" type="static_transform_publisher" name="base_footpring_tf" args="0 0 0 0 0 0 /base_footprint /openni_camera 33" />
+	</group>
 
-	</node>
-
-  <node pkg="rm_localization" type="localization" name="loclization"/>
+	<node pkg="rosbag" type="play" name="camera" args="$(find rm_localization)/test/camera_msgs.bag --clock" respawn="false"/>
 
 </launch>
-
