@@ -7,7 +7,7 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  Release        : w/o debug symbols, w/ optimization
 #  RelWithDebInfo : w/ debug symbols, w/ optimization
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-#set(ROS_BUILD_TYPE RelWithDebInfo)
+set(ROS_BUILD_TYPE RelWithDebInfo)
 
 rosbuild_find_ros_package(actionlib_msgs)
 include(${actionlib_msgs_PACKAGE_PATH}/cmake/actionbuild.cmake)
@@ -64,6 +64,6 @@ target_link_libraries(merge_maps_db ${PROJECT_NAME} mysqlcppconn)
 
 ################# Tests #################################
 
-rosbuild_add_gtest(test/util_test test/util_test.cpp)
-target_link_libraries(test/util_test ${PROJECT_NAME} mysqlcppconn)
+rosbuild_add_executable(test/util_test test/util_test.cpp)
+target_link_libraries(test/util_test ${PROJECT_NAME} gtest gtest_main)
 

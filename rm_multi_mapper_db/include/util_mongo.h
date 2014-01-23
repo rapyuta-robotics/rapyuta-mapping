@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include <ctime>
+#include <cassert>
 #include "mongo/client/dbclient.h"
 
 class util_mongo : public util {
@@ -43,12 +44,6 @@ public:
 
 
 private:
-	class DataBuf: public streambuf {
-	public:
-		DataBuf(char * d, size_t s) {
-			setg(d, d, d + s);
-		}
-	};
 
 	mongo::DBClientConnection conn;
 	color_keyframe::Ptr get_keyframe(mongo::BSONObj res);

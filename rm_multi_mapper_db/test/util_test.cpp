@@ -1,4 +1,5 @@
 #include <util.h>
+#include <util_mongo.h>
 #include <gtest/gtest.h>
 
 template<typename T>
@@ -33,8 +34,8 @@ void check_equal_pointclouds(const pcl::PointCloud<pcl::PointXYZ> & p1,
 }
 
 TEST(UtilTest, keyframeSaveTest) {
-	util U;
-	int robot_id = U.get_new_robot_id();
+	util::Ptr U(new util_mongo);
+	int robot_id = U->get_new_robot_id();
 
 	keyframe_map map;
 	map.load("test/data/map");
@@ -43,10 +44,10 @@ TEST(UtilTest, keyframeSaveTest) {
 	long shift = robot_id * (1l << 32);
 
 	map.frames[0]->set_id(shift);
-	U.add_keyframe(robot_id, map.frames[0]);
+	U->add_keyframe(robot_id, map.frames[0]);
 
 	keyframe::Ptr k1 = map.frames[0];
-	keyframe::Ptr k2 = U.get_keyframe(shift);
+	keyframe::Ptr k2 = U->get_keyframe(shift);
 
 	EXPECT_FLOAT_EQ(k1->get_pos().translation().x(),
 			k2->get_pos().translation().x());
@@ -74,8 +75,8 @@ TEST(UtilTest, keyframeSaveTest) {
 }
 
 TEST(UtilTest, keypointsSaveTest) {
-	util U;
-	int robot_id = U.get_new_robot_id();
+	util::Ptr U(new util_mongo);
+	int robot_id = U->get_new_robot_id();
 
 	keyframe_map map;
 	map.load("test/data/map");
@@ -84,18 +85,18 @@ TEST(UtilTest, keypointsSaveTest) {
 	long shift = robot_id * (1l << 32);
 
 	map.frames[0]->set_id(shift);
-	U.add_keyframe(robot_id, map.frames[0]);
-	U.add_keypoints(map.frames[0]);
+	U->add_keyframe(robot_id, map.frames[0]);
+	U->add_keypoints(map.frames[0]);
 
 	keyframe::Ptr k = map.frames[0];
 
 	std::vector<cv::KeyPoint> keypoints1;
 	pcl::PointCloud<pcl::PointXYZ> keypoints3d1, keypoints3d2;
 	cv::Mat descriptors1, descriptors2;
-	U.compute_features(k->get_i(0), k->get_d(0), k->get_intrinsics(0),
+	U->compute_features(k->get_i(0), k->get_d(0), k->get_intrinsics(0),
 			keypoints1, keypoints3d1, descriptors1);
 
-	U.get_keypoints(shift, keypoints3d2, descriptors2);
+	U->get_keypoints(shift, keypoints3d2, descriptors2);
 	check_equal<float>(descriptors1, descriptors2);
 	check_equal_pointclouds(keypoints3d1, keypoints3d2);
 
@@ -103,8 +104,8 @@ TEST(UtilTest, keypointsSaveTest) {
 
 
 TEST(UtilTest, keyframeUpdateTest) {
-	util U;
-	int robot_id = U.get_new_robot_id();
+	util::Ptr U(new util_mongo);
+	int robot_id = U->get_new_robot_id();
 
 	keyframe_map map;
 	map.load("test/data/map");
@@ -113,7 +114,7 @@ TEST(UtilTest, keyframeUpdateTest) {
 	long shift = robot_id * (1l << 32);
 
 	map.frames[0]->set_id(shift);
-	U.add_keyframe(robot_id, map.frames[0]);
+	U->add_keyframe(robot_id, map.frames[0]);
 
 	Eigen::Quaternionf q;
 	Eigen::Vector3f v;
@@ -124,8 +125,8 @@ TEST(UtilTest, keyframeUpdateTest) {
 	pos.idx = shift;
 	pos.transform = Sophus::SE3f(q,v);
 
-	U.update_position(pos);
-	keyframe::Ptr k2 = U.get_keyframe(shift);
+	U->update_position(pos);
+	keyframe::Ptr k2 = U->get_keyframe(shift);
 
 	EXPECT_FLOAT_EQ(pos.transform.translation().x(),
 			k2->get_pos().translation().x());

@@ -1,4 +1,7 @@
 #include <util_mongo.h>
+
+#include <algorithm>
+
 using namespace mongo;
 using namespace std;
 
@@ -122,7 +125,7 @@ void util_mongo::add_keypoints(const color_keyframe::Ptr & k) {
 	query.append("descriptor_size", (int)descriptors.cols);
 	query.append("descriptor_type", (int)descriptors.type());
 
-	assert(descriptors.type() == CV_32F);
+	//::assert(descriptors.type() == CV_32F);
 	//std::cerr << "Keypoints size " << keypoints3d.size() << " "
 	//		<< descriptors.size() << std::endl;
 
@@ -192,42 +195,27 @@ void util_mongo::get_keypoints(long frame_id,
 
 	keypoints3d.clear();
 	//cout<<"frame_id"<<frame_id<<endl;
+	int keypoints3d_buf_size;
 	int keypoints3d_size;
-	const char *keypoints3d_ptr;
-	keypoints3d_ptr = res.getField("keypoints").binDataClean(keypoints3d_size);
-	DataBuf keypoints_buffer((char *) keypoints3d_ptr, keypoints3d_size);
-	std::istream keypoints_stream(&keypoints_buffer);
-	/*boost::shared_ptr<std::istream> keypoints_in(&keypoints_stream);*/
-	while (keypoints_stream) {
-		pcl::PointXYZ tmp;
-		keypoints_stream.read((char*) &tmp, sizeof(tmp));
-		keypoints3d.push_back(tmp);
+	const pcl::PointXYZ * keypoints3d_ptr;
+	keypoints3d_ptr = (pcl::PointXYZ *) res.getField("keypoints").binDataClean(keypoints3d_buf_size);
+	keypoints3d_size = keypoints3d_buf_size/sizeof(pcl::PointXYZ);
+	for(int i=0; i<keypoints3d_size; i++) {
+		keypoints3d.push_back(keypoints3d_ptr[i]);
 	}
-	keypoints3d.resize(keypoints3d.size() - 1);
 
 	int descriptors_size;
-	std::vector<uint8_t> descriptors_data;
 	const char *descriptors_ptr;
 	descriptors_ptr = res.getField("descriptors").binDataClean(descriptors_size);
-	//cout<<"descriptors size"<<descriptors_size<<endl;
-	DataBuf descriptors_buffer((char*) descriptors_ptr, descriptors_size);
-	std::istream descriptors_stream(&descriptors_buffer);
-	//boost::shared_ptr<std::istream> descriptors_in(&descriptors_stream);
-	while (descriptors_stream) {
-		uint8_t tmp;
-		descriptors_stream.read((char*) &tmp, sizeof(tmp));
-		descriptors_data.push_back(tmp);
-	}
-	descriptors_data.resize(descriptors_data.size() - 1);
 
 	int cols = res.getField("descriptor_size").numberDouble();
 	int rows = res.getField("num_keypoints").numberDouble();
 	int type = res.getField("descriptor_type").numberDouble();
 
 	cv::Mat tmp_mat = cv::Mat(rows, cols, type,
-			(void *) descriptors_data.data());
+			(void *) descriptors_ptr);
 
-	cv::Size s = tmp_mat.size();
+	//cv::Size s = tmp_mat.size();
 	//cout<<"height width "<<s.height<<" "<<s.width<<endl;
 
 	//cout << "M = "<< endl << " "  << tmp_mat << endl << endl;
@@ -356,16 +344,19 @@ void util_mongo::get_overlapping_pairs(int map_id,
 				float distance = (map->frames[i]->get_pos().translation()
 						- map->frames[j]->get_pos().translation()).norm();
 
-				if (angle < M_PI / 4 && distance < 1) {
+				if ( (angle < M_PI / 4) && (distance < 3) ) {
 
 					overlapping_keyframes.push_back(std::make_pair(map->frames[i]->get_id(),
 													map->frames[j]->get_id()));
-					//ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
+					ROS_INFO("Images %d and %d intersect with angular distance %f", i, j, angle*180/M_PI);
 				}
+
 			}
 		}
 
 	}
+
+	ROS_INFO("Number of frame pairs %d", overlapping_keyframes.size());
 
 }
 
