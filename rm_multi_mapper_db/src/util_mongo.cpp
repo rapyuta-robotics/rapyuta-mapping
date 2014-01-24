@@ -435,14 +435,14 @@ long long util_mongo::get_random_keyframe_idx(int map_id) {
 
 void util_mongo::merge_map(int old_map_id, int new_map_id) {
 	conn.update("mapping.robot", BSON("map_id" << (int)old_map_id),
-			BSON("$set" << BSON("map_id"<< (int)new_map_id)));
+			BSON("$set" << BSON("map_id"<< (int)new_map_id)), false, true);
 	string e = conn.getLastError();
 	if (!e.empty()) {
 		cout << "update #3 failed: " << e << endl;
 	}
 
 	conn.update("mapping.keyframe", BSON("map_id" << (int)old_map_id),
-			BSON("$set" << BSON("map_id"<< (int)new_map_id)));
+			BSON("$set" << BSON("map_id"<< (int)new_map_id)), false, true);
 	e = conn.getLastError();
 	if (!e.empty()) {
 		cout << "update #4 failed: " << e << endl;
