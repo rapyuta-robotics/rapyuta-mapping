@@ -64,6 +64,6 @@ target_link_libraries(merge_maps_db ${PROJECT_NAME} mysqlcppconn)
 
 ################# Tests #################################
 
-rosbuild_add_executable(test/util_test test/util_test.cpp)
-target_link_libraries(test/util_test ${PROJECT_NAME} gtest gtest_main)
+#rosbuild_add_executable(test/util_test test/util_test.cpp)
+#target_link_libraries(test/util_test ${PROJECT_NAME} gtest gtest_main)
 

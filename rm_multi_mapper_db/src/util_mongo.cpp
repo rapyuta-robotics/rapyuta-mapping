@@ -28,19 +28,16 @@ util_mongo::~util_mongo() {
 }
 
 int util_mongo::getNextSequence(string name) {
-	mongo::BSONObjBuilder query;
-	query.append("_id", name);
-	mongo::BSONObj res = conn.findOne("mapping.counters", query.obj());
-	cout << res.isEmpty() << "\t" << res.jsonString() << endl;
-	int seq = res["seq"].numberInt();
-	seq++;
-	conn.update("mapping.counters", BSON("_id" << name),
-			BSON("$inc" << BSON( "seq" << 1)));
-	string e = conn.getLastError();
-	if (!e.empty()) {
-		cout << "update #1 failed: " << e << endl;
-	}
-	return seq;
+	mongo::BSONObj cmdResult;
+	bool ok = conn.runCommand(
+	  "mapping",
+	  BSON("findAndModify" << "counters"
+	                  << "query" << BSON("_id"<<name)
+	                  << "update" << BSON("$inc"<<BSON("seq"<<1))
+	                  << "new" << true),
+	  cmdResult);
+	//cout<<cmdResult<<endl;
+	return cmdResult["value"]["seq"].numberInt();
 }
 
 int util_mongo::get_new_robot_id() {
