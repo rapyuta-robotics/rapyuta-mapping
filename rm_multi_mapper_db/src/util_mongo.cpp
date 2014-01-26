@@ -314,43 +314,55 @@ void util_mongo::get_overlapping_pairs(int map_id,
 	 "(SELECT id FROM measurement "
 	 "WHERE measurement.one = f1.id AND two = f2.id )*/
 
-	auto_ptr<DBClientCursor> cursor = conn.query("mapping.keyframe",
+	auto_ptr<DBClientCursor> cursor1 = conn.query("mapping.keyframe",
 			QUERY("map_id" << map_id));
-	boost::shared_ptr<keyframe_map> map(new keyframe_map);
 
-	while (cursor->more()) {
-		map->frames.push_back(get_keyframe(cursor->next()));
-	}
+	while (cursor1->more()) {
+		mongo::BSONObj i = cursor1->next();
+		long long i_id = i["_id"].numberLong();
 
-	for (int i = 0; i < map->frames.size(); i++) {
+		auto_ptr<DBClientCursor> cursor2 = conn.query("mapping.keyframe",
+						QUERY("map_id" << map_id));
+		while(cursor2->more()) {
+			mongo::BSONObj j = cursor2->next();
+			long long j_id = j["_id"].numberLong();
+			auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
+						QUERY("one" << i_id << "two" << j_id));
+			if(cursor3->more()) continue;
+			if( i_id != j_id)
+			{
+				double iq0 = i["q0"].numberDouble();
+				double iq1 = i["q1"].numberDouble();
+				double iq2 = i["q2"].numberDouble();
+				double iq3 = i["q3"].numberDouble();
+				double jq0 = j["q0"].numberDouble();
+				double jq1 = j["q1"].numberDouble();
+				double jq2 = j["q2"].numberDouble();
+				double jq3 = j["q3"].numberDouble();
 
-		for (int j = 0; j < map->frames.size(); j++) {
+				double it0 = i["t0"].numberDouble();
+				double it1 = i["t1"].numberDouble();
+				double it2 = i["t2"].numberDouble();
+				double jt0 = j["t0"].numberDouble();
+				double jt1 = j["t1"].numberDouble();
+				double jt2 = j["t2"].numberDouble();
 
-			if (i != j) {
+				float dotproduct = abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3);
+				float angle = 2*acos(abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3));
 
-				float angle =
-						map->frames[i]->get_pos().unit_quaternion().angularDistance(
-								map->frames[j]->get_pos().unit_quaternion());
+				float distance = sqrt(pow((it0 - jt0), 2) +
+									pow((it1 - jt1), 2) +
+									pow((it2 - jt2), 2));
 
-				//float centroid_distance = (frames[i]->get_centroid()
-				//		- frames[j]->get_centroid()).norm();
+				if (((dotproduct) >= 1.0 || (angle < M_PI / 4)) && (distance < 3)) {
 
-				float distance = (map->frames[i]->get_pos().translation()
-						- map->frames[j]->get_pos().translation()).norm();
-
-				if ((angle < M_PI / 4) && (distance < 3)) {
-
-					overlapping_keyframes.push_back(
-							std::make_pair(map->frames[i]->get_id(),
-									map->frames[j]->get_id()));
+					overlapping_keyframes.push_back(std::make_pair(i_id, j_id));
 					ROS_INFO(
 							"Images %d and %d intersect with angular distance %f",
-							i, j, angle*180/M_PI);
+							i_id, j_id, angle*180/M_PI);
 				}
-
 			}
 		}
-
 	}
 
 	ROS_INFO("Number of frame pairs %d", overlapping_keyframes.size());

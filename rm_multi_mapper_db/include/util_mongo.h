@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include <ctime>
+#include <cmath>
 #include <cassert>
 #include "mongo/client/dbclient.h"
 
