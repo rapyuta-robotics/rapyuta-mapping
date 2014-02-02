@@ -51,7 +51,10 @@ target_link_libraries(show_map_db ${PROJECT_NAME} mysqlcppconn)
 
 ################# Map optimization #################################
 
-rosbuild_add_executable(worker_g2o src/worker_g2o.cpp)
+#rosbuild_add_executable(worker_g2o src/worker_g2o.cpp)
+#target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
+
+rosbuild_add_executable(worker_g2o src/worker_mongo_g2o.cpp)
 target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
 
 rosbuild_add_executable(master_g2o src/master_g2o.cpp)

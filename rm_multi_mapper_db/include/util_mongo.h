@@ -31,11 +31,11 @@ public:
 			cv::Mat & desctriptors);
 
 	color_keyframe::Ptr get_keyframe(long frame_id);
-
+	void get_keyframe_ids(int map_id, std::vector<long long> & keyframes);
 	boost::shared_ptr<keyframe_map> get_robot_map(int robot_id);
 
-	void get_overlapping_pairs(int map_id,
-			std::vector<std::pair<long, long> > & overlapping_keyframes);
+	void get_overlapping_keyframes(long long frame_id, int map_id,
+				std::vector<long> & overlapping_keyframes);
 
 	void load_measurements(long keyframe_id, std::vector<measurement> & m);
 	void load_positions(int map_id, std::vector<position> & p);

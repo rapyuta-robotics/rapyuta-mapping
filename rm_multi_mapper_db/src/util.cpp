@@ -204,7 +204,7 @@ bool util::estimate_transform_ransac(const pcl::PointCloud<pcl::PointXYZ> & src,
 	trans = Eigen::umeyama(src_rand, dst_rand, false);
 	trans.makeAffine();
 
-	std::cerr << max_inliers << std::endl;
+	std::cerr << "max inliers" << max_inliers << std::endl;
 
 	return true;
 

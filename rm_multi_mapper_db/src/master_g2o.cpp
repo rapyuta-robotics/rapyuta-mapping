@@ -4,7 +4,11 @@
 #include <std_msgs/Int32.h>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
+#ifdef MONGO
+#include <rm_multi_mapper_db/G2oWorker2Action.h>
+#else
 #include <rm_multi_mapper_db/G2oWorkerAction.h>
+#endif
 
 #include <util.h>
 #include <util_mysql.h>
@@ -27,7 +31,13 @@
 
 
 typedef unsigned long long timestamp_t;
-typedef rm_multi_mapper_db::G2oWorkerAction action_t;
+
+#ifdef MONGO
+	typedef rm_multi_mapper_db::G2oWorker2Action action_t;
+#else
+	typedef rm_multi_mapper_db::G2oWorkerAction action_t;
+#endif
+
 typedef actionlib::SimpleActionClient<action_t> action_client;
 
 void optimize_g2o(std::vector<util::position> & p, util::Ptr & U) {
@@ -130,13 +140,14 @@ int main(int argc, char **argv) {
 	boost::shared_ptr<keyframe_map> map;
 #ifdef MONGO
 	util::Ptr U(new util_mongo);
+	std::vector<long long> keyframes;
 #else
 	util::Ptr U(new util_mysql);
+	std::vector<std::pair<long, long> > overlapping_keyframes;
 #endif
 
 	//timestamp_t t0 = get_timestamp();
 
-	std::vector<std::pair<long, long> > overlapping_keyframes;
 	int workers = argc - 2;
 
 	int map_id = boost::lexical_cast<int>(argv[1]);
@@ -153,13 +164,25 @@ int main(int argc, char **argv) {
 		action_client* ac = new action_client(std::string(argv[i + 2]), true);
 		ac_list.push_back(ac);
 	}
+#ifdef MONGO
+	U->get_keyframe_ids(map_id, keyframes);
+	std::vector<rm_multi_mapper_db::G2oWorker2Goal> goals;
+	int keyframes_size = (int) keyframes.size();
 
+	for (int k = 0; k < workers; k++) {
+		rm_multi_mapper_db::G2oWorker2Goal goal;
+
+		int last_elem = (keyframes_size / workers) * (k + 1);
+		if (k == workers - 1)
+			last_elem = keyframes_size;
+
+		for (int i = (keyframes_size / workers) * k; i < last_elem; i++) {
+			goal.keyframes.push_back(keyframes[i]);
+		}
+		goals.push_back(goal);
+	}
+#else
 	U->get_overlapping_pairs(map_id, overlapping_keyframes);
-
-	//for (int i = 0; i < overlapping_keyframes.size(); i++) {
-	//	std::cerr << "Pair " << overlapping_keyframes[i].first << " "
-	//			<< overlapping_keyframes[i].second << std::endl;
-	//}
 
 	std::vector<rm_multi_mapper_db::G2oWorkerGoal> goals;
 	int keyframes_size = (int) overlapping_keyframes.size();
@@ -180,6 +203,7 @@ int main(int argc, char **argv) {
 		}
 		goals.push_back(goal);
 	}
+#endif
 
 	ROS_INFO("Waiting for action server to start.");
 	for (int i = 0; i < workers; i++) {

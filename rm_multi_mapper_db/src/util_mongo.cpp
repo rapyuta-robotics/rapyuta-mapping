@@ -177,6 +177,17 @@ color_keyframe::Ptr util_mongo::get_keyframe(long frame_id) {
 	return get_keyframe(res);
 }
 
+void util_mongo::get_keyframe_ids(int map_id, std::vector<long long> & keyframes) {
+	auto_ptr<DBClientCursor> cursor = conn.query("mapping.keyframe",
+						QUERY("map_id" << map_id));
+	while(cursor->more()) {
+		mongo::BSONObj j = cursor->next();
+		long long id = j["_id"].numberLong();
+		keyframes.push_back(id);
+	}
+
+}
+
 void util_mongo::get_keypoints(long frame_id,
 		pcl::PointCloud<pcl::PointXYZ> & keypoints3d, cv::Mat & descriptors) {
 
@@ -286,86 +297,61 @@ color_keyframe::Ptr util_mongo::get_keyframe(BSONObj res) {
 	return k;
 }
 
-void util_mongo::get_overlapping_pairs(int map_id,
-		std::vector<std::pair<long, long> > & overlapping_keyframes) {
+void util_mongo::get_overlapping_keyframes(long long frame_id, int map_id,
+		std::vector<long> & overlapping_keyframes) {
 
-	/*select_overlapping_keyframes->setInt(1, map_id);
-	 select_overlapping_keyframes->setInt(2, map_id);
+	BSONObjBuilder query;
+	query.append("_id", (long long) frame_id);
+	mongo::BSONObj i = conn.findOne("mapping.keyframe", query.obj());
+	long long i_id = i["_id"].numberLong();
+	cout<<"frame_id "<<frame_id<<endl;
+	auto_ptr<DBClientCursor> cursor2 = conn.query("mapping.keyframe",
+					QUERY("map_id" << map_id));
+	while(cursor2->more()) {
 
-	 boost::shared_ptr<sql::ResultSet> res(
-	 select_overlapping_keyframes->executeQuery());
+		mongo::BSONObj j = cursor2->next();
+		long long j_id = j["_id"].numberLong();
+		auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
+					QUERY("one" << i_id << "two" << j_id));
+		if(cursor3->more()) continue;
+		if( i_id != j_id)
+		{
+			//cout<<"cursor3"<<endl;
+			double iq0 = i["q0"].numberDouble();
+			double iq1 = i["q1"].numberDouble();
+			double iq2 = i["q2"].numberDouble();
+			double iq3 = i["q3"].numberDouble();
+			double jq0 = j["q0"].numberDouble();
+			double jq1 = j["q1"].numberDouble();
+			double jq2 = j["q2"].numberDouble();
+			double jq3 = j["q3"].numberDouble();
+			//cout<<iq0<<" "<<iq1<<endl;
+			double it0 = i["t0"].numberDouble();
+			double it1 = i["t1"].numberDouble();
+			double it2 = i["t2"].numberDouble();
+			double jt0 = j["t0"].numberDouble();
+			double jt1 = j["t1"].numberDouble();
+			double jt2 = j["t2"].numberDouble();
 
-	 while (res->next()) {
-	 overlapping_keyframes.push_back(
-	 std::make_pair(res->getInt64("id1"), res->getInt64("id2")));
-	 }
-	 SELECT f1.id as id1, f2.id as id2 "
-	 "FROM keyframe f1, keyframe f2 "
-	 "WHERE f1.map_id = ? "
-	 "AND f2.map_id = ? "
-	 "AND (abs(f1.q0*f2.q0 + f1.q1*f2.q1 + f1.q2*f2.q2"
-	 " + f1.q3*f2.q3) >= 1.0 OR 2*acos(abs(f1.q0*f2.q0 + f1.q1*f2.q1 +"
-	 " f1.q2*f2.q2 + f1.q3*f2.q3)) < pi()/4) "
-	 "AND f1.id < f2.id "
-	 "AND SQRT(POWER((f1.t0 - f2.t0), 2) + "
-	 "POWER((f1.t1 - f2.t1), 2) + "
-	 "POWER((f1.t2 - f2.t2), 2)) < 3 "
-	 "AND NOT EXISTS "
-	 "(SELECT id FROM measurement "
-	 "WHERE measurement.one = f1.id AND two = f2.id )*/
+			float dotproduct = abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3);
+			float angle = 2*acos(abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3));
 
-	auto_ptr<DBClientCursor> cursor1 = conn.query("mapping.keyframe",
-			QUERY("map_id" << map_id));
+			float distance = sqrt(pow((it0 - jt0), 2) +
+								pow((it1 - jt1), 2) +
+								pow((it2 - jt2), 2));
 
-	while (cursor1->more()) {
-		mongo::BSONObj i = cursor1->next();
-		long long i_id = i["_id"].numberLong();
+			if (((dotproduct) >= 1.0 || (angle < M_PI / 4)) && (distance < 3)) {
 
-		auto_ptr<DBClientCursor> cursor2 = conn.query("mapping.keyframe",
-						QUERY("map_id" << map_id));
-		while(cursor2->more()) {
-			mongo::BSONObj j = cursor2->next();
-			long long j_id = j["_id"].numberLong();
-			auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
-						QUERY("one" << i_id << "two" << j_id));
-			if(cursor3->more()) continue;
-			if( i_id != j_id)
-			{
-				double iq0 = i["q0"].numberDouble();
-				double iq1 = i["q1"].numberDouble();
-				double iq2 = i["q2"].numberDouble();
-				double iq3 = i["q3"].numberDouble();
-				double jq0 = j["q0"].numberDouble();
-				double jq1 = j["q1"].numberDouble();
-				double jq2 = j["q2"].numberDouble();
-				double jq3 = j["q3"].numberDouble();
-
-				double it0 = i["t0"].numberDouble();
-				double it1 = i["t1"].numberDouble();
-				double it2 = i["t2"].numberDouble();
-				double jt0 = j["t0"].numberDouble();
-				double jt1 = j["t1"].numberDouble();
-				double jt2 = j["t2"].numberDouble();
-
-				float dotproduct = abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3);
-				float angle = 2*acos(abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3));
-
-				float distance = sqrt(pow((it0 - jt0), 2) +
-									pow((it1 - jt1), 2) +
-									pow((it2 - jt2), 2));
-
-				if (((dotproduct) >= 1.0 || (angle < M_PI / 4)) && (distance < 3)) {
-
-					overlapping_keyframes.push_back(std::make_pair(i_id, j_id));
-					ROS_INFO(
-							"Images %d and %d intersect with angular distance %f",
-							i_id, j_id, angle*180/M_PI);
-				}
+				overlapping_keyframes.push_back(j_id);
+				//ROS_INFO(
+				//		"Images %ld and %ld intersect with angular distance %f",
+				//		i_id, j_id, angle*180/M_PI);
 			}
+
 		}
 	}
 
-	ROS_INFO("Number of frame pairs %d", overlapping_keyframes.size());
+	//ROS_INFO("Number of frame pairs %ld", overlapping_keyframes.size());
 
 }
 

@@ -42,10 +42,14 @@ public:
 	virtual color_keyframe::Ptr get_keyframe(long frame_id) = 0;
 
 	virtual boost::shared_ptr<keyframe_map> get_robot_map(int robot_id) = 0;
-
+#ifdef MONGO
+	virtual void get_overlapping_keyframes(long long frame_id, int map_id,
+			std::vector<long> & overlapping_keyframes) = 0;
+	virtual void get_keyframe_ids(int map_id, std::vector<long long> & keyframes) = 0;
+#else
 	virtual void get_overlapping_pairs(int map_id,
 			std::vector<std::pair<long, long> > & overlapping_keyframes) = 0;
-
+#endif
 	virtual void load_measurements(long keyframe_id,
 			std::vector<measurement> & m) = 0;
 	virtual void load_positions(int map_id, std::vector<position> & p) = 0;
