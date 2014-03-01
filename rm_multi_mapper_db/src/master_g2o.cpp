@@ -139,16 +139,17 @@ int main(int argc, char **argv) {
 
 	boost::shared_ptr<keyframe_map> map;
 #ifdef MONGO
-	util::Ptr U(new util_mongo);
+	util::Ptr U(new util_mongo(argv[2]));
 	std::vector<long long> keyframes;
+	int workers = argc - 3;
 #else
 	util::Ptr U(new util_mysql);
 	std::vector<std::pair<long, long> > overlapping_keyframes;
+	int workers = argc - 2;
 #endif
 
 	//timestamp_t t0 = get_timestamp();
 
-	int workers = argc - 2;
 
 	int map_id = boost::lexical_cast<int>(argv[1]);
 	map = U->get_robot_map(map_id);
@@ -160,11 +161,13 @@ int main(int argc, char **argv) {
 
 	std::vector<action_client*> ac_list;
 
+
+#ifdef MONGO
 	for (int i = 0; i < workers; i++) {
-		action_client* ac = new action_client(std::string(argv[i + 2]), true);
+		action_client* ac = new action_client(std::string(argv[i + 3]), true);
 		ac_list.push_back(ac);
 	}
-#ifdef MONGO
+
 	U->get_keyframe_ids(map_id, keyframes);
 	std::vector<rm_multi_mapper_db::G2oWorker2Goal> goals;
 	int keyframes_size = (int) keyframes.size();
@@ -182,8 +185,12 @@ int main(int argc, char **argv) {
 		goals.push_back(goal);
 	}
 #else
-	U->get_overlapping_pairs(map_id, overlapping_keyframes);
+	for (int i = 0; i < workers; i++) {
+		action_client* ac = new action_client(std::string(argv[i + 2]), true);
+		ac_list.push_back(ac);
+	}
 
+	U->get_overlapping_pairs(map_id, overlapping_keyframes);
 	std::vector<rm_multi_mapper_db::G2oWorkerGoal> goals;
 	int keyframes_size = (int) overlapping_keyframes.size();
 

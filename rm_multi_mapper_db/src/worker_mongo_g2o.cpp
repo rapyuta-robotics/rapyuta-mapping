@@ -28,9 +28,9 @@ protected:
 	int map_id;
 
 public:
-	G2oWorker2Action(std::string name, int id) :
+	G2oWorker2Action(std::string name, int id, std::string ip) :
 			as_(nh_, name, boost::bind(&G2oWorker2Action::executeCB, this, _1),
-					false), action_name_(name), U(new util_mongo), map_id(id) {
+					false), action_name_(name), U(new util_mongo(ip)), map_id(id) {
 		as_.start();
 
 	}
@@ -85,7 +85,7 @@ public:
 int main(int argc, char** argv) {
 
 	ros::init(argc, argv, argv[2]);
-	G2oWorker2Action worker(ros::this_node::getName(), atoi(argv[1]));
+	G2oWorker2Action worker(ros::this_node::getName(), atoi(argv[1]), argv[3]);
 	ros::spin();
 
 	return 0;

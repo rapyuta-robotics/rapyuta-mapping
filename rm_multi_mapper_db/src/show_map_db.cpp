@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 			pcl::PointCloud<pcl::PointXYZRGB> >("/pointcloud", 1);
 
 #ifdef MONGO
-	util::Ptr U(new util_mongo);
+	util::Ptr U(new util_mongo(argv[2]));
 #else
 	util::Ptr U(new util_mysql);
 #endif

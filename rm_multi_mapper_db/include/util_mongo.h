@@ -15,7 +15,7 @@
 class util_mongo : public util {
 public:
 
-	util_mongo();
+	util_mongo(string ip);
 	~util_mongo();
 
 	int getNextSequence(std::string name);

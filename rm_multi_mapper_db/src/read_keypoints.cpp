@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
 	int map_id = boost::lexical_cast<int>(argv[1]);
 
 #ifdef MONGO
-	util::Ptr U(new util_mongo);
+	util::Ptr U(new util_mongo(argv[2]));
 #else
 	util::Ptr U(new util_mysql);
 #endif
