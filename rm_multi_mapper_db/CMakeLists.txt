@@ -20,7 +20,7 @@ rosbuild_init()
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 #set the default path for built libraries to the "lib" directory
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
-add_definitions(-DMONGO)
+#add_definitions(-DMONGO)
 
 #uncomment if you have defined messages
 rosbuild_genmsg()
@@ -51,11 +51,11 @@ target_link_libraries(show_map_db ${PROJECT_NAME} mysqlcppconn)
 
 ################# Map optimization #################################
 
-#rosbuild_add_executable(worker_g2o src/worker_g2o.cpp)
-#target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
-
-rosbuild_add_executable(worker_g2o src/worker_mongo_g2o.cpp)
+rosbuild_add_executable(worker_g2o src/worker_g2o.cpp)
 target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
+
+#rosbuild_add_executable(worker_g2o src/worker_mongo_g2o.cpp)
+#target_link_libraries(worker_g2o ${PROJECT_NAME} mysqlcppconn)
 
 rosbuild_add_executable(master_g2o src/master_g2o.cpp)
 target_link_libraries(master_g2o ${PROJECT_NAME} mysqlcppconn g2o_stuff g2o_core g2o_types_slam3d g2o_solver_cholmod cholmod)
