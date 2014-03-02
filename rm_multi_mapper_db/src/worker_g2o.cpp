@@ -29,9 +29,9 @@ protected:
 
 public:
 #ifdef MONGO
-	G2oWorkerAction(std::string name) :
+	G2oWorkerAction(std::string name, std::string ip) :
 			as_(nh_, name, boost::bind(&G2oWorkerAction::executeCB, this, _1),
-					false), action_name_(name), U(new util_mongo) {
+					false), action_name_(name), U(new util_mongo(ip)) {
 		as_.start();
 
 	}
@@ -90,7 +90,7 @@ public:
 
 int main(int argc, char** argv) {
 	ros::init(argc, argv, argv[1]);
-	G2oWorkerAction worker(ros::this_node::getName());
+	G2oWorkerAction worker(ros::this_node::getName(), argv[2]);
 	ros::spin();
 
 	return 0;

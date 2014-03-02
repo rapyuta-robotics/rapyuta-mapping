@@ -7,7 +7,7 @@
 int main(int argc, char **argv) {
 
 #ifdef MONGO
-	util::Ptr U(new util_mongo);
+	util::Ptr U(new util_mongo(argv[2]));
 #else
 	util::Ptr U(new util_mysql);
 #endif

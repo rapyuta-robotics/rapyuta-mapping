@@ -5,10 +5,10 @@
 using namespace mongo;
 using namespace std;
 
-util_mongo::util_mongo() {
+util_mongo::util_mongo(string ip) {
 
-	conn.connect("localhost");
-	cout << "connected ok" << endl;
+	conn.connect(ip);
+	cout << "connected to" << ip << endl;
 
 	// Classes for feature extraction
 	de = new cv::SurfDescriptorExtractor;

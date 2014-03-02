@@ -5,7 +5,7 @@
 int main(int argc, char** argv) {
 	ros::init(argc, argv, "map_merger_db");
 #ifdef MONGO
-	util::Ptr U(new util_mongo);
+	util::Ptr U(new util_mongo(argv[3]));
 #else
 	util::Ptr U(new util_mysql);
 #endif

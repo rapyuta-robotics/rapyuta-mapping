@@ -129,15 +129,16 @@ int main(int argc, char **argv) {
 
 	boost::shared_ptr<keyframe_map> map;
 #ifdef MONGO
-	util::Ptr U(new util_mongo);
+	util::Ptr U(new util_mongo(argv[2]));
+	int workers = argc - 3;
 #else
 	util::Ptr U(new util_mysql);
+	int workers = argc - 2;
 #endif
 
 	//timestamp_t t0 = get_timestamp();
 
 	std::vector<std::pair<long, long> > overlapping_keyframes;
-	int workers = argc - 2;
 
 	int map_id = boost::lexical_cast<int>(argv[1]);
 	map = U->get_robot_map(map_id);
@@ -149,10 +150,17 @@ int main(int argc, char **argv) {
 
 	std::vector<action_client*> ac_list;
 
+#ifdef MONGO
+	for (int i = 0; i < workers; i++) {
+		action_client* ac = new action_client(std::string(argv[i + 3]), true);
+		ac_list.push_back(ac);
+	}
+#else
 	for (int i = 0; i < workers; i++) {
 		action_client* ac = new action_client(std::string(argv[i + 2]), true);
 		ac_list.push_back(ac);
 	}
+#endif
 
 	U->get_overlapping_pairs(map_id, overlapping_keyframes);
 
