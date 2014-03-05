@@ -329,7 +329,7 @@ void util_mongo::get_overlapping_pairs(int map_id,
 			auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
 						QUERY("one" << i_id << "two" << j_id));
 			if(cursor3->more()) continue;
-			if( i_id != j_id)
+			if( i_id < j_id)
 			{
 				double iq0 = i["q0"].numberDouble();
 				double iq1 = i["q1"].numberDouble();
