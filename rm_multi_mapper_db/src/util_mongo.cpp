@@ -1,6 +1,7 @@
 #include <util_mongo.h>
 
 #include <algorithm>
+#define tr(c,i) for(typeof((c).begin()) i = (c).begin(); i != (c).end(); i++)
 
 using namespace mongo;
 using namespace std;
@@ -316,36 +317,53 @@ void util_mongo::get_overlapping_pairs(int map_id,
 
 	auto_ptr<DBClientCursor> cursor1 = conn.query("mapping.keyframe",
 			QUERY("map_id" << map_id));
+	auto_ptr<DBClientCursor> cursor2 = conn.query("mapping.keyframe",
+							QUERY("map_id" << map_id));
+
+	long long i_id;
+	long long j_id;
+	map<long long, mongo::BSONObj> j;
+	while(cursor2->more()) {
+		mongo::BSONObj temp = cursor2->next();
+		j_id = temp["_id"].numberLong();
+		j[j_id] = temp;
+	}
+	auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
+											Query());
+	map<pair<long long, long long>, mongo::BSONObj> measurement;
+	while(cursor3->more()) {
+		mongo::BSONObj temp = cursor3->next();
+		i_id = temp["one"].numberLong();
+		j_id = temp["two"].numberLong();
+		pair<long long, long long> couple = make_pair(i_id, j_id);
+		measurement[couple] = temp;
+	}
 
 	while (cursor1->more()) {
 		mongo::BSONObj i = cursor1->next();
-		long long i_id = i["_id"].numberLong();
-
-		auto_ptr<DBClientCursor> cursor2 = conn.query("mapping.keyframe",
-						QUERY("map_id" << map_id));
-		while(cursor2->more()) {
-			mongo::BSONObj j = cursor2->next();
-			long long j_id = j["_id"].numberLong();
+		i_id = i["_id"].numberLong();
+		tr(j,it) {
+			j_id =  it->first;
 			if( i_id < j_id)
 			{
-				auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
-										QUERY("one" << i_id << "two" << j_id));
-				if(cursor3->more()) continue;
+
+				if(measurement.find(make_pair(i_id, j_id)) != measurement.end())
+				           continue;
 				double iq0 = i["q0"].numberDouble();
 				double iq1 = i["q1"].numberDouble();
 				double iq2 = i["q2"].numberDouble();
 				double iq3 = i["q3"].numberDouble();
-				double jq0 = j["q0"].numberDouble();
-				double jq1 = j["q1"].numberDouble();
-				double jq2 = j["q2"].numberDouble();
-				double jq3 = j["q3"].numberDouble();
+				double jq0 = it->second["q0"].numberDouble();
+				double jq1 = it->second["q1"].numberDouble();
+				double jq2 = it->second["q2"].numberDouble();
+				double jq3 = it->second["q3"].numberDouble();
 
 				double it0 = i["t0"].numberDouble();
 				double it1 = i["t1"].numberDouble();
 				double it2 = i["t2"].numberDouble();
-				double jt0 = j["t0"].numberDouble();
-				double jt1 = j["t1"].numberDouble();
-				double jt2 = j["t2"].numberDouble();
+				double jt0 = it->second["t0"].numberDouble();
+				double jt1 = it->second["t1"].numberDouble();
+				double jt2 = it->second["t2"].numberDouble();
 
 				float dotproduct = abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3);
 				float angle = 2*acos(abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3));
