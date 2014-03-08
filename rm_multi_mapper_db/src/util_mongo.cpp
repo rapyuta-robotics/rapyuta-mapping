@@ -287,6 +287,15 @@ color_keyframe::Ptr util_mongo::get_keyframe(BSONObj res) {
 	return k;
 }
 
+struct db_keyframe {
+	double q0;
+	double q1;
+	double q2;
+	double q3;
+	double t0;
+	double t1;
+	double t2;
+};
 void util_mongo::get_overlapping_pairs(int map_id,
 		std::vector<std::pair<long, long> > & overlapping_keyframes) {
 
@@ -322,21 +331,29 @@ void util_mongo::get_overlapping_pairs(int map_id,
 
 	long long i_id;
 	long long j_id;
-	map<long long, mongo::BSONObj> j;
+	map<long long, db_keyframe> j;
 	while(cursor2->more()) {
+		db_keyframe temp_k;
 		mongo::BSONObj temp = cursor2->next();
 		j_id = temp["_id"].numberLong();
-		j[j_id] = temp;
+		temp_k.q0 = temp["q0"].numberDouble();
+		temp_k.q1 = temp["q1"].numberDouble();
+		temp_k.q2 = temp["q2"].numberDouble();
+		temp_k.q3 = temp["q3"].numberDouble();
+		temp_k.t0 = temp["t0"].numberDouble();
+		temp_k.t1 = temp["t1"].numberDouble();
+		temp_k.t2 = temp["t2"].numberDouble();
+		j[j_id] = temp_k;
 	}
 	auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
 											Query());
-	map<pair<long long, long long>, mongo::BSONObj> measurement;
+	map<pair<long long, long long>, string> measurement;
 	while(cursor3->more()) {
 		mongo::BSONObj temp = cursor3->next();
 		i_id = temp["one"].numberLong();
 		j_id = temp["two"].numberLong();
 		pair<long long, long long> couple = make_pair(i_id, j_id);
-		measurement[couple] = temp;
+		measurement[couple] = "something";
 	}
 
 	while (cursor1->more()) {
@@ -353,17 +370,17 @@ void util_mongo::get_overlapping_pairs(int map_id,
 				double iq1 = i["q1"].numberDouble();
 				double iq2 = i["q2"].numberDouble();
 				double iq3 = i["q3"].numberDouble();
-				double jq0 = it->second["q0"].numberDouble();
-				double jq1 = it->second["q1"].numberDouble();
-				double jq2 = it->second["q2"].numberDouble();
-				double jq3 = it->second["q3"].numberDouble();
+				double jq0 = it->second.q0;
+				double jq1 = it->second.q1;
+				double jq2 = it->second.q2;
+				double jq3 = it->second.q3;
 
 				double it0 = i["t0"].numberDouble();
 				double it1 = i["t1"].numberDouble();
 				double it2 = i["t2"].numberDouble();
-				double jt0 = it->second["t0"].numberDouble();
-				double jt1 = it->second["t1"].numberDouble();
-				double jt2 = it->second["t2"].numberDouble();
+				double jt0 = it->second.t0;
+				double jt1 = it->second.t1;
+				double jt2 = it->second.t2;
 
 				float dotproduct = abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3);
 				float angle = 2*acos(abs(iq0*jq0 + iq1*jq1 + iq2*jq2 + iq3*jq3));
