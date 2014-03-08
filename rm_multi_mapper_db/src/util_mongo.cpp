@@ -326,11 +326,11 @@ void util_mongo::get_overlapping_pairs(int map_id,
 		while(cursor2->more()) {
 			mongo::BSONObj j = cursor2->next();
 			long long j_id = j["_id"].numberLong();
-			auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
-						QUERY("one" << i_id << "two" << j_id));
-			if(cursor3->more()) continue;
 			if( i_id < j_id)
 			{
+				auto_ptr<DBClientCursor> cursor3 = conn.query("mapping.measurement",
+										QUERY("one" << i_id << "two" << j_id));
+				if(cursor3->more()) continue;
 				double iq0 = i["q0"].numberDouble();
 				double iq1 = i["q1"].numberDouble();
 				double iq2 = i["q2"].numberDouble();
